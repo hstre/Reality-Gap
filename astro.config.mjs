@@ -5,5 +5,5 @@ export default defineConfig({
   integrations: [tailwind()],
   output: 'static',
   site: 'https://hstre.github.io',
-  base: '/reality-gap',
+  base: '/Reality-Gap',
 });
