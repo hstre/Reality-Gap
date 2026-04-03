@@ -1,0 +1,26 @@
+---
+interface Props {
+  label: string;       // e.g. "RG10 Q1 2026"
+  value: string;       // e.g. "11.3"
+  sublabel?: string;   // optional explanatory note
+  highlight?: boolean;
+}
+
+const { label, value, sublabel, highlight = false } = Astro.props;
+---
+
+<div class:list={[
+  'border rounded-md p-5 flex flex-col',
+  highlight ? 'border-accent bg-blue-50/30' : 'border-gray-200 bg-white',
+]}>
+  <span class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">{label}</span>
+  <span class:list={[
+    'text-3xl font-light tabular-nums',
+    highlight ? 'text-accent' : 'text-gray-900',
+  ]} style="font-family: Georgia, serif;">
+    {value}
+  </span>
+  {sublabel && (
+    <span class="text-xs text-gray-400 mt-2">{sublabel}</span>
+  )}
+</div>

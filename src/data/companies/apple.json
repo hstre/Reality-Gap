@@ -1,0 +1,36 @@
+{
+  "company": "Apple",
+  "ticker": "AAPL",
+  "slug": "apple",
+  "sector": "Technology",
+  "currency": "USD",
+  "description": "Illustrative approximation in the initial public RG dataset.",
+  "observations": [
+    {
+      "periodKey": "2026_q1",
+      "periodLabel": "Q1 2026",
+      "rg8": 28.7,
+      "rg10": 27.4,
+      "rg12": 26.2,
+      "trend": "+",
+      "marketCap": 3520,
+      "bookEquity": 67,
+      "netIncome": 98,
+      "fundamentalBaseApprox": 960,
+      "note": "Illustrative approximation, not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 27.9,
+      "rg10": 26.8,
+      "rg12": 25.7,
+      "trend": "=",
+      "marketCap": 3310,
+      "bookEquity": 65,
+      "netIncome": 95,
+      "fundamentalBaseApprox": 940,
+      "note": "Illustrative approximation, not fully adjusted."
+    }
+  ]
+}

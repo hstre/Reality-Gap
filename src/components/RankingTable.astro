@@ -1,0 +1,281 @@
+---
+import type { Company } from '../lib/rg';
+import { getLatestObservation, formatRG, parsePeriodKey } from '../lib/rg';
+import { sortByRG10Desc } from '../lib/sort';
+
+interface Props {
+  companies: Company[];
+  sectors: string[];
+  base: string;
+  lang?: string;
+  detailsBasePath?: string;
+  t: {
+    filterLabel: string;
+    allSectors: string;
+    searchLabel: string;
+    searchPlaceholder: string;
+    noResults: string;
+    columns: {
+      company: string;
+      ticker: string;
+      sector: string;
+      period: string;
+      rg8: string;
+      rg10: string;
+      rg12: string;
+      trend: string;
+    };
+    dataNote: string;
+  };
+}
+
+const {
+  companies,
+  sectors,
+  base,
+  lang = 'en',
+  detailsBasePath = '/companies',
+  t,
+} = Astro.props;
+
+// Pre-sort by RG10 descending for initial render
+const sorted = sortByRG10Desc(companies);
+
+// Build row data for the table (for SSR render + data attrs)
+interface RowData {
+  company: string;
+  ticker: string;
+  sector: string;
+  slug: string;
+  period: string;
+  periodKey: string;
+  rg8: string;
+  rg10: string;
+  rg12: string;
+  rg10Raw: number;
+  rg8Raw: number;
+  rg12Raw: number;
+  trend: string;
+  href: string;
+}
+
+const rows: RowData[] = sorted.map(c => {
+  const obs = getLatestObservation(c);
+  return {
+    company: c.company,
+    ticker: c.ticker,
+    sector: c.sector,
+    slug: c.slug,
+    period: obs?.periodLabel ?? '—',
+    periodKey: obs?.periodKey ?? '',
+    rg8: formatRG(obs?.rg8),
+    rg10: formatRG(obs?.rg10),
+    rg12: formatRG(obs?.rg12),
+    rg10Raw: obs?.rg10 ?? -1,
+    rg8Raw: obs?.rg8 ?? -1,
+    rg12Raw: obs?.rg12 ?? -1,
+    trend: obs?.trend ?? '—',
+    href: `${base}${detailsBasePath}/${c.slug}`,
+  };
+});
+
+const trendColors: Record<string, string> = {
+  '++': '#15803d',
+  '+':  '#16a34a',
+  '=':  '#6b7280',
+  '-':  '#b45309',
+  '--': '#b91c1c',
+};
+---
+
+<div class="space-y-4">
+  <!-- Controls -->
+  <div class="flex flex-wrap gap-4 items-end">
+    <div>
+      <label for="sector-filter" class="block text-xs text-gray-500 mb-1">{t.filterLabel}</label>
+      <select
+        id="sector-filter"
+        class="border border-gray-200 rounded text-sm px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-accent"
+      >
+        <option value="">{t.allSectors}</option>
+        {sectors.map(s => <option value={s}>{s}</option>)}
+      </select>
+    </div>
+    <div>
+      <label for="company-search" class="block text-xs text-gray-500 mb-1">{t.searchLabel}</label>
+      <input
+        id="company-search"
+        type="search"
+        placeholder={t.searchPlaceholder}
+        class="border border-gray-200 rounded text-sm px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-accent w-48"
+      />
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="overflow-x-auto rounded-md border border-gray-200">
+    <table class="table-rg w-full" id="rankings-table">
+      <thead>
+        <tr>
+          <th class="cursor-pointer select-none" data-col="company">{t.columns.company} <span class="sort-indicator" data-col="company"></span></th>
+          <th class="cursor-pointer select-none" data-col="ticker">{t.columns.ticker} <span class="sort-indicator" data-col="ticker"></span></th>
+          <th class="cursor-pointer select-none" data-col="sector">{t.columns.sector} <span class="sort-indicator" data-col="sector"></span></th>
+          <th class="cursor-pointer select-none" data-col="period">{t.columns.period} <span class="sort-indicator" data-col="period"></span></th>
+          <th class="cursor-pointer select-none text-right" data-col="rg8">{t.columns.rg8} <span class="sort-indicator" data-col="rg8"></span></th>
+          <th class="cursor-pointer select-none text-right" data-col="rg10">{t.columns.rg10} <span class="sort-indicator sort-active sort-desc" data-col="rg10">↓</span></th>
+          <th class="cursor-pointer select-none text-right" data-col="rg12">{t.columns.rg12} <span class="sort-indicator" data-col="rg12"></span></th>
+          <th data-col="trend">{t.columns.trend}</th>
+        </tr>
+      </thead>
+      <tbody id="rankings-tbody">
+        {rows.map((row, i) => (
+          <tr
+            data-company={row.company.toLowerCase()}
+            data-ticker={row.ticker.toLowerCase()}
+            data-sector={row.sector}
+            data-rg8={row.rg8Raw}
+            data-rg10={row.rg10Raw}
+            data-rg12={row.rg12Raw}
+            data-period={parsePeriodKey(row.periodKey)}
+          >
+            <td>
+              <a href={row.href} class="font-medium text-accent hover:underline">
+                {row.company}
+              </a>
+            </td>
+            <td class="text-gray-500 font-mono text-xs">{row.ticker}</td>
+            <td class="text-gray-600">{row.sector}</td>
+            <td class="text-gray-500 text-xs">{row.period}</td>
+            <td class="text-right tabular-nums">{row.rg8}</td>
+            <td class="text-right tabular-nums font-medium">{row.rg10}</td>
+            <td class="text-right tabular-nums">{row.rg12}</td>
+            <td>
+              <span
+                class="font-mono font-medium text-sm"
+                style={`color: ${trendColors[row.trend] ?? '#6b7280'}`}
+              >
+                {row.trend}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <p id="no-results" class="hidden text-sm text-gray-500 py-4 text-center">{t.noResults}</p>
+  <p class="text-xs text-gray-400">{t.dataNote}</p>
+</div>
+
+<script>
+  (() => {
+    const table = document.getElementById('rankings-table') as HTMLTableElement | null;
+    const tbody = document.getElementById('rankings-tbody') as HTMLTableSectionElement | null;
+    const sectorFilter = document.getElementById('sector-filter') as HTMLSelectElement | null;
+    const searchInput = document.getElementById('company-search') as HTMLInputElement | null;
+    const noResults = document.getElementById('no-results') as HTMLElement | null;
+
+    if (!table || !tbody || !sectorFilter || !searchInput || !noResults) return;
+
+    let currentSort = { col: 'rg10', dir: 'desc' as 'asc' | 'desc' };
+
+    function getRows(): HTMLTableRowElement[] {
+      return Array.from(tbody!.querySelectorAll('tr'));
+    }
+
+    function applyFilters() {
+      const sector = sectorFilter!.value;
+      const query = searchInput!.value.toLowerCase().trim();
+      let visibleCount = 0;
+
+      getRows().forEach(row => {
+        const rowSector = row.dataset.sector ?? '';
+        const rowCompany = row.dataset.company ?? '';
+        const rowTicker = row.dataset.ticker ?? '';
+
+        const sectorMatch = !sector || rowSector === sector;
+        const searchMatch = !query || rowCompany.includes(query) || rowTicker.includes(query);
+
+        if (sectorMatch && searchMatch) {
+          row.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          row.classList.add('hidden');
+        }
+      });
+
+      noResults!.classList.toggle('hidden', visibleCount > 0);
+    }
+
+    function sortRows(col: string, dir: 'asc' | 'desc') {
+      const rows = getRows();
+      const numericCols = new Set(['rg8', 'rg10', 'rg12', 'period']);
+
+      rows.sort((a, b) => {
+        const aVal = a.dataset[col] ?? '';
+        const bVal = b.dataset[col] ?? '';
+
+        let cmp: number;
+        if (numericCols.has(col)) {
+          cmp = parseFloat(aVal) - parseFloat(bVal);
+        } else {
+          cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
+        }
+
+        return dir === 'asc' ? cmp : -cmp;
+      });
+
+      rows.forEach(r => tbody!.appendChild(r));
+    }
+
+    function updateSortIndicators(col: string, dir: 'asc' | 'desc') {
+      document.querySelectorAll('.sort-indicator').forEach(el => {
+        const span = el as HTMLElement;
+        const spanCol = span.dataset.col ?? '';
+        if (spanCol === col) {
+          span.textContent = dir === 'asc' ? '↑' : '↓';
+          span.classList.add('sort-active', `sort-${dir}`);
+          span.classList.remove(dir === 'asc' ? 'sort-desc' : 'sort-asc');
+        } else {
+          span.textContent = '';
+          span.classList.remove('sort-active', 'sort-asc', 'sort-desc');
+        }
+      });
+    }
+
+    // Header click to sort
+    table.querySelectorAll('th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = (th as HTMLElement).dataset.col ?? '';
+        if (col === 'trend') return; // trend not sortable
+
+        const dir =
+          currentSort.col === col && currentSort.dir === 'desc' ? 'asc' : 'desc';
+        currentSort = { col, dir };
+        sortRows(col, dir);
+        updateSortIndicators(col, dir);
+        applyFilters();
+      });
+    });
+
+    sectorFilter.addEventListener('change', applyFilters);
+    searchInput.addEventListener('input', applyFilters);
+  })();
+</script>
+
+<style>
+  .sort-indicator {
+    display: inline-block;
+    width: 1ch;
+    margin-left: 2px;
+    opacity: 0.5;
+    font-size: 0.75rem;
+  }
+  .sort-indicator.sort-active {
+    opacity: 1;
+    color: var(--color-accent);
+  }
+  th[data-col]:not([data-col="trend"]):hover {
+    background-color: #f3f4f6;
+  }
+</style>

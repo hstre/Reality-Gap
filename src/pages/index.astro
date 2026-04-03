@@ -1,0 +1,73 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import { en } from '../i18n/en';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = en;
+---
+
+<BaseLayout
+  title={t.home.meta.title}
+  description={t.home.meta.description}
+  lang="en"
+  canonicalPath="/"
+  altLangPath="/de/"
+  altLang="de"
+>
+  <!-- Hero -->
+  <section class="max-w-5xl mx-auto px-6 pt-16 pb-12">
+    <div class="max-w-2xl">
+      <h1 class="text-4xl font-normal text-gray-900 mb-3" style="font-family: Georgia, serif;">
+        {t.home.hero.title}
+      </h1>
+      <p class="text-lg text-gray-500 mb-6 font-light">{t.home.hero.subtitle}</p>
+      <p class="text-base text-gray-700 leading-relaxed mb-8">
+        {t.home.hero.description}
+      </p>
+      <p class="text-xs text-gray-400 border-l-2 border-gray-200 pl-3">
+        {t.home.hero.note}
+      </p>
+    </div>
+  </section>
+
+  <!-- Cards -->
+  <section class="max-w-5xl mx-auto px-6 pb-16">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Methodology -->
+      <a href={`${base}/methodology`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
+        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
+          {t.home.cards.methodology.title}
+        </h2>
+        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.methodology.description}</p>
+        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
+      </a>
+
+      <!-- Paper -->
+      <a href={`${base}/paper`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
+        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
+          {t.home.cards.paper.title}
+        </h2>
+        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.paper.description}</p>
+        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
+      </a>
+
+      <!-- Rankings -->
+      <a href={`${base}/rankings`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
+        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
+          {t.home.cards.rankings.title}
+        </h2>
+        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.rankings.description}</p>
+        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
+      </a>
+
+      <!-- Companies -->
+      <a href={`${base}/companies`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
+        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
+          {t.home.cards.companies.title}
+        </h2>
+        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.companies.description}</p>
+        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
+      </a>
+    </div>
+  </section>
+</BaseLayout>

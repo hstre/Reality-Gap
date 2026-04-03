@@ -1,0 +1,156 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import MetricBlock from '../../components/ui/MetricBlock.astro';
+import TrendBadge from '../../components/ui/TrendBadge.astro';
+import { en } from '../../i18n/en';
+import type { Company } from '../../lib/rg';
+import { getLatestObservation, formatRG, formatRGLabel, formatMarketCap } from '../../lib/rg';
+import { formatBillions } from '../../lib/format';
+import slugsJson from '../../data/companies.index.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = en;
+
+export async function getStaticPaths() {
+  const slugs: string[] = (await import('../../data/companies.index.json')).default;
+  return Promise.all(
+    slugs.map(async slug => {
+      const company: Company = (await import(`../../data/companies/${slug}.json`)).default;
+      return { params: { slug }, props: { company } };
+    })
+  );
+}
+
+interface Props {
+  company: Company;
+}
+
+const { company } = Astro.props;
+const obs = getLatestObservation(company);
+const tc = t.companyDetail;
+---
+
+<BaseLayout
+  title={`${company.company} — Reality Gap`}
+  description={`Reality Gap values for ${company.company} (${company.ticker}). RG8, RG10, RG12 and trend for ${obs?.periodLabel ?? 'latest period'}.`}
+  lang="en"
+  canonicalPath={`/companies/${company.slug}`}
+  altLangPath={`/de/unternehmen/${company.slug}`}
+  altLang="de"
+>
+  <div class="max-w-4xl mx-auto px-6 py-12">
+    <!-- Back link -->
+    <a href={`${base}/companies`} class="text-sm text-gray-400 hover:text-accent no-underline mb-6 block">
+      {tc.backToCompanies}
+    </a>
+
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex flex-wrap items-start gap-4 justify-between">
+        <div>
+          <h1 class="text-3xl font-normal text-gray-900" style="font-family: Georgia, serif;">
+            {company.company}
+          </h1>
+          <p class="text-gray-500 mt-1">
+            <span class="font-mono text-sm">{company.ticker}</span>
+            {' · '}
+            <span>{company.sector}</span>
+            {' · '}
+            <span>{company.currency}</span>
+          </p>
+        </div>
+        {obs && (
+          <div class="text-right">
+            <p class="text-xs text-gray-400 mb-1">{tc.latestObservation}</p>
+            <p class="text-sm font-medium text-gray-700">{obs.periodLabel}</p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {obs ? (
+      <>
+        <!-- RG Metrics -->
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">{tc.metrics.heading}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <MetricBlock
+            label={formatRGLabel(8, obs.periodLabel)}
+            value={formatRG(obs.rg8)}
+          />
+          <MetricBlock
+            label={formatRGLabel(10, obs.periodLabel)}
+            value={formatRG(obs.rg10)}
+            highlight={true}
+          />
+          <MetricBlock
+            label={formatRGLabel(12, obs.periodLabel)}
+            value={formatRG(obs.rg12)}
+          />
+        </div>
+
+        <!-- Trend -->
+        <div class="mb-8">
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">{tc.trend}</p>
+          <TrendBadge trend={obs.trend} />
+        </div>
+
+        <!-- Supporting data -->
+        {(obs.marketCap !== undefined || obs.bookEquity !== undefined || obs.netIncome !== undefined || obs.fundamentalBaseApprox !== undefined) && (
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">{tc.supportingData.heading}</h2>
+            <div class="border border-gray-200 rounded-md overflow-hidden">
+              <table class="table-rg">
+                <tbody>
+                  {obs.marketCap !== undefined && (
+                    <tr>
+                      <td class="text-gray-600">{tc.supportingData.marketCap}</td>
+                      <td class="text-right font-mono">{formatBillions(obs.marketCap, company.currency)}</td>
+                    </tr>
+                  )}
+                  {obs.bookEquity !== undefined && (
+                    <tr>
+                      <td class="text-gray-600">{tc.supportingData.bookEquity}</td>
+                      <td class="text-right font-mono">{formatBillions(obs.bookEquity, company.currency)}</td>
+                    </tr>
+                  )}
+                  {obs.netIncome !== undefined && (
+                    <tr>
+                      <td class="text-gray-600">{tc.supportingData.netIncome}</td>
+                      <td class="text-right font-mono">{formatBillions(obs.netIncome, company.currency)}</td>
+                    </tr>
+                  )}
+                  {obs.fundamentalBaseApprox !== undefined && (
+                    <tr>
+                      <td class="text-gray-600">{tc.supportingData.fundamentalBase}</td>
+                      <td class="text-right font-mono">{formatBillions(obs.fundamentalBaseApprox, company.currency)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">{tc.supportingData.billions}.</p>
+          </div>
+        )}
+
+        <!-- Data note -->
+        {obs.note && (
+          <div class="border-l-2 border-amber-200 pl-4 py-1 mb-8">
+            <p class="text-xs text-gray-500 font-medium mb-1">{tc.dataNote}</p>
+            <p class="text-sm text-gray-600">{obs.note}</p>
+          </div>
+        )}
+
+        <!-- Historical placeholder -->
+        <div class="border border-dashed border-gray-200 rounded-md p-6 bg-gray-50 mb-8">
+          <h2 class="text-base font-semibold text-gray-500 mb-2">{tc.historicalPlaceholder.heading}</h2>
+          <p class="text-sm text-gray-400">{tc.historicalPlaceholder.body}</p>
+        </div>
+      </>
+    ) : (
+      <p class="text-gray-500">No data available for this company.</p>
+    )}
+
+    <!-- General disclaimer -->
+    <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">{tc.disclaimer}</p>
+  </div>
+</BaseLayout>

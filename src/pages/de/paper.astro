@@ -1,0 +1,53 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import { de } from '../../i18n/de';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = de;
+const p = t.paper;
+
+const year = new Date().getFullYear();
+const citationAPA = `Stre, H. (${year}). ${p.paperTitle}. Working Paper.`;
+const pdfPath = `${base}/papers/reality-gap-working-paper.pdf`;
+---
+
+<BaseLayout
+  title={p.meta.title}
+  description={p.meta.description}
+  lang="de"
+  canonicalPath="/de/paper"
+  altLangPath="/paper"
+  altLang="en"
+>
+  <div class="max-w-3xl mx-auto px-6 py-12">
+    <p class="text-xs uppercase tracking-widest text-gray-400 mb-3">{p.label}</p>
+    <h1 class="text-3xl font-normal text-gray-900 mb-2 leading-tight" style="font-family: Georgia, serif;">
+      {p.paperTitle}
+    </h1>
+    <p class="text-gray-500 mb-10">{p.author}</p>
+
+    <div class="border border-gray-200 rounded-md p-6 bg-white mb-8">
+      <h2 class="text-lg font-semibold text-gray-800 mb-3">{p.abstract.heading}</h2>
+      <p class="text-gray-700 leading-relaxed text-sm">{p.abstract.body}</p>
+    </div>
+
+    <div class="border border-gray-200 rounded-md p-6 bg-white mb-8">
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">{p.download.heading}</h2>
+      <p class="text-sm text-gray-600 mb-4">{p.download.description}</p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <a href={pdfPath} class="btn-primary no-underline text-sm" download>
+          {p.download.button}
+        </a>
+      </div>
+      <p class="text-xs text-gray-400 mt-4 italic">{p.download.placeholder}</p>
+    </div>
+
+    <div class="border border-gray-200 rounded-md p-6 bg-gray-50">
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">{p.citation.heading}</h2>
+      <p class="text-xs text-gray-500 mb-2">{p.citation.note}</p>
+      <code class="block text-sm text-gray-700 bg-white border border-gray-200 rounded p-3 leading-relaxed">
+        {citationAPA}
+      </code>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,123 @@
+---
+interface Props {
+  lang: string;
+  base: string;
+  altLangPath?: string;
+  altLang?: string;
+}
+
+const { lang, base, altLangPath, altLang } = Astro.props;
+
+const isDE = lang === 'de';
+
+const navLinks = isDE
+  ? [
+      { href: `${base}/de/`, label: 'Startseite' },
+      { href: `${base}/de/methodik`, label: 'Methodik' },
+      { href: `${base}/de/paper`, label: 'Paper' },
+      { href: `${base}/de/unternehmen`, label: 'Unternehmen' },
+      { href: `${base}/de/rankings`, label: 'Rankings' },
+      { href: `${base}/de/ueber`, label: 'Über' },
+    ]
+  : [
+      { href: `${base}/`, label: 'Home' },
+      { href: `${base}/methodology`, label: 'Methodology' },
+      { href: `${base}/paper`, label: 'Paper' },
+      { href: `${base}/companies`, label: 'Companies' },
+      { href: `${base}/rankings`, label: 'Rankings' },
+      { href: `${base}/about`, label: 'About' },
+    ];
+
+const currentPath = Astro.url.pathname;
+
+const altLangHref = altLangPath
+  ? `${base}${altLangPath}`
+  : isDE
+    ? `${base}/`
+    : `${base}/de/`;
+
+const altLangLabel = isDE ? 'EN' : 'DE';
+---
+
+<header class="border-b border-gray-200 bg-white">
+  <div class="max-w-5xl mx-auto px-6 flex items-center justify-between h-14">
+    <!-- Wordmark -->
+    <a
+      href={isDE ? `${base}/de/` : `${base}/`}
+      class="text-base font-semibold tracking-tight text-gray-900 hover:text-accent no-underline"
+      style="font-family: Georgia, serif; letter-spacing: -0.01em;"
+    >
+      Reality Gap
+    </a>
+
+    <!-- Desktop nav -->
+    <nav class="hidden md:flex items-center gap-6" aria-label="Main navigation">
+      {navLinks.map(link => {
+        const isActive = currentPath === link.href || currentPath === link.href + '/';
+        return (
+          <a
+            href={link.href}
+            class:list={[
+              'text-sm no-underline transition-colors',
+              isActive
+                ? 'text-accent font-medium'
+                : 'text-gray-600 hover:text-gray-900',
+            ]}
+          >
+            {link.label}
+          </a>
+        );
+      })}
+      <a
+        href={altLangHref}
+        class="text-xs font-medium text-gray-400 hover:text-gray-700 border border-gray-200 rounded px-2 py-0.5 no-underline ml-2"
+        title={altLangLabel === 'DE' ? 'Deutsche Version' : 'English version'}
+      >
+        {altLangLabel}
+      </a>
+    </nav>
+
+    <!-- Mobile: language + hamburger -->
+    <div class="flex md:hidden items-center gap-3">
+      <a
+        href={altLangHref}
+        class="text-xs font-medium text-gray-400 border border-gray-200 rounded px-2 py-0.5 no-underline"
+      >
+        {altLangLabel}
+      </a>
+      <button
+        id="menu-toggle"
+        aria-label="Toggle navigation"
+        class="text-gray-600 hover:text-gray-900 p-1"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile nav drawer -->
+  <div id="mobile-nav" class="hidden md:hidden border-t border-gray-100 bg-white">
+    <nav class="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3">
+      {navLinks.map(link => (
+        <a
+          href={link.href}
+          class="text-sm text-gray-700 hover:text-accent no-underline py-1"
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle = document.getElementById('menu-toggle');
+  const mobileNav = document.getElementById('mobile-nav');
+  if (toggle && mobileNav) {
+    toggle.addEventListener('click', () => {
+      mobileNav.classList.toggle('hidden');
+    });
+  }
+</script>

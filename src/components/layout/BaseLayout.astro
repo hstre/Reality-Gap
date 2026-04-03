@@ -1,0 +1,68 @@
+---
+import Header from './Header.astro';
+import Footer from './Footer.astro';
+import '../../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  lang?: string;
+  ogImage?: string;
+  canonicalPath?: string;
+  altLangPath?: string;
+  altLang?: string;
+}
+
+const {
+  title,
+  description = 'Reality Gap — A research-based heuristic indicator for fundamental coverage.',
+  lang = 'en',
+  ogImage,
+  canonicalPath = Astro.url.pathname,
+  altLangPath,
+  altLang,
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const siteUrl = 'https://hstre.github.io/reality-gap';
+const canonicalUrl = siteUrl + canonicalPath;
+const ogImageUrl = ogImage ? siteUrl + ogImage : siteUrl + '/og-default.png';
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    {altLangPath && altLang && (
+      <link rel="alternate" hreflang={altLang} href={siteUrl + altLangPath} />
+    )}
+    <link rel="alternate" hreflang={lang} href={canonicalUrl} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:site_name" content="Reality Gap" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
+  </head>
+  <body class="min-h-screen flex flex-col bg-white text-gray-900">
+    <Header lang={lang} base={base} altLangPath={altLangPath} altLang={altLang} />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer lang={lang} base={base} />
+  </body>
+</html>

@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import RankingTable from '../../components/RankingTable.astro';
+import { de } from '../../i18n/de';
+import type { Company } from '../../lib/rg';
+import slugsJson from '../../data/companies.index.json';
+import sectorsJson from '../../data/sectors.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = de;
+
+const slugs: string[] = slugsJson;
+const companies: Company[] = await Promise.all(
+  slugs.map(slug =>
+    import(`../../data/companies/${slug}.json`).then(m => m.default as Company)
+  )
+);
+
+const sectors: string[] = sectorsJson;
+---
+
+<BaseLayout
+  title={t.rankings.meta.title}
+  description={t.rankings.meta.description}
+  lang="de"
+  canonicalPath="/de/rankings"
+  altLangPath="/rankings"
+  altLang="en"
+>
+  <div class="max-w-5xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-normal text-gray-900 mb-3" style="font-family: Georgia, serif;">
+      {t.rankings.title}
+    </h1>
+    <p class="text-gray-600 mb-8">{t.rankings.intro}</p>
+
+    <RankingTable
+      companies={companies}
+      sectors={sectors}
+      base={base}
+      lang="de"
+      detailsBasePath="/de/unternehmen"
+      t={t.rankings}
+    />
+  </div>
+</BaseLayout>

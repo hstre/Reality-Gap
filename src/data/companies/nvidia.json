@@ -1,0 +1,36 @@
+{
+  "company": "Nvidia",
+  "ticker": "NVDA",
+  "slug": "nvidia",
+  "sector": "Semiconductors",
+  "currency": "USD",
+  "description": "Illustrative approximation in the initial public RG dataset.",
+  "observations": [
+    {
+      "periodKey": "2026_q1",
+      "periodLabel": "Q1 2026",
+      "rg8": 42.1,
+      "rg10": 38.6,
+      "rg12": 35.9,
+      "trend": "++",
+      "marketCap": 2980,
+      "bookEquity": 58,
+      "netIncome": 72,
+      "fundamentalBaseApprox": 580,
+      "note": "Illustrative approximation, not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 38.4,
+      "rg10": 35.2,
+      "rg12": 33.1,
+      "trend": "+",
+      "marketCap": 2640,
+      "bookEquity": 50,
+      "netIncome": 61,
+      "fundamentalBaseApprox": 510,
+      "note": "Illustrative approximation, not fully adjusted."
+    }
+  ]
+}

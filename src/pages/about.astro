@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import { en } from '../i18n/en';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = en;
+const a = t.about;
+---
+
+<BaseLayout
+  title={a.meta.title}
+  description={a.meta.description}
+  lang="en"
+  canonicalPath="/about"
+  altLangPath="/de/ueber"
+  altLang="de"
+>
+  <div class="max-w-3xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-normal text-gray-900 mb-10" style="font-family: Georgia, serif;">
+      {a.title}
+    </h1>
+
+    <div class="prose-rg space-y-0">
+
+      <!-- Project -->
+      <h2>{a.sections.project.heading}</h2>
+      {a.sections.project.body.map(p => <p>{p}</p>)}
+
+      <!-- Author -->
+      <h2>{a.sections.author.heading}</h2>
+      <p>{a.sections.author.body}</p>
+
+      <!-- Contact -->
+      <h2>{a.sections.contact.heading}</h2>
+      <p>{a.sections.contact.body}</p>
+      <p>
+        <a href={`mailto:${a.sections.contact.email}`} class="text-accent">
+          {a.sections.contact.email}
+        </a>
+      </p>
+      <p>
+        <a href="https://github.com/hstre/reality-gap" class="text-accent" target="_blank" rel="noopener noreferrer">
+          {a.sections.contact.githubLabel}
+        </a>
+      </p>
+
+      <!-- Disclaimer -->
+      <div class="border border-gray-200 rounded-md p-5 bg-gray-50 mt-10">
+        <h2 class="mt-0 mb-3 text-base font-semibold text-gray-700">{a.sections.disclaimer.heading}</h2>
+        <p class="text-sm text-gray-600 mb-0">{a.sections.disclaimer.body}</p>
+      </div>
+
+    </div>
+  </div>
+</BaseLayout>

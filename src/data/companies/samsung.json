@@ -1,0 +1,36 @@
+{
+  "company": "Samsung",
+  "ticker": "005930.KS",
+  "slug": "samsung",
+  "sector": "Technology / Consumer Electronics",
+  "currency": "KRW",
+  "description": "Illustrative approximation in the initial public RG dataset.",
+  "observations": [
+    {
+      "periodKey": "2026_q1",
+      "periodLabel": "Q1 2026",
+      "rg8": 8.9,
+      "rg10": 8.2,
+      "rg12": 7.7,
+      "trend": "--",
+      "marketCap": 320,
+      "bookEquity": 242,
+      "netIncome": 22,
+      "fundamentalBaseApprox": 195,
+      "note": "Illustrative approximation. Market cap shown in USD billions equivalent. Not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 10.2,
+      "rg10": 9.5,
+      "rg12": 8.9,
+      "trend": "-",
+      "marketCap": 355,
+      "bookEquity": 248,
+      "netIncome": 28,
+      "fundamentalBaseApprox": 220,
+      "note": "Illustrative approximation. Market cap shown in USD billions equivalent. Not fully adjusted."
+    }
+  ]
+}

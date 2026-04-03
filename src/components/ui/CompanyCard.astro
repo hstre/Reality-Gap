@@ -1,0 +1,68 @@
+---
+import type { Company } from '../../lib/rg';
+import { getLatestObservation, formatRG, getTrendLabel } from '../../lib/rg';
+
+interface Props {
+  company: Company;
+  base: string;
+  lang?: string;
+  viewDetailsLabel?: string;
+  rg10Label?: string;
+  detailsBasePath?: string; // e.g. '/companies' or '/de/unternehmen'
+}
+
+const {
+  company,
+  base,
+  lang = 'en',
+  viewDetailsLabel = 'View Details',
+  rg10Label = 'RG10',
+  detailsBasePath = '/companies',
+} = Astro.props;
+
+const obs = getLatestObservation(company);
+const rg10Display = obs ? formatRG(obs.rg10) : '—';
+const trend = obs?.trend ?? null;
+const periodLabel = obs?.periodLabel ?? '—';
+
+const trendColors: Record<string, string> = {
+  '++': 'text-green-700',
+  '+':  'text-green-600',
+  '=':  'text-gray-500',
+  '-':  'text-amber-700',
+  '--': 'text-red-700',
+};
+const trendColor = trend ? (trendColors[trend] ?? 'text-gray-500') : 'text-gray-400';
+const trendDisplay = trend ?? '—';
+
+const href = `${base}${detailsBasePath}/${company.slug}`;
+---
+
+<a
+  href={href}
+  class="block border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group"
+>
+  <div class="flex items-start justify-between mb-3">
+    <div>
+      <h3 class="text-base font-semibold text-gray-900 group-hover:text-accent transition-colors">
+        {company.company}
+      </h3>
+      <p class="text-sm text-gray-500 mt-0.5">{company.ticker} · {company.sector}</p>
+    </div>
+    <span class:list={['text-lg font-mono font-medium tabular-nums', trendColor]} aria-label={getTrendLabel(trend)}>
+      {trendDisplay}
+    </span>
+  </div>
+
+  <div class="flex items-end justify-between mt-4">
+    <div>
+      <p class="text-xs text-gray-400 mb-0.5">{rg10Label} · {periodLabel}</p>
+      <p class="text-2xl font-light text-gray-900 tabular-nums" style="font-family: Georgia, serif;">
+        {rg10Display}
+      </p>
+    </div>
+    <span class="text-xs text-accent opacity-0 group-hover:opacity-100 transition-opacity">
+      {viewDetailsLabel} →
+    </span>
+  </div>
+</a>

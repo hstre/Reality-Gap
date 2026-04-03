@@ -1,0 +1,36 @@
+{
+  "company": "Microsoft",
+  "ticker": "MSFT",
+  "slug": "microsoft",
+  "sector": "Technology",
+  "currency": "USD",
+  "description": "Illustrative approximation in the initial public RG dataset.",
+  "observations": [
+    {
+      "periodKey": "2026_q1",
+      "periodLabel": "Q1 2026",
+      "rg8": 34.2,
+      "rg10": 33.0,
+      "rg12": 31.8,
+      "trend": "+",
+      "marketCap": 3180,
+      "bookEquity": 121,
+      "netIncome": 88,
+      "fundamentalBaseApprox": 1020,
+      "note": "Illustrative approximation, not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 33.1,
+      "rg10": 32.0,
+      "rg12": 30.9,
+      "trend": "=",
+      "marketCap": 3050,
+      "bookEquity": 117,
+      "netIncome": 84,
+      "fundamentalBaseApprox": 990,
+      "note": "Illustrative approximation, not fully adjusted."
+    }
+  ]
+}

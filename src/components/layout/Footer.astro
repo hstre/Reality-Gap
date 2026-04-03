@@ -1,0 +1,32 @@
+---
+interface Props {
+  lang: string;
+  base: string;
+}
+
+const { lang } = Astro.props;
+const year = new Date().getFullYear();
+
+const isDE = lang === 'de';
+const tagline = isDE
+  ? 'Ein forschungsbasierter heuristischer Indikator für fundamentale Abdeckung.'
+  : 'A research-based heuristic indicator for fundamental coverage.';
+const disclaimer = isDE
+  ? 'Alle dargestellten Daten sind illustrativ und dienen ausschließlich Forschungszwecken. Keine Anlageberatung.'
+  : 'All data shown is illustrative and for research purposes only. Not investment advice.';
+---
+
+<footer class="border-t border-gray-200 bg-gray-50 mt-16">
+  <div class="max-w-5xl mx-auto px-6 py-8">
+    <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold text-gray-700" style="font-family: Georgia, serif;">Reality Gap</p>
+        <p class="text-xs text-gray-500 mt-1 max-w-sm">{tagline}</p>
+      </div>
+      <div class="text-right">
+        <p class="text-xs text-gray-400">© {year} Reality Gap Project</p>
+        <p class="text-xs text-gray-400 mt-1 max-w-xs ml-auto">{disclaimer}</p>
+      </div>
+    </div>
+  </div>
+</footer>

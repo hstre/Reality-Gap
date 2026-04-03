@@ -1,0 +1,92 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import { de } from '../../i18n/de';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = de;
+const m = t.methodology;
+---
+
+<BaseLayout
+  title={m.meta.title}
+  description={m.meta.description}
+  lang="de"
+  canonicalPath="/de/methodik"
+  altLangPath="/methodology"
+  altLang="en"
+>
+  <div class="max-w-3xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-normal text-gray-900 mb-4" style="font-family: Georgia, serif;">
+      {m.title}
+    </h1>
+    <p class="text-gray-600 leading-relaxed mb-10 text-base border-b border-gray-100 pb-8">
+      {m.intro}
+    </p>
+
+    <div class="prose-rg space-y-0">
+
+      <h2>{m.sections.whatIsRG.heading}</h2>
+      {m.sections.whatIsRG.body.map(p => <p>{p}</p>)}
+
+      <h2>{m.sections.whatRGIsNot.heading}</h2>
+      <ul>
+        {m.sections.whatRGIsNot.body.map(item => <li>{item}</li>)}
+      </ul>
+
+      <h2>{m.sections.variants.heading}</h2>
+      <p>{m.sections.variants.body}</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
+        {m.sections.variants.items.map(v => (
+          <div class="border border-gray-200 rounded-md p-4 bg-white">
+            <p class="text-base font-semibold text-accent mb-2" style="font-family: Georgia, serif;">{v.label}</p>
+            <p class="text-sm text-gray-600 leading-relaxed">{v.description}</p>
+          </div>
+        ))}
+      </div>
+      <p class="text-sm text-gray-500 italic">{m.sections.variants.note}</p>
+
+      <h2>{m.sections.trendCodes.heading}</h2>
+      <p>{m.sections.trendCodes.body}</p>
+      <div class="overflow-x-auto my-6">
+        <table class="table-rg">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Bedeutung</th>
+              <th>Beschreibung</th>
+            </tr>
+          </thead>
+          <tbody>
+            {m.sections.trendCodes.items.map(item => (
+              <tr>
+                <td class="font-mono font-semibold text-base">{item.code}</td>
+                <td class="font-medium text-gray-700">{item.label}</td>
+                <td class="text-gray-600">{item.description}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-sm text-gray-500 italic">{m.sections.trendCodes.note}</p>
+
+      <h2>{m.sections.keyConcepts.heading}</h2>
+      <div class="space-y-4 my-4">
+        {m.sections.keyConcepts.items.map(item => (
+          <div class="border-l-2 border-gray-200 pl-4">
+            <p class="font-semibold text-gray-800 text-sm mb-1">{item.label}</p>
+            <p class="text-sm text-gray-600 leading-relaxed">{item.description}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="border border-gray-200 rounded-md p-6 bg-gray-50 mt-10">
+        <h2 class="text-xl mt-0 mb-3">{m.sections.paper.heading}</h2>
+        <p class="text-gray-600 mb-4">{m.sections.paper.body}</p>
+        <a href={`${base}/de/paper`} class="btn-primary no-underline">
+          {m.sections.paper.link}
+        </a>
+      </div>
+
+    </div>
+  </div>
+</BaseLayout>

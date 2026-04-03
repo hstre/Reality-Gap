@@ -1,0 +1,41 @@
+---
+interface Props {
+  trend: string | null | undefined;
+  label?: string;
+  size?: 'sm' | 'md';
+}
+
+const { trend, label, size = 'md' } = Astro.props;
+
+const colorMap: Record<string, string> = {
+  '++': 'bg-green-50 text-green-800 border-green-200',
+  '+':  'bg-green-50 text-green-700 border-green-200',
+  '=':  'bg-gray-50  text-gray-600  border-gray-200',
+  '-':  'bg-amber-50 text-amber-800 border-amber-200',
+  '--': 'bg-red-50   text-red-800   border-red-200',
+};
+
+const defaultLabels: Record<string, string> = {
+  '++': 'Strongly Increasing',
+  '+':  'Increasing',
+  '=':  'Stable',
+  '-':  'Declining',
+  '--': 'Strongly Declining',
+};
+
+const display = trend ?? '—';
+const colorClass = trend ? (colorMap[trend] ?? 'bg-gray-50 text-gray-500 border-gray-200') : 'bg-gray-50 text-gray-400 border-gray-200';
+const displayLabel = label ?? (trend ? defaultLabels[trend] : '—');
+const sizeClass = size === 'sm' ? 'text-xs px-2 py-0.5' : 'text-sm px-3 py-1';
+---
+
+<span
+  class:list={['inline-flex items-center gap-1.5 border rounded font-mono font-medium', colorClass, sizeClass]}
+  title={displayLabel}
+  aria-label={displayLabel}
+>
+  {display}
+  {size === 'md' && (
+    <span class="font-sans font-normal text-xs opacity-70">{displayLabel}</span>
+  )}
+</span>

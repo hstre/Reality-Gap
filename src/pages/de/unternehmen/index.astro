@@ -1,0 +1,51 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import CompanyCard from '../../../components/ui/CompanyCard.astro';
+import { de } from '../../../i18n/de';
+import type { Company } from '../../../lib/rg';
+import { sortByRG10Desc } from '../../../lib/sort';
+import slugsJson from '../../../data/companies.index.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = de;
+
+const slugs: string[] = slugsJson;
+const companies: Company[] = await Promise.all(
+  slugs.map(slug =>
+    import(`../../../data/companies/${slug}.json`).then(m => m.default as Company)
+  )
+);
+
+const sorted = sortByRG10Desc(companies);
+---
+
+<BaseLayout
+  title={t.companies.meta.title}
+  description={t.companies.meta.description}
+  lang="de"
+  canonicalPath="/de/unternehmen"
+  altLangPath="/companies"
+  altLang="en"
+>
+  <div class="max-w-5xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-normal text-gray-900 mb-3" style="font-family: Georgia, serif;">
+      {t.companies.title}
+    </h1>
+    <p class="text-gray-600 mb-8">{t.companies.intro}</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {sorted.map(company => (
+        <CompanyCard
+          company={company}
+          base={base}
+          lang="de"
+          viewDetailsLabel={t.companies.viewDetails}
+          rg10Label={t.companies.rg10Label}
+          detailsBasePath="/de/unternehmen"
+        />
+      ))}
+    </div>
+
+    <p class="text-xs text-gray-400 mt-8">{t.companies.dataNote}</p>
+  </div>
+</BaseLayout>

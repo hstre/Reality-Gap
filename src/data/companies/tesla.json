@@ -1,0 +1,36 @@
+{
+  "company": "Tesla",
+  "ticker": "TSLA",
+  "slug": "tesla",
+  "sector": "Automotive / Technology",
+  "currency": "USD",
+  "description": "Illustrative approximation in the initial public RG dataset.",
+  "observations": [
+    {
+      "periodKey": "2026_q1",
+      "periodLabel": "Q1 2026",
+      "rg8": 12.4,
+      "rg10": 11.3,
+      "rg12": 10.5,
+      "trend": "-",
+      "marketCap": 1353,
+      "bookEquity": 82,
+      "netIncome": 3.8,
+      "fundamentalBaseApprox": 120,
+      "note": "Illustrative approximation, not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 13.1,
+      "rg10": 12.0,
+      "rg12": 11.2,
+      "trend": "=",
+      "marketCap": 1210,
+      "bookEquity": 79,
+      "netIncome": 4.1,
+      "fundamentalBaseApprox": 115,
+      "note": "Illustrative approximation, not fully adjusted."
+    }
+  ]
+}
