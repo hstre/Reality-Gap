@@ -1,0 +1,64 @@
+{
+  "company": "DHL Group",
+  "ticker": "DHL.DE",
+  "slug": "dhlgroup",
+  "sector": "Industrials",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 1.03,
+      "rg10": 1.02,
+      "rg12": 1.04,
+      "trend": "=",
+      "marketCap": 51.6,
+      "bookEquity": 7.5,
+      "netIncome": 4.2,
+      "fundamentalBaseApprox": 50.6,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 1.0,
+      "rg10": 1.03,
+      "rg12": 1.05,
+      "trend": "=",
+      "marketCap": 51.6,
+      "bookEquity": 7.5,
+      "netIncome": 3.3,
+      "fundamentalBaseApprox": 50.04,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 0.99,
+      "rg10": 1.02,
+      "rg12": 1.05,
+      "trend": "=",
+      "marketCap": 51.6,
+      "bookEquity": 7.5,
+      "netIncome": 3.1,
+      "fundamentalBaseApprox": 50.45,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 0.98,
+      "rg10": 1.01,
+      "rg12": 1.05,
+      "trend": null,
+      "marketCap": 51.6,
+      "bookEquity": 7.5,
+      "netIncome": 4.4,
+      "fundamentalBaseApprox": 50.98,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "company": "Nintendo",
+  "ticker": "7974.T",
+  "slug": "nintendo",
+  "sector": "Technology / Consumer Electronics",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 1.37,
+      "rg10": 1.35,
+      "rg12": 1.35,
+      "trend": null,
+      "marketCap": 10071.1,
+      "bookEquity": 2817.3,
+      "netIncome": 0,
+      "fundamentalBaseApprox": 7440.3,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

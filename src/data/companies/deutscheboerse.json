@@ -1,0 +1,64 @@
+{
+  "company": "Deutsche Boerse",
+  "ticker": "DB1.DE",
+  "slug": "deutscheboerse",
+  "sector": "Financials",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 2.61,
+      "rg10": 2.66,
+      "rg12": 2.67,
+      "trend": "=",
+      "marketCap": 46.8,
+      "bookEquity": -1.0,
+      "netIncome": 2.0,
+      "fundamentalBaseApprox": 17.6,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 2.69,
+      "rg10": 2.7,
+      "rg12": 2.7,
+      "trend": "=",
+      "marketCap": 46.8,
+      "bookEquity": -1.0,
+      "netIncome": 2.0,
+      "fundamentalBaseApprox": 17.37,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.75,
+      "rg10": 2.75,
+      "rg12": 2.71,
+      "trend": "=",
+      "marketCap": 46.8,
+      "bookEquity": -1.0,
+      "netIncome": 2.1,
+      "fundamentalBaseApprox": 17.06,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 2.83,
+      "rg10": 2.81,
+      "rg12": 2.73,
+      "trend": null,
+      "marketCap": 46.8,
+      "bookEquity": -1.0,
+      "netIncome": 2.0,
+      "fundamentalBaseApprox": 16.68,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "company": "Siemens Healthineers",
+  "ticker": "SHL.DE",
+  "slug": "siemenshealthineers",
+  "sector": "Healthcare",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 2.05,
+      "rg10": 2.07,
+      "rg12": 2.05,
+      "trend": "=",
+      "marketCap": 40.2,
+      "bookEquity": -5.1,
+      "netIncome": 1.8,
+      "fundamentalBaseApprox": 19.43,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 2.06,
+      "rg10": 2.04,
+      "rg12": 2.03,
+      "trend": "=",
+      "marketCap": 40.2,
+      "bookEquity": -5.1,
+      "netIncome": 2.2,
+      "fundamentalBaseApprox": 19.67,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.08,
+      "rg10": 2.06,
+      "rg12": 2.09,
+      "trend": "=",
+      "marketCap": 40.2,
+      "bookEquity": -5.1,
+      "netIncome": 2.1,
+      "fundamentalBaseApprox": 19.5,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 2.1,
+      "rg10": 2.07,
+      "rg12": 2.15,
+      "trend": null,
+      "marketCap": 40.2,
+      "bookEquity": -5.1,
+      "netIncome": 1.9,
+      "fundamentalBaseApprox": 19.42,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

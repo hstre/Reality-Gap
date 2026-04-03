@@ -1,0 +1,25 @@
+{
+  "company": "Fast Retailing",
+  "ticker": "9983.T",
+  "slug": "fastretailing",
+  "sector": "Consumer Discretionary",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2024_q3",
+      "periodLabel": "Q3 2024",
+      "rg8": 3.99,
+      "rg10": 3.9,
+      "rg12": 3.79,
+      "trend": null,
+      "marketCap": 19729.2,
+      "bookEquity": 2173.4,
+      "netIncome": 236.6,
+      "fundamentalBaseApprox": 5060.32,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

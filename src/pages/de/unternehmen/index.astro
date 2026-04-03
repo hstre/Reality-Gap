@@ -17,6 +17,7 @@ const companies: Company[] = await Promise.all(
 );
 
 const sorted = sortByRG10Desc(companies);
+const allIndices = [...new Set(sorted.map(c => c.index).filter(Boolean) as string[])].sort();
 ---
 
 <BaseLayout
@@ -31,21 +32,62 @@ const sorted = sortByRG10Desc(companies);
     <h1 class="text-3xl font-normal text-gray-900 mb-3" style="font-family: Georgia, serif;">
       {t.companies.title}
     </h1>
-    <p class="text-gray-600 mb-8">{t.companies.intro}</p>
+    <p class="text-gray-600 mb-6">{t.companies.intro}</p>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {allIndices.length > 1 && (
+      <div class="flex flex-wrap gap-2 mb-6" id="index-tabs">
+        <button
+          class="index-tab active text-sm px-3 py-1 rounded border border-gray-200 bg-white text-gray-700 hover:border-accent transition-colors"
+          data-index=""
+        >
+          Alle
+        </button>
+        {allIndices.map(idx => (
+          <button
+            class="index-tab text-sm px-3 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:border-accent transition-colors"
+            data-index={idx}
+          >
+            {idx}
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="companies-grid">
       {sorted.map(company => (
-        <CompanyCard
-          company={company}
-          base={base}
-          lang="de"
-          viewDetailsLabel={t.companies.viewDetails}
-          rg10Label={t.companies.rg10Label}
-          detailsBasePath="/de/unternehmen"
-        />
+        <div class="company-item" data-index={company.index ?? ''}>
+          <CompanyCard
+            company={company}
+            base={base}
+            lang="de"
+            viewDetailsLabel={t.companies.viewDetails}
+            rg10Label={t.companies.rg10Label}
+            detailsBasePath="/de/unternehmen"
+          />
+        </div>
       ))}
     </div>
 
     <p class="text-xs text-gray-400 mt-8">{t.companies.dataNote}</p>
   </div>
 </BaseLayout>
+
+<script>
+  const tabs  = document.querySelectorAll('.index-tab');
+  const items = document.querySelectorAll('.company-item');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const idx = (tab as HTMLElement).dataset.index ?? '';
+      tabs.forEach(t => t.classList.remove('active', 'border-accent', 'text-accent'));
+      tab.classList.add('active', 'border-accent', 'text-accent');
+      items.forEach(item => {
+        const match = !idx || (item as HTMLElement).dataset.index === idx;
+        (item as HTMLElement).style.display = match ? '' : 'none';
+      });
+    });
+  });
+</script>
+
+<style>
+  .index-tab.active { border-color: var(--color-accent); color: var(--color-accent); }
+</style>

@@ -48,6 +48,9 @@ const href = `${base}${detailsBasePath}/${company.slug}`;
         {company.company}
       </h3>
       <p class="text-sm text-gray-500 mt-0.5">{company.ticker} · {company.sector}</p>
+      {company.index && (
+        <p class="text-xs text-gray-400 mt-0.5">{company.index}</p>
+      )}
     </div>
     <span class:list={['text-lg font-mono font-medium tabular-nums', trendColor]} aria-label={getTrendLabel(trend)}>
       {trendDisplay}

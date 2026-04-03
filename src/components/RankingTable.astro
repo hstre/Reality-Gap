@@ -6,12 +6,15 @@ import { sortByRG10Desc } from '../lib/sort';
 interface Props {
   companies: Company[];
   sectors: string[];
+  indices?: string[];
   base: string;
   lang?: string;
   detailsBasePath?: string;
   t: {
     filterLabel: string;
     allSectors: string;
+    indexFilterLabel?: string;
+    allIndices?: string;
     searchLabel: string;
     searchPlaceholder: string;
     noResults: string;
@@ -32,20 +35,26 @@ interface Props {
 const {
   companies,
   sectors,
+  indices = [],
   base,
   lang = 'en',
   detailsBasePath = '/companies',
   t,
 } = Astro.props;
 
-// Pre-sort by RG10 descending for initial render
+// Derive distinct indices from company data if not explicitly passed
+const allIndices: string[] = indices.length > 0
+  ? indices
+  : [...new Set(companies.map(c => c.index).filter(Boolean) as string[])].sort();
+
 const sorted = sortByRG10Desc(companies);
 
-// Build row data for the table (for SSR render + data attrs)
 interface RowData {
   company: string;
   ticker: string;
   sector: string;
+  index: string;
+  country: string;
   slug: string;
   period: string;
   periodKey: string;
@@ -62,17 +71,19 @@ interface RowData {
 const rows: RowData[] = sorted.map(c => {
   const obs = getLatestObservation(c);
   return {
-    company: c.company,
-    ticker: c.ticker,
-    sector: c.sector,
-    slug: c.slug,
-    period: obs?.periodLabel ?? '—',
+    company:  c.company,
+    ticker:   c.ticker,
+    sector:   c.sector,
+    index:    c.index ?? '',
+    country:  c.country ?? '',
+    slug:     c.slug,
+    period:   obs?.periodLabel ?? '—',
     periodKey: obs?.periodKey ?? '',
-    rg8: formatRG(obs?.rg8),
+    rg8:  formatRG(obs?.rg8),
     rg10: formatRG(obs?.rg10),
     rg12: formatRG(obs?.rg12),
     rg10Raw: obs?.rg10 ?? -1,
-    rg8Raw: obs?.rg8 ?? -1,
+    rg8Raw:  obs?.rg8  ?? -1,
     rg12Raw: obs?.rg12 ?? -1,
     trend: obs?.trend ?? '—',
     href: `${base}${detailsBasePath}/${c.slug}`,
@@ -86,11 +97,31 @@ const trendColors: Record<string, string> = {
   '-':  '#b45309',
   '--': '#b91c1c',
 };
+
+const flagEmoji: Record<string, string> = {
+  US: '🇺🇸',
+  JP: '🇯🇵',
+  DE: '🇩🇪',
+};
 ---
 
 <div class="space-y-4">
   <!-- Controls -->
-  <div class="flex flex-wrap gap-4 items-end">
+  <div class="flex flex-wrap gap-3 items-end">
+    {allIndices.length > 1 && (
+      <div>
+        <label for="index-filter" class="block text-xs text-gray-500 mb-1">
+          {t.indexFilterLabel ?? 'Index:'}
+        </label>
+        <select
+          id="index-filter"
+          class="border border-gray-200 rounded text-sm px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-accent"
+        >
+          <option value="">{t.allIndices ?? 'All Indices'}</option>
+          {allIndices.map(idx => <option value={idx}>{idx}</option>)}
+        </select>
+      </div>
+    )}
     <div>
       <label for="sector-filter" class="block text-xs text-gray-500 mb-1">{t.filterLabel}</label>
       <select
@@ -107,7 +138,7 @@ const trendColors: Record<string, string> = {
         id="company-search"
         type="search"
         placeholder={t.searchPlaceholder}
-        class="border border-gray-200 rounded text-sm px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-accent w-48"
+        class="border border-gray-200 rounded text-sm px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-accent w-44"
       />
     </div>
   </div>
@@ -117,22 +148,38 @@ const trendColors: Record<string, string> = {
     <table class="table-rg w-full" id="rankings-table">
       <thead>
         <tr>
-          <th class="cursor-pointer select-none" data-col="company">{t.columns.company} <span class="sort-indicator" data-col="company"></span></th>
-          <th class="cursor-pointer select-none" data-col="ticker">{t.columns.ticker} <span class="sort-indicator" data-col="ticker"></span></th>
-          <th class="cursor-pointer select-none" data-col="sector">{t.columns.sector} <span class="sort-indicator" data-col="sector"></span></th>
-          <th class="cursor-pointer select-none" data-col="period">{t.columns.period} <span class="sort-indicator" data-col="period"></span></th>
-          <th class="cursor-pointer select-none text-right" data-col="rg8">{t.columns.rg8} <span class="sort-indicator" data-col="rg8"></span></th>
-          <th class="cursor-pointer select-none text-right" data-col="rg10">{t.columns.rg10} <span class="sort-indicator sort-active sort-desc" data-col="rg10">↓</span></th>
-          <th class="cursor-pointer select-none text-right" data-col="rg12">{t.columns.rg12} <span class="sort-indicator" data-col="rg12"></span></th>
+          <th class="cursor-pointer select-none" data-col="company">
+            {t.columns.company} <span class="sort-indicator" data-col="company"></span>
+          </th>
+          <th class="cursor-pointer select-none" data-col="ticker">
+            {t.columns.ticker} <span class="sort-indicator" data-col="ticker"></span>
+          </th>
+          <th class="cursor-pointer select-none" data-col="sector">
+            {t.columns.sector} <span class="sort-indicator" data-col="sector"></span>
+          </th>
+          <th class="cursor-pointer select-none" data-col="period">
+            {t.columns.period} <span class="sort-indicator" data-col="period"></span>
+          </th>
+          <th class="cursor-pointer select-none text-right" data-col="rg8">
+            {t.columns.rg8} <span class="sort-indicator" data-col="rg8"></span>
+          </th>
+          <th class="cursor-pointer select-none text-right" data-col="rg10">
+            {t.columns.rg10} <span class="sort-indicator sort-active sort-desc" data-col="rg10">↓</span>
+          </th>
+          <th class="cursor-pointer select-none text-right" data-col="rg12">
+            {t.columns.rg12} <span class="sort-indicator" data-col="rg12"></span>
+          </th>
           <th data-col="trend">{t.columns.trend}</th>
         </tr>
       </thead>
       <tbody id="rankings-tbody">
-        {rows.map((row, i) => (
+        {rows.map(row => (
           <tr
             data-company={row.company.toLowerCase()}
             data-ticker={row.ticker.toLowerCase()}
             data-sector={row.sector}
+            data-index={row.index}
+            data-country={row.country}
             data-rg8={row.rg8Raw}
             data-rg10={row.rg10Raw}
             data-rg12={row.rg12Raw}
@@ -142,13 +189,18 @@ const trendColors: Record<string, string> = {
               <a href={row.href} class="font-medium text-accent hover:underline">
                 {row.company}
               </a>
+              {row.country && (
+                <span class="ml-1 text-xs" aria-label={row.country}>
+                  {flagEmoji[row.country] ?? row.country}
+                </span>
+              )}
             </td>
             <td class="text-gray-500 font-mono text-xs">{row.ticker}</td>
-            <td class="text-gray-600">{row.sector}</td>
+            <td class="text-gray-600 text-xs">{row.sector}</td>
             <td class="text-gray-500 text-xs">{row.period}</td>
-            <td class="text-right tabular-nums">{row.rg8}</td>
+            <td class="text-right tabular-nums text-sm">{row.rg8}</td>
             <td class="text-right tabular-nums font-medium">{row.rg10}</td>
-            <td class="text-right tabular-nums">{row.rg12}</td>
+            <td class="text-right tabular-nums text-sm">{row.rg12}</td>
             <td>
               <span
                 class="font-mono font-medium text-sm"
@@ -169,13 +221,14 @@ const trendColors: Record<string, string> = {
 
 <script>
   (() => {
-    const table = document.getElementById('rankings-table') as HTMLTableElement | null;
-    const tbody = document.getElementById('rankings-tbody') as HTMLTableSectionElement | null;
-    const sectorFilter = document.getElementById('sector-filter') as HTMLSelectElement | null;
-    const searchInput = document.getElementById('company-search') as HTMLInputElement | null;
-    const noResults = document.getElementById('no-results') as HTMLElement | null;
+    const table      = document.getElementById('rankings-table') as HTMLTableElement | null;
+    const tbody      = document.getElementById('rankings-tbody') as HTMLElement | null;
+    const sectorSel  = document.getElementById('sector-filter') as HTMLSelectElement | null;
+    const indexSel   = document.getElementById('index-filter')  as HTMLSelectElement | null;
+    const searchIn   = document.getElementById('company-search') as HTMLInputElement | null;
+    const noResults  = document.getElementById('no-results') as HTMLElement | null;
 
-    if (!table || !tbody || !sectorFilter || !searchInput || !noResults) return;
+    if (!table || !tbody || !sectorSel || !searchIn || !noResults) return;
 
     let currentSort = { col: 'rg10', dir: 'desc' as 'asc' | 'desc' };
 
@@ -184,58 +237,44 @@ const trendColors: Record<string, string> = {
     }
 
     function applyFilters() {
-      const sector = sectorFilter!.value;
-      const query = searchInput!.value.toLowerCase().trim();
-      let visibleCount = 0;
+      const sector  = sectorSel!.value;
+      const index   = indexSel?.value ?? '';
+      const query   = searchIn!.value.toLowerCase().trim();
+      let visible   = 0;
 
       getRows().forEach(row => {
-        const rowSector = row.dataset.sector ?? '';
-        const rowCompany = row.dataset.company ?? '';
-        const rowTicker = row.dataset.ticker ?? '';
-
-        const sectorMatch = !sector || rowSector === sector;
-        const searchMatch = !query || rowCompany.includes(query) || rowTicker.includes(query);
-
-        if (sectorMatch && searchMatch) {
-          row.classList.remove('hidden');
-          visibleCount++;
-        } else {
-          row.classList.add('hidden');
-        }
+        const ok =
+          (!sector || row.dataset.sector === sector) &&
+          (!index  || row.dataset.index  === index)  &&
+          (!query  || (row.dataset.company ?? '').includes(query) ||
+                      (row.dataset.ticker  ?? '').includes(query));
+        row.classList.toggle('hidden', !ok);
+        if (ok) visible++;
       });
 
-      noResults!.classList.toggle('hidden', visibleCount > 0);
+      noResults!.classList.toggle('hidden', visible > 0);
     }
 
     function sortRows(col: string, dir: 'asc' | 'desc') {
-      const rows = getRows();
-      const numericCols = new Set(['rg8', 'rg10', 'rg12', 'period']);
-
-      rows.sort((a, b) => {
-        const aVal = a.dataset[col] ?? '';
-        const bVal = b.dataset[col] ?? '';
-
-        let cmp: number;
-        if (numericCols.has(col)) {
-          cmp = parseFloat(aVal) - parseFloat(bVal);
-        } else {
-          cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
-        }
-
+      const numCols = new Set(['rg8', 'rg10', 'rg12', 'period']);
+      const rows = getRows().sort((a, b) => {
+        const av = a.dataset[col] ?? '';
+        const bv = b.dataset[col] ?? '';
+        const cmp = numCols.has(col)
+          ? parseFloat(av) - parseFloat(bv)
+          : av.localeCompare(bv, undefined, { sensitivity: 'base' });
         return dir === 'asc' ? cmp : -cmp;
       });
-
       rows.forEach(r => tbody!.appendChild(r));
     }
 
-    function updateSortIndicators(col: string, dir: 'asc' | 'desc') {
+    function updateIndicators(col: string, dir: 'asc' | 'desc') {
       document.querySelectorAll('.sort-indicator').forEach(el => {
         const span = el as HTMLElement;
-        const spanCol = span.dataset.col ?? '';
-        if (spanCol === col) {
+        const c = span.dataset.col ?? '';
+        if (c === col) {
           span.textContent = dir === 'asc' ? '↑' : '↓';
-          span.classList.add('sort-active', `sort-${dir}`);
-          span.classList.remove(dir === 'asc' ? 'sort-desc' : 'sort-asc');
+          span.classList.add('sort-active');
         } else {
           span.textContent = '';
           span.classList.remove('sort-active', 'sort-asc', 'sort-desc');
@@ -243,23 +282,21 @@ const trendColors: Record<string, string> = {
       });
     }
 
-    // Header click to sort
     table.querySelectorAll('th[data-col]').forEach(th => {
       th.addEventListener('click', () => {
         const col = (th as HTMLElement).dataset.col ?? '';
-        if (col === 'trend') return; // trend not sortable
-
-        const dir =
-          currentSort.col === col && currentSort.dir === 'desc' ? 'asc' : 'desc';
+        if (col === 'trend') return;
+        const dir = (currentSort.col === col && currentSort.dir === 'desc') ? 'asc' : 'desc';
         currentSort = { col, dir };
         sortRows(col, dir);
-        updateSortIndicators(col, dir);
+        updateIndicators(col, dir);
         applyFilters();
       });
     });
 
-    sectorFilter.addEventListener('change', applyFilters);
-    searchInput.addEventListener('input', applyFilters);
+    sectorSel.addEventListener('change', applyFilters);
+    indexSel?.addEventListener('change', applyFilters);
+    searchIn.addEventListener('input', applyFilters);
   })();
 </script>
 
@@ -271,11 +308,6 @@ const trendColors: Record<string, string> = {
     opacity: 0.5;
     font-size: 0.75rem;
   }
-  .sort-indicator.sort-active {
-    opacity: 1;
-    color: var(--color-accent);
-  }
-  th[data-col]:not([data-col="trend"]):hover {
-    background-color: #f3f4f6;
-  }
+  .sort-indicator.sort-active { opacity: 1; color: var(--color-accent); }
+  th[data-col]:not([data-col="trend"]):hover { background-color: #f3f4f6; }
 </style>

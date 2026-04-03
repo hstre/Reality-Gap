@@ -1,0 +1,25 @@
+{
+  "company": "Keyence",
+  "ticker": "6861.T",
+  "slug": "keyence",
+  "sector": "Industrials",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2024_q3",
+      "periodLabel": "Q3 2024",
+      "rg8": 2.22,
+      "rg10": 2.2,
+      "rg12": 2.18,
+      "trend": null,
+      "marketCap": 14001.0,
+      "bookEquity": 2948.6,
+      "netIncome": 384.7,
+      "fundamentalBaseApprox": 6368.29,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

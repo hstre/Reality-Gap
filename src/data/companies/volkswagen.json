@@ -1,0 +1,64 @@
+{
+  "company": "Volkswagen",
+  "ticker": "VOW3.DE",
+  "slug": "volkswagen",
+  "sector": "Automotive",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 0.2,
+      "rg10": 0.2,
+      "rg12": 0.19,
+      "trend": "+",
+      "marketCap": 43.8,
+      "bookEquity": 96.8,
+      "netIncome": 13.3,
+      "fundamentalBaseApprox": 224.24,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 0.2,
+      "rg10": 0.19,
+      "rg12": 0.19,
+      "trend": "=",
+      "marketCap": 43.8,
+      "bookEquity": 96.8,
+      "netIncome": 9.3,
+      "fundamentalBaseApprox": 227.5,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 0.19,
+      "rg10": 0.19,
+      "rg12": 0.19,
+      "trend": "+",
+      "marketCap": 43.8,
+      "bookEquity": 96.8,
+      "netIncome": 7.9,
+      "fundamentalBaseApprox": 234.69,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 0.18,
+      "rg10": 0.18,
+      "rg12": 0.18,
+      "trend": null,
+      "marketCap": 43.8,
+      "bookEquity": 96.8,
+      "netIncome": 13.1,
+      "fundamentalBaseApprox": 243.3,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "company": "Bayer",
+  "ticker": "BAYN.DE",
+  "slug": "bayer",
+  "sector": "Healthcare",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q3",
+      "periodLabel": "Q3 2025",
+      "rg8": 1.97,
+      "rg10": 3.93,
+      "rg12": 11.57,
+      "trend": "+",
+      "marketCap": 39.0,
+      "bookEquity": -22.7,
+      "netIncome": -3.9,
+      "fundamentalBaseApprox": 9.93,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 1.87,
+      "rg10": 3.6,
+      "rg12": 8.76,
+      "trend": "--",
+      "marketCap": 39.0,
+      "bookEquity": -22.7,
+      "netIncome": -0.8,
+      "fundamentalBaseApprox": 10.84,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.14,
+      "rg10": 4.49,
+      "rg12": 13.04,
+      "trend": null,
+      "marketCap": 39.0,
+      "bookEquity": -22.7,
+      "netIncome": 5.2,
+      "fundamentalBaseApprox": 8.69,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

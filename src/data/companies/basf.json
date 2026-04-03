@@ -1,0 +1,64 @@
+{
+  "company": "BASF",
+  "ticker": "BAS.DE",
+  "slug": "basf",
+  "sector": "Materials",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 1.74,
+      "rg10": 1.8,
+      "rg12": 1.79,
+      "trend": "-",
+      "marketCap": 45.0,
+      "bookEquity": 23.5,
+      "netIncome": 2.2,
+      "fundamentalBaseApprox": 25.01,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 2.02,
+      "rg10": 1.96,
+      "rg12": 1.92,
+      "trend": "=",
+      "marketCap": 45.0,
+      "bookEquity": 23.5,
+      "netIncome": 0.3,
+      "fundamentalBaseApprox": 23.0,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.03,
+      "rg10": 1.97,
+      "rg12": 1.86,
+      "trend": "--",
+      "marketCap": 45.0,
+      "bookEquity": 23.5,
+      "netIncome": 3.2,
+      "fundamentalBaseApprox": 22.9,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 2.44,
+      "rg10": 2.26,
+      "rg12": 1.99,
+      "trend": null,
+      "marketCap": 45.0,
+      "bookEquity": 23.5,
+      "netIncome": -3.1,
+      "fundamentalBaseApprox": 19.9,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

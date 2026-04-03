@@ -1,0 +1,25 @@
+{
+  "company": "Central Japan Railway",
+  "ticker": "9022.T",
+  "slug": "centraljapanrailway",
+  "sector": "Industrials",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 0.73,
+      "rg10": 0.66,
+      "rg12": 0.61,
+      "trend": null,
+      "marketCap": 3956.7,
+      "bookEquity": 4600.5,
+      "netIncome": 0,
+      "fundamentalBaseApprox": 6039.31,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

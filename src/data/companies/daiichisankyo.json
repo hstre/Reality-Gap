@@ -1,0 +1,25 @@
+{
+  "company": "Daiichi Sankyo",
+  "ticker": "4568.T",
+  "slug": "daiichisankyo",
+  "sector": "Healthcare",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.4,
+      "rg10": 2.18,
+      "rg12": 2.05,
+      "trend": null,
+      "marketCap": 5252.0,
+      "bookEquity": 1308.6,
+      "netIncome": 0,
+      "fundamentalBaseApprox": 2414.67,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}

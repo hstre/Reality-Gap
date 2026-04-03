@@ -19,6 +19,8 @@ export interface Company {
   slug: string;
   sector: string;
   currency: string;
+  country?: string;   // ISO 2-letter: "US" | "JP" | "DE"
+  index?: string;     // "S&P 500" | "Nikkei 225" | "DAX 40"
   description?: string;
   observations: Observation[];
 }

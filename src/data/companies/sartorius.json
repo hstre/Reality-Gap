@@ -1,0 +1,64 @@
+{
+  "company": "Sartorius",
+  "ticker": "SRT.DE",
+  "slug": "sartorius",
+  "sector": "Healthcare",
+  "currency": "EUR",
+  "country": "DE",
+  "index": "DAX 40",
+  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q4",
+      "periodLabel": "Q4 2025",
+      "rg8": 3.14,
+      "rg10": 3.02,
+      "rg12": 3.27,
+      "trend": "-",
+      "marketCap": 11.5,
+      "bookEquity": -2.6,
+      "netIncome": 0.4,
+      "fundamentalBaseApprox": 3.83,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q2",
+      "periodLabel": "Q2 2025",
+      "rg8": 2.84,
+      "rg10": 3.16,
+      "rg12": 3.4,
+      "trend": "=",
+      "marketCap": 11.5,
+      "bookEquity": -2.6,
+      "netIncome": 0.1,
+      "fundamentalBaseApprox": 3.66,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 2.78,
+      "rg10": 3.09,
+      "rg12": 3.44,
+      "trend": "=",
+      "marketCap": 11.5,
+      "bookEquity": -2.6,
+      "netIncome": 0.2,
+      "fundamentalBaseApprox": 3.73,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 2.77,
+      "rg10": 3.08,
+      "rg12": 3.54,
+      "trend": null,
+      "marketCap": 11.5,
+      "bookEquity": -2.6,
+      "netIncome": 0.2,
+      "fundamentalBaseApprox": 3.75,
+      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+    }
+  ]
+}
