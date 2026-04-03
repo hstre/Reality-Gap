@@ -2,6 +2,7 @@
 import BaseLayout from '../../../components/layout/BaseLayout.astro';
 import MetricBlock from '../../../components/ui/MetricBlock.astro';
 import TrendBadge from '../../../components/ui/TrendBadge.astro';
+import RGChart from '../../../components/ui/RGChart.astro';
 import { de } from '../../../i18n/de';
 import type { Company } from '../../../lib/rg';
 import { getLatestObservation, formatRG, formatRGLabel } from '../../../lib/rg';
@@ -144,10 +145,12 @@ const trendLabel = obs?.trend ? (trendLabelsDE[obs.trend] ?? obs.trend) : undefi
           </div>
         )}
 
-        <div class="border border-dashed border-gray-200 rounded-md p-6 bg-gray-50 mb-8">
-          <h2 class="text-base font-semibold text-gray-500 mb-2">{tc.historicalPlaceholder.heading}</h2>
-          <p class="text-sm text-gray-400">{tc.historicalPlaceholder.body}</p>
-        </div>
+        <!-- Historischer RG-Verlauf -->
+        <RGChart
+          company={company}
+          headingLabel={tc.historicalPlaceholder.heading}
+          noteLabel={tc.historicalPlaceholder.body}
+        />
       </>
     ) : (
       <p class="text-gray-500">Keine Daten für dieses Unternehmen verfügbar.</p>

@@ -209,8 +209,8 @@ export const de = {
     trend: 'Trend',
     dataNote: 'Datenhinweis',
     historicalPlaceholder: {
-      heading: 'Historische Daten',
-      body: 'Historische Daten über mehrere Quartale und Diagramme werden in einer zukünftigen Version verfügbar sein.',
+      heading: 'Historische RG-Werte',
+      body: 'Diagramm zeigt verfügbare Beobachtungen. Historische Marktkapitalisierung näherungsweise aus Schlusskurs × aktuelle Aktienanzahl.',
     },
     disclaimer: 'Alle Werte sind illustrative Näherungswerte und werden ausschließlich zu Forschungszwecken bereitgestellt. Keine Anlageberatung.',
   },

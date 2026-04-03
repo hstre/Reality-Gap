@@ -6,7 +6,7 @@
   "currency": "JPY",
   "country": "JP",
   "index": "Nikkei 225",
-  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "description": "Data sourced via yfinance / Yahoo Finance. Approximation.",
   "observations": [
     {
       "periodKey": "2025_q1",
@@ -14,12 +14,41 @@
       "rg8": 2.4,
       "rg10": 2.18,
       "rg12": 2.05,
-      "trend": null,
+      "trend": "--",
       "marketCap": 5252.0,
       "bookEquity": 1308.6,
       "netIncome": 0,
       "fundamentalBaseApprox": 2414.67,
-      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+    },
+    {
+      "periodKey": "2024_q1",
+      "periodLabel": "Q1 2024",
+      "rg8": 3.31,
+      "rg10": 3.53,
+      "rg12": 3.69,
+      "trend": null,
+      "marketCap": 9458.8,
+      "bookEquity": 1308.6,
+      "netIncome": 200.7,
+      "fundamentalBaseApprox": 2682.19,
+      "dataType": "annual",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation."
+    },
+    {
+      "periodKey": "2023_q1",
+      "periodLabel": "Q1 2023",
+      "rg8": 3.7,
+      "rg10": null,
+      "rg12": null,
+      "trend": null,
+      "marketCap": 8105.7,
+      "bookEquity": 1308.6,
+      "netIncome": 109.2,
+      "fundamentalBaseApprox": 1308.57,
+      "dataType": "annual",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation."
     }
   ]
 }

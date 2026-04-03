@@ -6,7 +6,7 @@
   "currency": "USD",
   "country": "US",
   "index": "S&P 500",
-  "description": "Data sourced via yfinance / Yahoo Finance. Illustrative approximation.",
+  "description": "Data sourced via yfinance / Yahoo Finance. Approximation.",
   "observations": [
     {
       "periodKey": "2025_q4",
@@ -19,7 +19,8 @@
       "bookEquity": 234.2,
       "netIncome": 30.1,
       "fundamentalBaseApprox": 519.34,
-      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
     },
     {
       "periodKey": "2025_q3",
@@ -32,7 +33,8 @@
       "bookEquity": 234.2,
       "netIncome": 33.9,
       "fundamentalBaseApprox": 515.53,
-      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
     },
     {
       "periodKey": "2025_q2",
@@ -45,7 +47,8 @@
       "bookEquity": 234.2,
       "netIncome": 28.5,
       "fundamentalBaseApprox": 507.96,
-      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
     },
     {
       "periodKey": "2025_q1",
@@ -53,12 +56,41 @@
       "rg8": 0.7,
       "rg10": 0.7,
       "rg12": 0.7,
-      "trend": null,
+      "trend": "+",
       "marketCap": 354.4,
       "bookEquity": 234.2,
       "netIncome": 29.6,
       "fundamentalBaseApprox": 505.8,
-      "note": "Computed via yfinance. Insufficient quarterly history; older quarters estimated from annual net income / 4. Historical market cap not adjusted. Approximation — not fully adjusted."
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+    },
+    {
+      "periodKey": "2024_q4",
+      "periodLabel": "Q4 2024",
+      "rg8": 0.64,
+      "rg10": 0.64,
+      "rg12": 0.64,
+      "trend": null,
+      "marketCap": 321.5,
+      "bookEquity": 234.2,
+      "netIncome": 27.0,
+      "fundamentalBaseApprox": 502.39,
+      "dataType": "annual",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation."
+    },
+    {
+      "periodKey": "2023_q4",
+      "periodLabel": "Q4 2023",
+      "rg8": 0.46,
+      "rg10": null,
+      "rg12": null,
+      "trend": null,
+      "marketCap": 230.3,
+      "bookEquity": 234.2,
+      "netIncome": 26.3,
+      "fundamentalBaseApprox": 234.22,
+      "dataType": "annual",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation."
     }
   ]
 }

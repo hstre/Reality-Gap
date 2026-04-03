@@ -1,0 +1,212 @@
+---
+import type { Company } from '../../lib/rg';
+
+interface Props {
+  company: Company;
+  headingLabel?: string;
+  noteLabel?: string;
+}
+
+const { company, headingLabel = 'Historical RG Values', noteLabel } = Astro.props;
+
+// Sort observations oldest-first for chart
+const sorted = [...company.observations].sort((a, b) =>
+  a.periodKey < b.periodKey ? -1 : a.periodKey > b.periodKey ? 1 : 0
+);
+
+// Only include observations that have at least one RG value
+const chartObs = sorted.filter(o => o.rg8 !== null || o.rg10 !== null || o.rg12 !== null);
+
+const labels  = chartObs.map(o => o.periodLabel);
+const rg8Data  = chartObs.map(o => o.rg8  ?? null);
+const rg10Data = chartObs.map(o => o.rg10 ?? null);
+const rg12Data = chartObs.map(o => o.rg12 ?? null);
+
+const canvasId = `rg-chart-${company.slug}`;
+const serialised = JSON.stringify({ labels, rg8: rg8Data, rg10: rg10Data, rg12: rg12Data });
+
+const hasData = chartObs.length >= 2;
+---
+
+{hasData && (
+  <div class="mb-8">
+    <h2 class="text-lg font-semibold text-gray-800 mb-4">{headingLabel}</h2>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-4 mb-3 text-xs text-gray-500">
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block w-6 h-0.5 bg-[#7ba7c9] opacity-80" style="border-top: 2px dashed #7ba7c9;"></span>
+        RG8
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block w-6 h-0.5 bg-[#1e4d78]" style="border-top: 2.5px solid #1e4d78;"></span>
+        RG10
+      </span>
+      <span class="flex items-center gap-1.5">
+        <span class="inline-block w-6 h-0.5 bg-[#3d8b85]" style="border-top: 2px solid #3d8b85;"></span>
+        RG12
+      </span>
+    </div>
+
+    <div class="relative" style="height: 280px;">
+      <canvas
+        id={canvasId}
+        data-chart={serialised}
+        aria-label={`RG chart for ${company.company}`}
+        role="img"
+        style="width:100%; height:100%;"
+      ></canvas>
+    </div>
+
+    {noteLabel && (
+      <p class="text-xs text-gray-400 mt-2">{noteLabel}</p>
+    )}
+  </div>
+)}
+
+<script>
+  // Initialise all RG charts on the page
+  function initCharts() {
+    const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-chart]');
+    if (canvases.length === 0) return;
+
+    // @ts-ignore
+    const Chart = (window as any).Chart;
+    if (!Chart) return;
+
+    canvases.forEach(canvas => {
+      const raw = canvas.getAttribute('data-chart');
+      if (!raw) return;
+      const { labels, rg8, rg10, rg12 } = JSON.parse(raw) as {
+        labels: string[];
+        rg8: (number | null)[];
+        rg10: (number | null)[];
+        rg12: (number | null)[];
+      };
+
+      new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'RG8',
+              data: rg8,
+              borderColor: '#7ba7c9',
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
+              pointRadius: 2,
+              pointHoverRadius: 4,
+              tension: 0.3,
+              spanGaps: false,
+            },
+            {
+              label: 'RG10',
+              data: rg10,
+              borderColor: '#1e4d78',
+              backgroundColor: 'transparent',
+              borderWidth: 2.5,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              tension: 0.3,
+              spanGaps: false,
+            },
+            {
+              label: 'RG12',
+              data: rg12,
+              borderColor: '#3d8b85',
+              backgroundColor: 'transparent',
+              borderWidth: 1.5,
+              pointRadius: 2,
+              pointHoverRadius: 4,
+              tension: 0.3,
+              spanGaps: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: any) => {
+                  const v = ctx.parsed.y;
+                  return v !== null ? `${ctx.dataset.label}: ${v.toFixed(2)}×` : `${ctx.dataset.label}: —`;
+                },
+              },
+            },
+            annotation: {
+              annotations: {
+                fairValue: {
+                  type: 'line',
+                  yMin: 1,
+                  yMax: 1,
+                  borderColor: '#d1d5db',
+                  borderWidth: 1,
+                  borderDash: [3, 3],
+                  label: {
+                    content: '1×',
+                    display: true,
+                    position: 'start',
+                    color: '#9ca3af',
+                    font: { size: 10 },
+                  },
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: '#9ca3af',
+                font: { size: 10 },
+                maxRotation: 45,
+                autoSkip: true,
+                maxTicksLimit: 10,
+              },
+              border: { color: '#e5e7eb' },
+            },
+            y: {
+              beginAtZero: false,
+              grid: { color: '#f3f4f6' },
+              ticks: {
+                color: '#9ca3af',
+                font: { size: 10 },
+                callback: (v: any) => `${Number(v).toFixed(1)}×`,
+              },
+              border: { color: '#e5e7eb' },
+            },
+          },
+        },
+      });
+    });
+  }
+
+  // Load Chart.js + annotation plugin from CDN, then init
+  function loadChartJs(callback: () => void) {
+    // @ts-ignore
+    if ((window as any).Chart) { callback(); return; }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+    script.onload = () => {
+      // annotation plugin is optional; attempt load but don't block
+      const ann = document.createElement('script');
+      ann.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js';
+      ann.onload = callback;
+      ann.onerror = callback;  // proceed even if annotation fails
+      document.head.appendChild(ann);
+    };
+    document.head.appendChild(script);
+  }
+
+  loadChartJs(initCharts);
+</script>

@@ -2,6 +2,7 @@
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import MetricBlock from '../../components/ui/MetricBlock.astro';
 import TrendBadge from '../../components/ui/TrendBadge.astro';
+import RGChart from '../../components/ui/RGChart.astro';
 import { en } from '../../i18n/en';
 import type { Company } from '../../lib/rg';
 import { getLatestObservation, formatRG, formatRGLabel, formatMarketCap } from '../../lib/rg';
@@ -140,11 +141,12 @@ const tc = t.companyDetail;
           </div>
         )}
 
-        <!-- Historical placeholder -->
-        <div class="border border-dashed border-gray-200 rounded-md p-6 bg-gray-50 mb-8">
-          <h2 class="text-base font-semibold text-gray-500 mb-2">{tc.historicalPlaceholder.heading}</h2>
-          <p class="text-sm text-gray-400">{tc.historicalPlaceholder.body}</p>
-        </div>
+        <!-- Historical RG Chart -->
+        <RGChart
+          company={company}
+          headingLabel={tc.historicalPlaceholder.heading}
+          noteLabel={tc.historicalPlaceholder.body}
+        />
       </>
     ) : (
       <p class="text-gray-500">No data available for this company.</p>
