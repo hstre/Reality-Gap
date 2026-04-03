@@ -145,11 +145,12 @@ const trendLabel = obs?.trend ? (trendLabelsDE[obs.trend] ?? obs.trend) : undefi
           </div>
         )}
 
-        <!-- Historischer RG-Verlauf -->
+        <!-- Historischer RG-Verlauf (nur Quartalsbeobachtungen) -->
         <RGChart
           company={company}
-          headingLabel={tc.historicalPlaceholder.heading}
-          noteLabel={tc.historicalPlaceholder.body}
+          headingLabel={tc.historicalChart.heading}
+          noDataLabel={tc.historicalChart.noData}
+          shorterHistLabel={tc.historicalChart.shorterHistory}
         />
       </>
     ) : (

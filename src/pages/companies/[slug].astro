@@ -141,11 +141,12 @@ const tc = t.companyDetail;
           </div>
         )}
 
-        <!-- Historical RG Chart -->
+        <!-- Historical RG Chart (quarterly observations only) -->
         <RGChart
           company={company}
-          headingLabel={tc.historicalPlaceholder.heading}
-          noteLabel={tc.historicalPlaceholder.body}
+          headingLabel={tc.historicalChart.heading}
+          noDataLabel={tc.historicalChart.noData}
+          shorterHistLabel={tc.historicalChart.shorterHistory}
         />
       </>
     ) : (

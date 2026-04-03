@@ -208,9 +208,10 @@ export const de = {
     },
     trend: 'Trend',
     dataNote: 'Datenhinweis',
-    historicalPlaceholder: {
+    historicalChart: {
       heading: 'Historische RG-Werte',
-      body: 'Diagramm zeigt verfügbare Beobachtungen. Historische Marktkapitalisierung näherungsweise aus Schlusskurs × aktuelle Aktienanzahl.',
+      noData: 'Historischer RG-Verlauf für dieses Unternehmen noch nicht verfügbar.',
+      shorterHistory: 'Historische Reihe kürzer als 10 Jahre aufgrund aktueller Datenverfügbarkeit.',
     },
     disclaimer: 'Alle Werte sind illustrative Näherungswerte und werden ausschließlich zu Forschungszwecken bereitgestellt. Keine Anlageberatung.',
   },

@@ -208,9 +208,10 @@ export const en = {
     },
     trend: 'Trend',
     dataNote: 'Data Note',
-    historicalPlaceholder: {
+    historicalChart: {
       heading: 'Historical RG Values',
-      body: 'Chart shows available observations. Historical market cap approximated from closing price × current shares outstanding.',
+      noData: 'Historical RG chart not yet available for this company.',
+      shorterHistory: 'Historical series shorter than 10 years due to current data availability.',
     },
     disclaimer: 'All values are illustrative approximations and are provided for research purposes only. Not investment advice.',
   },

@@ -4,7 +4,7 @@ A static public website for the **Reality Gap (RG)** research project.
 
 Reality Gap is a heuristic indicator measuring whether a company's market capitalisation is approximately covered by its estimated fundamental base (derived from smoothed earnings and tangible equity). This site presents the methodology, working paper, and an initial set of illustrative company data.
 
-**Live site:** https://hstre.github.io/reality-gap/
+**Live site:** https://hstre.github.io/Reality-Gap/
 
 ---
 
@@ -205,6 +205,7 @@ Each company is stored in its own JSON file under `src/data/companies/`.
 | `netIncome` | number? | Net income in billions (annualised) |
 | `fundamentalBaseApprox` | number? | Estimated fundamental base in billions |
 | `note` | string? | Data quality or disclaimer note |
+| `dataType` | string? | `"quarterly"` (real) or `"annual"` (approximate) |
 
 ### Period Key Format
 
@@ -329,12 +330,12 @@ export default defineConfig({
   integrations: [tailwind()],
   output: 'static',
   site: 'https://hstre.github.io',
-  base: '/reality-gap',
+  base: '/Reality-Gap',
 });
 ```
 
 - `site`: Full site URL (used for canonical URLs and OG tags)
-- `base`: Base path for GitHub Pages deployment
+- `base`: Base path for GitHub Pages — must match the exact GitHub repository name (case-sensitive)
 
 If you deploy to a custom domain (e.g. `reality-gap.com`), update both `site` and `base` (set `base: '/'`).
 
@@ -351,13 +352,91 @@ If you deploy to a custom domain (e.g. `reality-gap.com`), update both `site` an
 
 ---
 
+## Historical RG Charts
+
+### Charting solution
+
+**Chart.js 4** (loaded via CDN at runtime) renders the historical line chart on each company detail page. It was chosen because:
+- No npm dependency (static site stays lightweight)
+- Mature, well-documented API
+- Sufficient for simple multi-line time-series charts
+- No flashy defaults — animations are disabled
+
+### Data integrity rules
+
+The chart component (`src/components/ui/RGChart.astro`) enforces strict data-quality rules:
+
+1. **Only `dataType: "quarterly"` observations are plotted.**  
+   These come from real yfinance quarterly income statements.
+
+2. **`dataType: "annual"` observations are excluded from the chart.**  
+   Annual observations use synthetic quarterly equivalents (annual NI ÷ 4) and an approximated historical market cap (closing price × current shares). They remain in the JSON for data completeness but are never plotted.
+
+3. **No values are fabricated, interpolated, or gap-filled.**  
+   If a quarter has no real data, it simply does not appear as a chart point.
+
+4. **Minimum threshold: 2 real quarterly observations.**  
+   Fewer than 2 points cannot form a meaningful line.
+
+### Chart behaviour by data availability
+
+| Real quarterly obs | Chart output |
+|--------------------|--------------|
+| 0 or 1 | Empty state: *"Historical RG chart not yet available for this company."* |
+| 2 – 39 | Chart rendered + note: *"Historical series shorter than 10 years due to current data availability."* |
+| 40+ (≥ 10 years) | Chart rendered without any additional note |
+
+### Current data state (as of initial release)
+
+yfinance returns at most 4–5 quarters of quarterly income data per company via the free API. Therefore:
+
+- Most companies: **4 quarterly observations** (~1 year), chart shown with "shorter than 10 years" note
+- Some Japanese companies (semi-annual reporters): **1 quarterly observation**, chart shows empty state
+- No company yet has 10 years of quarterly data
+
+As new quarters are appended each quarter, the chart will grow organically.
+
+### How latest-quarter display and historical chart differ
+
+| Component | Data used | Purpose |
+|-----------|-----------|---------|
+| Top metric blocks (RG8/10/12) | `getLatestObservation()` — single most recent `observations[0]` regardless of dataType | Current snapshot |
+| Historical chart | All `dataType === "quarterly"` observations, sorted oldest-first | Trend over time |
+
+The top section always works regardless of chart data availability.
+
+### How to add real historical quarterly data
+
+To extend the chart backwards in time, add one observation per real reporting period directly to the company JSON. Each observation must have `dataType: "quarterly"` and use only values derived from actual reported data:
+
+```json
+{
+  "periodKey": "2023_q2",
+  "periodLabel": "Q2 2023",
+  "rg8":  18.4,
+  "rg10": 17.1,
+  "rg12": 16.0,
+  "trend": "+",
+  "dataType": "quarterly",
+  "marketCap": 2800,
+  "bookEquity": 62,
+  "netIncome": 23.0,
+  "fundamentalBaseApprox": 292,
+  "note": "Computed from Q2 2023 yfinance data."
+}
+```
+
+Do **not** add entries with invented or interpolated RG values. The chart will show an honest shorter series rather than a falsely populated one.
+
+---
+
 ## Future Extension Points
 
 The architecture is designed to support these additions without restructuring:
 
 - **More companies**: add JSON files + update index
 - **More quarters**: add observations to existing company files
-- **Historical charts**: add a chart library (e.g. Chart.js) to company detail pages — the data model is already structured for time series
+- **Longer historical charts**: append real quarterly observations over time; the chart grows automatically
 - **Quarter selector**: add a dropdown on detail pages to switch between observations
 - **Status badges**: add `dataStatus`, `isApproximation` etc. fields to observations
 - **CSV/JSON export**: generate export files during build from existing JSON data
