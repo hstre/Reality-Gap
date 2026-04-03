@@ -73,21 +73,28 @@ const tc = t.companyDetail;
       <>
         <!-- RG Metrics -->
         <h2 class="text-lg font-semibold text-gray-800 mb-4">{tc.metrics.heading}</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <MetricBlock
-            label={formatRGLabel(8, obs.periodLabel)}
-            value={formatRG(obs.rg8)}
-          />
-          <MetricBlock
-            label={formatRGLabel(10, obs.periodLabel)}
-            value={formatRG(obs.rg10)}
-            highlight={true}
-          />
-          <MetricBlock
-            label={formatRGLabel(12, obs.periodLabel)}
-            value={formatRG(obs.rg12)}
-          />
-        </div>
+        {obs.rg8 === null && obs.rg10 === null && obs.rg12 === null ? (
+          <div class="border border-amber-200 bg-amber-50 rounded-md px-5 py-4 mb-8">
+            <p class="text-sm font-semibold text-amber-800 mb-1">{tc.metrics.notComputable}</p>
+            <p class="text-sm text-amber-700">{tc.metrics.notComputableNote}</p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <MetricBlock
+              label={formatRGLabel(8, obs.periodLabel)}
+              value={formatRG(obs.rg8)}
+            />
+            <MetricBlock
+              label={formatRGLabel(10, obs.periodLabel)}
+              value={formatRG(obs.rg10)}
+              highlight={true}
+            />
+            <MetricBlock
+              label={formatRGLabel(12, obs.periodLabel)}
+              value={formatRG(obs.rg12)}
+            />
+          </div>
+        )}
 
         <!-- Trend -->
         <div class="mb-8">

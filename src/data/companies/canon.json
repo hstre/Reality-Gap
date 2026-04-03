@@ -11,14 +11,14 @@
     {
       "periodKey": "2025_q4",
       "periodLabel": "Q4 2025",
-      "rg8": 0.82,
-      "rg10": 0.85,
-      "rg12": 0.88,
+      "rg8": 0.83,
+      "rg10": 0.83,
+      "rg12": 0.82,
       "trend": "--",
       "marketCap": 3926.8,
       "bookEquity": 2246.3,
       "netIncome": 0,
-      "fundamentalBaseApprox": 4600.29,
+      "fundamentalBaseApprox": 4743.68,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
     },

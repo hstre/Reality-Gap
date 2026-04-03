@@ -197,6 +197,8 @@ export const de = {
     currency: 'Währung',
     metrics: {
       heading: 'RG-Kennzahlen',
+      notComputable: 'RG nicht berechenbar',
+      notComputableNote: 'Die fundamentale Basis ist null oder negativ: Das materielle Eigenkapital ist negativ und der geglättete Gewinn ist über alle Glättungsfenster (RG8, RG10, RG12) hinweg negativ. Nach der RG-Methodik bedeutet eine nicht-positive fundamentale Basis, dass die Gewinnhistorie keine fundamentale Abdeckung bei der aktuellen Marktkapitalisierung bietet. RG ist undefiniert.',
     },
     supportingData: {
       heading: 'Zusatzdaten',

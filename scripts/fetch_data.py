@@ -185,9 +185,14 @@ def trend_code(current: Optional[float], previous: Optional[float]) -> Optional[
     return "--"
 
 
-def calc_rg(market_cap_b: float, smoothed_annual_b: float,
+def calc_rg(market_cap_b: float, smoothed_annual_b: Optional[float],
             tangible_eq_b: float) -> Optional[float]:
-    """RG = marketCap / (max(tangibleEquity,0) + smoothedAnnualEarnings*10)"""
+    """RG = marketCap / (max(tangibleEquity,0) + smoothedAnnualEarnings*10)
+    Returns None when smoothed earnings are None or when the fundamental
+    base is zero or negative (i.e. the company is not fundamentally coverable).
+    """
+    if smoothed_annual_b is None:
+        return None
     fb = max(tangible_eq_b, 0.0) + smoothed_annual_b * 10
     if fb <= 0:
         return None
@@ -196,12 +201,24 @@ def calc_rg(market_cap_b: float, smoothed_annual_b: float,
 
 def build_ni_series(quarterly_ni: list[float], annual_ni: list[float],
                     n_needed: int) -> tuple[list[float], bool]:
-    """Extend quarterly series with annual/4 fallback (newest-first)."""
+    """
+    Extend a newest-first quarterly NI series with annual/4 estimates.
+
+    annual_ni must be newest-first (most recent fiscal year first).
+    Iteration proceeds newest → oldest so that the most recent annual
+    data fills the positions immediately after the known quarters.
+    This preserves chronological order in the smoothing window.
+
+    Previously used reversed(annual_ni) which incorrectly placed the
+    oldest annual year (highest for turnaround companies) into the
+    most-recent unobserved positions, inflating smoothed earnings for
+    companies with deteriorating earnings history.
+    """
     result = list(quarterly_ni)
     supplemented = False
     if len(result) >= n_needed:
         return result[:n_needed], supplemented
-    for ann_val in reversed(annual_ni):
+    for ann_val in annual_ni:          # newest-first (no reversed)
         per_q = ann_val / 4.0
         for _ in range(4):
             if len(result) >= n_needed:
@@ -284,15 +301,16 @@ def build_historical_annual_obs(
         se10 = se(10)
         se12 = se(12)
 
-        rg8  = calc_rg(hist_mc_b, se8  or 0, tangible_eq_b) if se8  else None
-        rg10 = calc_rg(hist_mc_b, se10 or 0, tangible_eq_b) if se10 else None
-        rg12 = calc_rg(hist_mc_b, se12 or 0, tangible_eq_b) if se12 else None
+        rg8  = calc_rg(hist_mc_b, se8,  tangible_eq_b)
+        rg10 = calc_rg(hist_mc_b, se10, tangible_eq_b)
+        rg12 = calc_rg(hist_mc_b, se12, tangible_eq_b)
 
-        # Skip only if we can't compute even RG8
+        # Skip annual historical obs where even RG8 is not computable
         if rg8 is None:
             continue
 
-        fb = round(max(tangible_eq_b, 0) + (se10 or 0) * 10, 2)
+        _fb_raw = max(tangible_eq_b, 0) + (se10 or 0) * 10
+        fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
 
         obs: dict = {
             "periodKey":             period_key(date),
@@ -437,12 +455,21 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             def sa(series: list[float]) -> Optional[float]:
                 return round(sum(series) / len(series) * 4, 4) if series else None
 
-            rg8  = calc_rg(market_cap_b, sa(s8)  or 0, tangible_eq_b) if len(s8)  >= 8  else None
-            rg10 = calc_rg(market_cap_b, sa(s10) or 0, tangible_eq_b) if len(s10) >= 10 else None
-            rg12 = calc_rg(market_cap_b, sa(s12) or 0, tangible_eq_b) if len(s12) >= 12 else None
+            se8  = sa(s8)  if len(s8)  >= 8  else None
+            se10 = sa(s10) if len(s10) >= 10 else None
+            se12 = sa(s12) if len(s12) >= 12 else None
+
+            # calc_rg returns None when fundamental base ≤ 0
+            # Pass smoothed earnings directly (no "or 0" coercion)
+            rg8  = calc_rg(market_cap_b, se8,  tangible_eq_b) if se8  is not None else None
+            rg10 = calc_rg(market_cap_b, se10, tangible_eq_b) if se10 is not None else None
+            rg12 = calc_rg(market_cap_b, se12, tangible_eq_b) if se12 is not None else None
 
             used_annual = any([sup8, sup10, sup12])
-            fb = round(max(tangible_eq_b, 0) + (sa(s10) or 0) * 10, 2)
+
+            # fundamentalBaseApprox: null when fb ≤ 0 (not a meaningful positive base)
+            _fb_raw = max(tangible_eq_b, 0) + (se10 or 0) * 10
+            fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
 
             note = "Computed via yfinance."
             if used_annual:
@@ -465,17 +492,25 @@ def fetch_company(ticker: str, display_name: str, sector: str,
                 "note": note,
             })
 
-        # Trend codes for recent obs
+        # Trend codes for recent obs (computed from rg10; null-rg obs get null trend)
         for i in range(len(recent_obs)):
             curr = recent_obs[i]["rg10"]
             prev = recent_obs[i + 1]["rg10"] if i + 1 < len(recent_obs) else None
             recent_obs[i]["trend"] = trend_code(curr, prev)
 
-        recent_obs = [o for o in recent_obs if o.get("rg10") is not None]
-
-        if not recent_obs:
-            print("SKIP (no valid RG10)")
-            return None
+        # Keep observations even when RG is None (negative fundamental base).
+        # Filtering them out would leave stale data on disk. Instead, include
+        # them with a clear note so the detail page can explain the situation.
+        has_any_rg = any(o.get("rg10") is not None for o in recent_obs)
+        if not has_any_rg:
+            # Add explicit explanation to each null-RG observation
+            for o in recent_obs:
+                o["note"] = (
+                    "RG values not computable: fundamental base is zero or negative "
+                    "(tangible equity negative and smoothed earnings negative across "
+                    "all window sizes). The company's earnings do not provide a "
+                    "positive fundamental base at any smoothing horizon."
+                )
 
         # --- Historical annual observations (for chart) ----------------------
         hist_obs: list[dict] = []
@@ -520,7 +555,8 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
         n_hist = len(extra_hist)
         rg10_val = all_sorted[0].get("rg10")
-        print(f"OK  ({len(all_sorted)} obs [{n_hist} hist], RG10={rg10_val})")
+        status = "OK " if rg10_val is not None else "RG=∅"
+        print(f"{status} ({len(all_sorted)} obs [{n_hist} hist], RG10={rg10_val})")
         return company
 
     except Exception as exc:

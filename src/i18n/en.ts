@@ -197,6 +197,8 @@ export const en = {
     currency: 'Currency',
     metrics: {
       heading: 'RG Metrics',
+      notComputable: 'RG Not Computable',
+      notComputableNote: 'The fundamental base is zero or negative: tangible book equity is negative and smoothed earnings are negative across all smoothing windows (RG8, RG10, RG12). Under the RG methodology, a non-positive fundamental base means the company\'s earnings history does not provide fundamental coverage at the current market capitalisation. RG is undefined.',
     },
     supportingData: {
       heading: 'Supporting Data',

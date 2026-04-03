@@ -1,0 +1,26 @@
+{
+  "company": "SoftBank Group",
+  "ticker": "9984.T",
+  "slug": "softbankgroup",
+  "sector": "Technology",
+  "currency": "JPY",
+  "country": "JP",
+  "index": "Nikkei 225",
+  "description": "Data sourced via yfinance / Yahoo Finance. Approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "Q1 2025",
+      "rg8": 1.95,
+      "rg10": 2.68,
+      "rg12": 3.57,
+      "trend": null,
+      "marketCap": 20566.8,
+      "bookEquity": 5915.6,
+      "netIncome": 0,
+      "fundamentalBaseApprox": 7678.04,
+      "dataType": "quarterly",
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+    }
+  ]
+}

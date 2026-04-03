@@ -25,14 +25,14 @@
     {
       "periodKey": "2024_q3",
       "periodLabel": "Q3 2024",
-      "rg8": 3.99,
-      "rg10": 3.9,
-      "rg12": 3.79,
+      "rg8": 3.27,
+      "rg10": 3.33,
+      "rg12": 3.4,
       "trend": null,
       "marketCap": 19729.2,
       "bookEquity": 2173.4,
       "netIncome": 236.6,
-      "fundamentalBaseApprox": 5060.32,
+      "fundamentalBaseApprox": 5926.33,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
     },
