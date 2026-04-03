@@ -16,7 +16,7 @@ export const en = {
   footer: {
     tagline: 'A research-based heuristic indicator for fundamental coverage.',
     disclaimer: 'All data shown is illustrative and for research purposes only. Not investment advice.',
-    copyright: (year: number) => `© ${year} Reality Gap Project`,
+    copyright: (year: number) => `© ${year} Hanns-Steffen Rentschler`,
   },
 
   home: {
@@ -156,7 +156,7 @@ export const en = {
     title: 'Working Paper',
     label: 'Working Paper',
     paperTitle: 'Reality Gap: A Heuristic Indicator for Fundamental Coverage',
-    author: 'H. Stre',
+    author: 'Hanns-Steffen Rentschler',
     abstract: {
       heading: 'Abstract',
       body: 'This paper introduces the Reality Gap (RG) indicator, a heuristic measure of the relationship between a company\'s market capitalisation and its estimated fundamental base. The fundamental base is constructed from a combination of smoothed earnings — averaged over 8, 10, or 12 quarterly periods — and tangible book equity. The resulting ratio provides a descriptive, period-specific view of how far market valuations extend beyond what the underlying fundamentals directly support. The paper presents the formal construction of the indicator, discusses its assumptions and limitations, and illustrates its application across a sample of publicly traded companies. RG is explicitly not a valuation model and does not generate price targets or investment recommendations.',
@@ -260,13 +260,22 @@ export const en = {
       },
       author: {
         heading: 'Author',
-        body: 'The Reality Gap indicator was developed by H. Stre. The accompanying working paper presents the full methodological framework.',
+        body: 'The Reality Gap indicator was developed by Hanns-Steffen Rentschler. The accompanying working paper presents the full methodological framework.',
       },
       contact: {
         heading: 'Contact',
         body: 'For questions, feedback, or research inquiries, please get in touch via email.',
-        email: 'contact@reality-gap.com',
+        email: 'rentschler@lbsmail.de',
         githubLabel: 'Project on GitHub',
+      },
+      dataSources: {
+        heading: 'Data Sources',
+        body: [
+          'All financial data displayed on this website — including market capitalisation, net income, and book equity — is retrieved via yfinance, an open-source Python library that accesses publicly available data from Yahoo Finance.',
+          'Yahoo Finance aggregates financial data from stock exchanges and company filings. The data may contain errors, delays, or gaps. No independent verification is performed.',
+          'Historical market capitalisation values are approximations: closing prices at fiscal year-end multiplied by current shares outstanding. Share count changes over time are not reflected.',
+          'The RG values shown are computed approximations, not audited financial figures. They are provided for research and illustrative purposes only.',
+        ],
       },
       disclaimer: {
         heading: 'Disclaimer',

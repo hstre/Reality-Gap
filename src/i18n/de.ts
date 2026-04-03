@@ -16,7 +16,7 @@ export const de = {
   footer: {
     tagline: 'Ein forschungsbasierter heuristischer Indikator für fundamentale Abdeckung.',
     disclaimer: 'Alle dargestellten Daten sind illustrativ und dienen ausschließlich Forschungszwecken. Keine Anlageberatung.',
-    copyright: (year: number) => `© ${year} Reality Gap Project`,
+    copyright: (year: number) => `© ${year} Hanns-Steffen Rentschler`,
   },
 
   home: {
@@ -156,7 +156,7 @@ export const de = {
     title: 'Working Paper',
     label: 'Working Paper',
     paperTitle: 'Reality Gap: Ein heuristischer Indikator für fundamentale Abdeckung',
-    author: 'H. Stre',
+    author: 'Hanns-Steffen Rentschler',
     abstract: {
       heading: 'Abstract',
       body: 'Dieses Paper stellt den Reality-Gap-Indikator (RG) vor, ein heuristisches Maß für das Verhältnis zwischen der Marktkapitalisierung eines Unternehmens und seiner geschätzten fundamentalen Basis. Die fundamentale Basis wird aus einer Kombination geglätteter Gewinne — gemittelt über 8, 10 oder 12 Quartalszeiträume — und materiellem Buchwert des Eigenkapitals konstruiert. Das resultierende Verhältnis bietet einen beschreibenden, periodenspezifischen Blick darauf, wie weit Marktbewertungen über das hinausgehen, was die zugrunde liegenden Fundamentaldaten direkt stützen. Das Paper präsentiert die formale Konstruktion des Indikators, erörtert seine Annahmen und Einschränkungen und veranschaulicht seine Anwendung an einer Stichprobe börsennotierter Unternehmen. RG ist ausdrücklich kein Bewertungsmodell und generiert keine Kursziele oder Anlageempfehlungen.',
@@ -260,13 +260,22 @@ export const de = {
       },
       author: {
         heading: 'Autor',
-        body: 'Der Reality-Gap-Indikator wurde von H. Stre entwickelt. Das begleitende Working Paper präsentiert den vollständigen methodischen Rahmen.',
+        body: 'Der Reality-Gap-Indikator wurde von Hanns-Steffen Rentschler entwickelt. Das begleitende Working Paper präsentiert den vollständigen methodischen Rahmen.',
       },
       contact: {
         heading: 'Kontakt',
         body: 'Für Fragen, Feedback oder Forschungsanfragen können Sie per E-Mail Kontakt aufnehmen.',
-        email: 'contact@reality-gap.com',
+        email: 'rentschler@lbsmail.de',
         githubLabel: 'Projekt auf GitHub',
+      },
+      dataSources: {
+        heading: 'Datenquellen',
+        body: [
+          'Alle auf dieser Website angezeigten Finanzdaten — einschließlich Marktkapitalisierung, Nettogewinn und Buchwert — werden über yfinance abgerufen, eine Open-Source-Python-Bibliothek, die öffentlich verfügbare Daten von Yahoo Finance bezieht.',
+          'Yahoo Finance aggregiert Finanzdaten von Börsen und Unternehmensberichten. Die Daten können Fehler, Verzögerungen oder Lücken enthalten. Es wird keine unabhängige Überprüfung vorgenommen.',
+          'Historische Marktkapitalisierungswerte sind Näherungswerte: Schlusskurse am Geschäftsjahresende multipliziert mit der aktuellen Aktienanzahl. Veränderungen der Aktienanzahl im Zeitverlauf sind nicht berücksichtigt.',
+          'Die dargestellten RG-Werte sind berechnete Näherungen, keine geprüften Finanzkennzahlen. Sie dienen ausschließlich Forschungs- und Illustrationszwecken.',
+        ],
       },
       disclaimer: {
         heading: 'Haftungsausschluss',

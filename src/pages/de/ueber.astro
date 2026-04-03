@@ -41,6 +41,9 @@ const a = t.about;
         </a>
       </p>
 
+      <h2>{a.sections.dataSources.heading}</h2>
+      {a.sections.dataSources.body.map(p => <p>{p}</p>)}
+
       <div class="border border-gray-200 rounded-md p-5 bg-gray-50 mt-10">
         <h2 class="mt-0 mb-3 text-base font-semibold text-gray-700">{a.sections.disclaimer.heading}</h2>
         <p class="text-sm text-gray-600 mb-0">{a.sections.disclaimer.body}</p>
