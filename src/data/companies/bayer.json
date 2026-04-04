@@ -71,17 +71,17 @@
     {
       "periodKey": "2023_q4",
       "periodLabel": "Q4 2023",
-      "rg8": 4.66,
-      "rg10": null,
-      "rg12": null,
+      "rg8": 5.82,
+      "rg10": 4.66,
+      "rg12": 3.88,
       "trend": null,
       "marketCap": 28.1,
       "bookEquity": -22.7,
       "netIncome": -2.9,
-      "fundamentalBaseApprox": null,
+      "fundamentalBaseApprox": 6.04,
       "dataType": "annual",
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation.",
-      "dataQuality": "positive_rg_no_fb"
+      "dataQuality": "ok"
     }
   ]
 }

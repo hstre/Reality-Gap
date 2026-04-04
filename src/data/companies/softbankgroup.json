@@ -11,17 +11,32 @@
     {
       "periodKey": "2025_q1",
       "periodLabel": "Q1 2025",
-      "rg8": 1.95,
-      "rg10": 2.68,
-      "rg12": 3.57,
+      "rg8": 2.14,
+      "rg10": 1.95,
+      "rg12": 1.79,
       "trend": null,
       "marketCap": 20566.8,
       "bookEquity": 5915.6,
       "netIncome": 0,
-      "fundamentalBaseApprox": 7678.04,
+      "fundamentalBaseApprox": 10544.01,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
       "dataQuality": "ok"
+    },
+    {
+      "periodKey": "2024_q1",
+      "periodLabel": "Q1 2024",
+      "rg8": 9.95,
+      "rg10": null,
+      "rg12": null,
+      "trend": null,
+      "marketCap": 11189.0,
+      "bookEquity": 5915.6,
+      "netIncome": -227.6,
+      "fundamentalBaseApprox": null,
+      "dataType": "annual",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation.",
+      "dataQuality": "positive_rg_no_fb"
     }
   ]
 }

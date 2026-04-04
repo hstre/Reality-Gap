@@ -11,14 +11,14 @@
     {
       "periodKey": "2025_q4",
       "periodLabel": "Q4 2025",
-      "rg8": 2.36,
+      "rg8": 2.95,
       "rg10": 2.36,
-      "rg12": 2.37,
+      "rg12": 1.97,
       "trend": "=",
       "marketCap": 46.8,
       "bookEquity": -1.0,
       "netIncome": 2.0,
-      "fundamentalBaseApprox": 19.82,
+      "fundamentalBaseApprox": 19.85,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
       "dataQuality": "ok"
@@ -26,14 +26,14 @@
     {
       "periodKey": "2025_q2",
       "periodLabel": "Q2 2025",
-      "rg8": 2.35,
-      "rg10": 2.36,
-      "rg12": 2.37,
+      "rg8": 2.94,
+      "rg10": 2.35,
+      "rg12": 1.96,
       "trend": "=",
       "marketCap": 46.8,
       "bookEquity": -1.0,
       "netIncome": 2.0,
-      "fundamentalBaseApprox": 19.82,
+      "fundamentalBaseApprox": 19.91,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
       "dataQuality": "ok"
@@ -41,14 +41,14 @@
     {
       "periodKey": "2025_q1",
       "periodLabel": "Q1 2025",
-      "rg8": 2.37,
+      "rg8": 2.96,
       "rg10": 2.37,
-      "rg12": 2.4,
+      "rg12": 1.97,
       "trend": "=",
       "marketCap": 46.8,
       "bookEquity": -1.0,
       "netIncome": 2.1,
-      "fundamentalBaseApprox": 19.73,
+      "fundamentalBaseApprox": 19.8,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
       "dataQuality": "ok"
@@ -56,14 +56,14 @@
     {
       "periodKey": "2024_q4",
       "periodLabel": "Q4 2024",
-      "rg8": 2.39,
+      "rg8": 2.99,
       "rg10": 2.39,
-      "rg12": 2.44,
-      "trend": null,
+      "rg12": 1.99,
+      "trend": "++",
       "marketCap": 46.8,
       "bookEquity": -1.0,
       "netIncome": 2.0,
-      "fundamentalBaseApprox": 19.58,
+      "fundamentalBaseApprox": 19.61,
       "dataType": "quarterly",
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
       "dataQuality": "ok"
@@ -71,17 +71,17 @@
     {
       "periodKey": "2023_q4",
       "periodLabel": "Q4 2023",
-      "rg8": 2.02,
-      "rg10": null,
-      "rg12": null,
+      "rg8": 2.52,
+      "rg10": 2.02,
+      "rg12": 1.68,
       "trend": null,
       "marketCap": 32.5,
       "bookEquity": -1.0,
       "netIncome": 1.7,
-      "fundamentalBaseApprox": null,
+      "fundamentalBaseApprox": 16.09,
       "dataType": "annual",
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation.",
-      "dataQuality": "positive_rg_no_fb"
+      "dataQuality": "ok"
     }
   ]
 }

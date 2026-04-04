@@ -193,14 +193,23 @@ def trend_code(current: Optional[float], previous: Optional[float]) -> Optional[
 
 
 def calc_rg(market_cap_b: float, smoothed_annual_b: Optional[float],
-            tangible_eq_b: float) -> Optional[float]:
-    """RG = marketCap / (max(tangibleEquity,0) + smoothedAnnualEarnings*10)
+            tangible_eq_b: float, multiplier: int = 10) -> Optional[float]:
+    """RG_N = marketCap / (max(tangibleEquity,0) + smoothedAnnualEarnings * N)
+
+    The subscript N (8, 10, 12) is the capitalization factor — how many years
+    of smoothed earnings are assumed to represent 'fair value' of the earnings
+    component.  A larger N implies a more generous valuation assumption, so
+    RG8 >= RG10 >= RG12 for any company with positive smoothed earnings.
+
+    Smoothed earnings are always derived from the same fixed 8-quarter window;
+    only the capitalization multiple varies across RG8/10/12.
+
     Returns None when smoothed earnings are None or when the fundamental
-    base is zero or negative (i.e. the company is not fundamentally coverable).
+    base is zero or negative.
     """
     if smoothed_annual_b is None:
         return None
-    fb = max(tangible_eq_b, 0.0) + smoothed_annual_b * 10
+    fb = max(tangible_eq_b, 0.0) + smoothed_annual_b * multiplier
     if fb <= 0:
         return None
     return round(market_cap_b / fb, 2)
@@ -286,7 +295,7 @@ def build_historical_annual_obs(
         q_synthetic   = [v / 4.0 for v in avail_annual for _ in range(4)]
         n_q = len(q_synthetic)
 
-        # Need at least 8 synthetic quarters for any RG variant
+        # Need at least 8 synthetic quarters for smoothed earnings
         if n_q < 8:
             continue
 
@@ -297,26 +306,20 @@ def build_historical_annual_obs(
         else:
             hist_mc_b = current_mc_b  # fallback
 
-        # Smoothed earnings (annualised mean over window)
-        def se(n: int) -> Optional[float]:
-            if n_q < n:
-                return None
-            window = q_synthetic[-n:]   # most-recent n synthetic quarters
-            return round(sum(window) / n * 4, 4)
+        # Single smoothed earnings: mean of the 8 most-recent synthetic quarters × 4
+        # N in RG_N is the capitalization factor, not the smoothing window.
+        window8 = q_synthetic[-8:]
+        se = round(sum(window8) / 8 * 4, 4)
 
-        se8  = se(8)
-        se10 = se(10)
-        se12 = se(12)
+        rg8  = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=8)
+        rg10 = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=10)
+        rg12 = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=12)
 
-        rg8  = calc_rg(hist_mc_b, se8,  tangible_eq_b)
-        rg10 = calc_rg(hist_mc_b, se10, tangible_eq_b)
-        rg12 = calc_rg(hist_mc_b, se12, tangible_eq_b)
-
-        # Skip annual historical obs where even RG8 is not computable
+        # Skip annual historical obs where RG8 is not computable (fundamental base ≤ 0)
         if rg8 is None:
             continue
 
-        _fb_raw = max(tangible_eq_b, 0) + (se10 or 0) * 10
+        _fb_raw = max(tangible_eq_b, 0) + se * 10
         fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
 
         obs: dict = {
@@ -350,16 +353,22 @@ def validate_and_annotate_observations(observations: list[dict]) -> list[dict]:
     """
     Validate each observation for internal consistency and add a 'dataQuality' field.
 
+    Convention (post-fix): RG_N = mc / (max(TE,0) + se × N) where se is fixed
+    (mean of last 8 quarters × 4) and N ∈ {8,10,12} is the capitalization factor.
+    With se > 0 this guarantees RG8 >= RG10 >= RG12 mathematically.
+
     Values:
-      "ok"                      – all checks pass
-      "window_boundary_artifact"– RG8/10/12 not monotone; expected when the
-                                   annual-supplement boundary falls at a
-                                   different position across window sizes
-                                   (obs_idx 1-3 only, not a formula error)
-      "fb_rg_inconsistency"     – RG10 × fundamentalBaseApprox ≠ marketCap
-                                   (indicates stale/placeholder data)
-      "positive_rg_no_fb"       – RG is positive but fundamentalBase is null
-                                   or non-positive (should not occur)
+      "ok"                        – all checks pass
+      "negative_earnings_ordering"– se < 0 so the RG ordering inverts (RG8 ≤ RG10 ≤ RG12);
+                                     the company had negative smoothed earnings at this
+                                     observation but a large enough tangible equity to keep
+                                     all three fundamental bases positive. Mathematically
+                                     correct; not a formula error.
+      "fb_rg_inconsistency"       – RG10 × fundamentalBaseApprox ≠ marketCap by more than
+                                     5% AND 0.10 absolute (indicates stale/placeholder data)
+      "positive_rg_no_fb"         – RG is positive but fundamentalBase is null or ≤ 0
+                                     (can occur at boundary observations where se is not
+                                     storable via the N=10 base; informational only)
     Multiple issues are joined with "|".
     """
     for obs in observations:
@@ -371,17 +380,15 @@ def validate_and_annotate_observations(observations: list[dict]) -> list[dict]:
 
         issues: list[str] = []
 
-        # 1. Monotonicity: must be weakly monotone in either direction
-        if rg8 is not None and rg10 is not None and rg12 is not None:
-            eps = 1e-6
-            monotone_up   = (rg8 <= rg10 + eps) and (rg10 <= rg12 + eps)
-            monotone_down = (rg8 >= rg10 - eps) and (rg10 >= rg12 - eps)
-            if not monotone_up and not monotone_down:
-                issues.append("window_boundary_artifact")
+        # 1. Detect negative-earnings ordering inversion
+        #    With positive se: RG8 >= RG10 >= RG12 (normal)
+        #    With negative se: RG8 <= RG10 <= RG12 (inverted, but mathematically correct)
+        if rg8 is not None and rg10 is not None:
+            if rg8 < rg10 - 0.005:          # strictly inverted (beyond rounding)
+                issues.append("negative_earnings_ordering")
 
         # 2. FB–RG10 round-trip: rg10 ≈ marketCap / fundamentalBaseApprox
-        #    Require BOTH >5% relative AND >0.1 absolute deviation to flag,
-        #    so that rounding to 2 decimal places doesn't produce false positives.
+        #    Require BOTH >5% relative AND >0.10 absolute to avoid rounding false positives.
         if rg10 is not None and mc is not None and fb is not None and fb > 0:
             implied = mc / fb
             rel_err = abs(implied - rg10) / max(abs(rg10), 1e-9)
@@ -512,27 +519,20 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             pl   = period_label(date)
 
             avail_q = q_values[obs_idx:]
-            s8,  sup8  = build_ni_series(avail_q, a_values, 8)
-            s10, sup10 = build_ni_series(avail_q, a_values, 10)
-            s12, sup12 = build_ni_series(avail_q, a_values, 12)
 
-            def sa(series: list[float]) -> Optional[float]:
-                return round(sum(series) / len(series) * 4, 4) if series else None
+            # Single smoothed earnings from a fixed 8-quarter window.
+            # N in RG_N is the capitalization factor (not the smoothing window),
+            # ensuring RG8 >= RG10 >= RG12 for any company with positive earnings.
+            s8, used_annual = build_ni_series(avail_q, a_values, 8)
+            se = round(sum(s8) / len(s8) * 4, 4) if len(s8) >= 8 else None
 
-            se8  = sa(s8)  if len(s8)  >= 8  else None
-            se10 = sa(s10) if len(s10) >= 10 else None
-            se12 = sa(s12) if len(s12) >= 12 else None
+            # Three RG variants: same smoothed earnings, different multipliers
+            rg8  = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=8)
+            rg10 = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=10)
+            rg12 = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=12)
 
-            # calc_rg returns None when fundamental base ≤ 0
-            # Pass smoothed earnings directly (no "or 0" coercion)
-            rg8  = calc_rg(market_cap_b, se8,  tangible_eq_b) if se8  is not None else None
-            rg10 = calc_rg(market_cap_b, se10, tangible_eq_b) if se10 is not None else None
-            rg12 = calc_rg(market_cap_b, se12, tangible_eq_b) if se12 is not None else None
-
-            used_annual = any([sup8, sup10, sup12])
-
-            # fundamentalBaseApprox: null when fb ≤ 0 (not a meaningful positive base)
-            _fb_raw = max(tangible_eq_b, 0) + (se10 or 0) * 10
+            # fundamentalBaseApprox stores the N=10 base for reference
+            _fb_raw = max(tangible_eq_b, 0) + (se or 0) * 10
             fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
 
             note = "Computed via yfinance."
