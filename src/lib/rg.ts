@@ -10,6 +10,7 @@ export interface Observation {
   bookEquity?: number;
   netIncome?: number;
   fundamentalBaseApprox?: number;
+  nearBoundary?: boolean;
   note?: string;
 }
 
@@ -60,11 +61,24 @@ export function formatMarketCap(value: number | undefined): string {
   return `$${value.toLocaleString('en-US')}B`;
 }
 
+/** Cap above which RG values are shown as ">N" in the UI */
+export const RG_DISPLAY_CAP = 50;
+
 /**
  * Format RG value with 1 decimal, or "—" if null/undefined
  */
 export function formatRG(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
+  return value.toFixed(1);
+}
+
+/**
+ * Format RG for display, capping values above RG_DISPLAY_CAP.
+ * Keeps raw precision in data; only the visual presentation is capped.
+ */
+export function formatRGCapped(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  if (value > RG_DISPLAY_CAP) return `>${RG_DISPLAY_CAP}`;
   return value.toFixed(1);
 }
 

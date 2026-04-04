@@ -24,6 +24,7 @@
       "netIncome": 0.4,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Not fundamentally covered: fundamental base FB_N = TE + E_N ≤ 0 for all capitalization factors. TE is negative and smoothed earnings G ≤ 0 (or G × N < |TE|).",
       "dataQuality": "ok"
     },
@@ -43,6 +44,7 @@
       "netIncome": 0.1,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Not fundamentally covered: fundamental base FB_N = TE + E_N ≤ 0 for all capitalization factors. TE is negative and smoothed earnings G ≤ 0 (or G × N < |TE|).",
       "dataQuality": "ok"
     },
@@ -62,6 +64,7 @@
       "netIncome": 0.2,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Not fundamentally covered: fundamental base FB_N = TE + E_N ≤ 0 for all capitalization factors. TE is negative and smoothed earnings G ≤ 0 (or G × N < |TE|).",
       "dataQuality": "ok"
     },
@@ -81,6 +84,7 @@
       "netIncome": 0.2,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Not fundamentally covered: fundamental base FB_N = TE + E_N ≤ 0 for all capitalization factors. TE is negative and smoothed earnings G ≤ 0 (or G × N < |TE|).",
       "dataQuality": "ok"
     },
@@ -100,6 +104,7 @@
       "netIncome": 0.2,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     }

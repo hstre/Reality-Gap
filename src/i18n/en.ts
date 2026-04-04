@@ -199,6 +199,8 @@ export const en = {
       heading: 'RG Metrics',
       notComputable: 'Not Fundamentally Covered',
       notComputableNote: 'FB\u2099 = TE + E\u2099 \u2264 0 for all capitalization factors N \u2208 {8,10,12}. Tangible equity is negative and smoothed earnings G are not large enough to produce a positive fundamental base. Under the paper definition, RG is undefined for this company at this period.',
+      nearBoundaryHeading: 'Near-Boundary Case',
+      nearBoundaryNote: 'Tangible equity (TE) is deeply negative. The fundamental base FB\u2088 = TE + G\u00d78 is positive but very small — less than 10% of the earnings contribution G\u00d78. A small change in smoothed earnings G would push FB\u2088 negative (not fundamentally covered). RG\u2088 values above 50 are displayed as \u201e>50\u201c for readability. The underlying raw value is stored in full precision.',
     },
     supportingData: {
       heading: 'Supporting Data',

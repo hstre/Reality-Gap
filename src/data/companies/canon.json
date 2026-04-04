@@ -24,6 +24,7 @@
       "netIncome": 0,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Approximation.",
       "dataQuality": "ok"
     },
@@ -43,6 +44,7 @@
       "netIncome": 160.0,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     },
@@ -62,6 +64,7 @@
       "netIncome": 264.5,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     }

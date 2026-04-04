@@ -321,6 +321,22 @@ def fundamental_base(smoothed_annual_b: Optional[float],
     return round(FB, 4) if FB > 0 else None
 
 
+NEAR_BOUNDARY_THRESHOLD = 0.10
+
+def is_near_boundary(G: Optional[float], tangible_eq_b: float) -> bool:
+    """True when G>0, TE<0, and FB8 < 10% of G×8 (near-singular denominator).
+
+    Flags cases where the N=8 fundamental base is positive but very small
+    relative to the earnings contribution — the two components nearly cancel.
+    A minor change in G would flip FB8 negative (not fundamentally covered).
+    """
+    if G is None or G <= 0 or tangible_eq_b >= 0:
+        return False
+    E8  = G * 8
+    FB8 = tangible_eq_b + E8
+    return 0.0 < FB8 < E8 * NEAR_BOUNDARY_THRESHOLD
+
+
 def build_ni_series(quarterly_ni: list[float], annual_ni: list[float],
                     n_needed: int) -> tuple[list[float], bool]:
     """
@@ -456,6 +472,7 @@ def build_historical_annual_obs(
             "netIncome":            round(avail_annual[-1] if avail_annual else 0, 1),
             "dataType":             "annual",
             "teIsApprox":           True,  # historical TE is always current snapshot
+            "nearBoundary":         is_near_boundary(G, tangible_eq_b),
             "note": (
                 "Annual historical observation. Market cap approximated from "
                 "historical close price × current shares outstanding. "
@@ -709,6 +726,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
                 "netIncome":            round((avail_q[0] if avail_q else 0) * 4, 1),
                 "dataType":             "quarterly",
                 "teIsApprox":           te_is_approx,
+                "nearBoundary":         is_near_boundary(G, tangible_eq_b),
                 "note":                 note,
             })
 

@@ -199,6 +199,8 @@ export const de = {
       heading: 'RG-Kennzahlen',
       notComputable: 'Fundamental nicht abgedeckt',
       notComputableNote: 'FB\u2099 = EK + E\u2099 \u2264 0 für alle Kapitalisierungsfaktoren N \u2208 {8,10,12}. Das tangible Eigenkapital ist negativ und der geglättete Gewinn G reicht nicht aus, um eine positive fundamentale Basis zu erzeugen. Nach der Papierdefinition ist RG für dieses Unternehmen in diesem Zeitraum undefiniert.',
+      nearBoundaryHeading: 'Grenzfall der Methodik',
+      nearBoundaryNote: 'Das tangible Eigenkapital (EK) ist stark negativ. Die fundamentale Basis FB\u2088 = EK + G\u00d78 ist zwar positiv, aber sehr klein \u2014 unter 10\u00a0% des Gewinnbeitrags G\u00d78. Eine kleine \u00c4nderung im gegl\u00e4tteten Gewinn G w\u00fcrde FB\u2088 ins Negative kippen (nicht fundamental gedeckt). RG\u2088-Werte \u00fcber 50 werden aus Gr\u00fcnden der Lesbarkeit als \u201e>50\u201c dargestellt. Der zugrundeliegende Rohwert ist in voller Pr\u00e4zision gespeichert.',
     },
     supportingData: {
       heading: 'Zusatzdaten',

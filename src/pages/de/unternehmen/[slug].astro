@@ -5,7 +5,7 @@ import TrendBadge from '../../../components/ui/TrendBadge.astro';
 import RGChart from '../../../components/ui/RGChart.astro';
 import { de } from '../../../i18n/de';
 import type { Company } from '../../../lib/rg';
-import { getLatestObservation, formatRG, formatRGLabel } from '../../../lib/rg';
+import { getLatestObservation, formatRGCapped, formatRGLabel } from '../../../lib/rg';
 import { formatBillions } from '../../../lib/format';
 import slugsJson from '../../../data/companies.index.json';
 
@@ -86,21 +86,33 @@ const trendLabel = obs?.trend ? (trendLabelsDE[obs.trend] ?? obs.trend) : undefi
             <p class="text-sm text-amber-700">{tc.metrics.notComputableNote}</p>
           </div>
         ) : (
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <MetricBlock
-              label={formatRGLabel(8, obs.periodLabel)}
-              value={formatRG(obs.rg8)}
-            />
-            <MetricBlock
-              label={formatRGLabel(10, obs.periodLabel)}
-              value={formatRG(obs.rg10)}
-              highlight={true}
-            />
-            <MetricBlock
-              label={formatRGLabel(12, obs.periodLabel)}
-              value={formatRG(obs.rg12)}
-            />
-          </div>
+          <>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <MetricBlock
+                label={formatRGLabel(8, obs.periodLabel)}
+                value={formatRGCapped(obs.rg8)}
+                nearBoundary={(obs as any).nearBoundary === true}
+              />
+              <MetricBlock
+                label={formatRGLabel(10, obs.periodLabel)}
+                value={formatRGCapped(obs.rg10)}
+                highlight={(obs as any).nearBoundary !== true}
+                nearBoundary={(obs as any).nearBoundary === true}
+              />
+              <MetricBlock
+                label={formatRGLabel(12, obs.periodLabel)}
+                value={formatRGCapped(obs.rg12)}
+                nearBoundary={(obs as any).nearBoundary === true}
+              />
+            </div>
+            {(obs as any).nearBoundary === true && (
+              <div class="border border-amber-200 bg-amber-50 rounded-md px-5 py-3 mb-8">
+                <p class="text-sm font-semibold text-amber-800 mb-1">{tc.metrics.nearBoundaryHeading}</p>
+                <p class="text-sm text-amber-700">{tc.metrics.nearBoundaryNote}</p>
+              </div>
+            )}
+            {(obs as any).nearBoundary !== true && <div class="mb-8" />}
+          </>
         )}
 
         <div class="mb-8">

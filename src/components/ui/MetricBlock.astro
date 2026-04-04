@@ -4,23 +4,31 @@ interface Props {
   value: string;       // e.g. "11.3"
   sublabel?: string;   // optional explanatory note
   highlight?: boolean;
+  nearBoundary?: boolean;
 }
 
-const { label, value, sublabel, highlight = false } = Astro.props;
+const { label, value, sublabel, highlight = false, nearBoundary = false } = Astro.props;
 ---
 
 <div class:list={[
   'border rounded-md p-5 flex flex-col',
-  highlight ? 'border-accent bg-blue-50/30' : 'border-gray-200 bg-white',
+  nearBoundary
+    ? 'border-amber-300 bg-amber-50/60'
+    : highlight
+      ? 'border-accent bg-blue-50/30'
+      : 'border-gray-200 bg-white',
 ]}>
   <span class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-2">{label}</span>
   <span class:list={[
     'text-3xl font-light tabular-nums',
-    highlight ? 'text-accent' : 'text-gray-900',
+    nearBoundary ? 'text-amber-700' : highlight ? 'text-accent' : 'text-gray-900',
   ]} style="font-family: Georgia, serif;">
     {value}
   </span>
-  {sublabel && (
+  {nearBoundary && (
+    <span class="text-xs text-amber-600 mt-2 font-medium">⚠ near boundary</span>
+  )}
+  {sublabel && !nearBoundary && (
     <span class="text-xs text-gray-400 mt-2">{sublabel}</span>
   )}
 </div>

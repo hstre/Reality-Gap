@@ -24,6 +24,7 @@
       "netIncome": 76.8,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     },
@@ -43,6 +44,7 @@
       "netIncome": 49.5,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     },
@@ -62,6 +64,7 @@
       "netIncome": 18.4,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     },
@@ -81,6 +84,7 @@
       "netIncome": 78.8,
       "dataType": "quarterly",
       "teIsApprox": false,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     },
@@ -100,6 +104,7 @@
       "netIncome": 96.2,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     }

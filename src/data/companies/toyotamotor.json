@@ -24,6 +24,7 @@
       "netIncome": 5029.9,
       "dataType": "quarterly",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. TE approximated as book equity (GW/IA not separately available). Approximation.",
       "dataQuality": "ok"
     },
@@ -43,6 +44,7 @@
       "netIncome": 3728.3,
       "dataType": "quarterly",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. TE approximated as book equity (GW/IA not separately available). Approximation.",
       "dataQuality": "ok"
     },
@@ -62,6 +64,7 @@
       "netIncome": 3365.4,
       "dataType": "quarterly",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. TE approximated as book equity (GW/IA not separately available). Approximation.",
       "dataQuality": "ok"
     },
@@ -81,6 +84,7 @@
       "netIncome": 2658.8,
       "dataType": "quarterly",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. TE approximated as book equity (GW/IA not separately available). Approximation.",
       "dataQuality": "ok"
     },
@@ -100,6 +104,7 @@
       "netIncome": 4944.9,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     },
@@ -119,6 +124,7 @@
       "netIncome": 2451.3,
       "dataType": "annual",
       "teIsApprox": true,
+      "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     }
