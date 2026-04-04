@@ -28,10 +28,31 @@ const sectors: string[] = sectorsJson;
   altLang="en"
 >
   <div class="max-w-5xl mx-auto px-6 py-12">
-    <h1 class="text-3xl font-normal text-gray-900 mb-3" style="font-family: Georgia, serif;">
-      {t.rankings.title}
-    </h1>
-    <p class="text-gray-600 mb-8">{t.rankings.intro}</p>
+    <div class="flex flex-wrap items-start justify-between gap-4 mb-3">
+      <h1 class="text-3xl font-normal text-gray-900" style="font-family: Georgia, serif;">
+        {t.rankings.title}
+      </h1>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <a
+          href={`${base}/data/companies.csv`}
+          download="reality-gap-data.csv"
+          class="inline-flex items-center gap-1.5 text-xs font-medium text-accent border border-accent/40 rounded px-3 py-1.5 hover:bg-accent/5 transition-colors no-underline"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          {t.rankings.downloadCsv}
+        </a>
+        <a
+          href={`${base}/data/companies.json`}
+          download="reality-gap-data.json"
+          class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 transition-colors no-underline"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          {t.rankings.downloadJson}
+        </a>
+      </div>
+    </div>
+    <p class="text-gray-600 mb-1">{t.rankings.intro}</p>
+    <p class="text-xs text-gray-400 mb-8">{t.rankings.downloadNote}</p>
 
     <RankingTable
       companies={companies}
