@@ -125,7 +125,7 @@ export const de = {
           {
             label: 'Geglättete Gewinne',
             description:
-              'Ein Durchschnitt des Nettoeinkommens über das Beobachtungsfenster (8, 10 oder 12 Quartale). Die Glättung reduziert den Einfluss von Einmaleffekten und zyklischen Verzerrungen.',
+              'Geglätteter Langfristgewinn G: Mittelwert der letzten 8 verfügbaren Quartale, annualisiert. Dasselbe G wird für RG8, RG10 und RG12 verwendet — nur der Kapitalisierungsfaktor N variiert.',
           },
           {
             label: 'Fundamentale Basis',
@@ -159,7 +159,7 @@ export const de = {
     author: 'Hanns-Steffen Rentschler',
     abstract: {
       heading: 'Abstract',
-      body: 'Dieses Paper stellt den Reality-Gap-Indikator (RG) vor, ein heuristisches Maß für das Verhältnis zwischen der Marktkapitalisierung eines Unternehmens und seiner geschätzten fundamentalen Basis. Die fundamentale Basis wird aus einer Kombination geglätteter Gewinne — gemittelt über 8, 10 oder 12 Quartalszeiträume — und materiellem Buchwert des Eigenkapitals konstruiert. Das resultierende Verhältnis bietet einen beschreibenden, periodenspezifischen Blick darauf, wie weit Marktbewertungen über das hinausgehen, was die zugrunde liegenden Fundamentaldaten direkt stützen. Das Paper präsentiert die formale Konstruktion des Indikators, erörtert seine Annahmen und Einschränkungen und veranschaulicht seine Anwendung an einer Stichprobe börsennotierter Unternehmen. RG ist ausdrücklich kein Bewertungsmodell und generiert keine Kursziele oder Anlageempfehlungen.',
+      body: 'Dieses Paper stellt den Reality-Gap-Indikator (RG) vor, ein heuristisches Maß für das Verhältnis zwischen der Marktkapitalisierung eines Unternehmens und seiner geschätzten fundamentalen Basis. Die fundamentale Basis ist FB\u2099 = EK + E\u2099, wobei EK das tangible Eigenkapital und E\u2099 = N\u00d7G die kapitalisierte nachhaltige Ertragskraft ist (G = geglätteter Langfristgewinn, N \u2208 {8, 10, 12} der Kapitalisierungsfaktor). Das resultierende Verhältnis bietet einen beschreibenden, periodenspezifischen Blick darauf, wie weit Marktbewertungen über das hinausgehen, was die zugrunde liegenden Fundamentaldaten direkt stützen. Das Paper präsentiert die formale Konstruktion des Indikators, erörtert seine Annahmen und Einschränkungen und veranschaulicht seine Anwendung an einer Stichprobe börsennotierter Unternehmen. RG ist ausdrücklich kein Bewertungsmodell und generiert keine Kursziele oder Anlageempfehlungen.',
     },
     download: {
       heading: 'Download',
@@ -276,10 +276,18 @@ export const de = {
         email: 'rentschler@lbsmail.de',
         githubLabel: 'Projekt auf GitHub',
       },
+      websiteApproximation: {
+        heading: 'Operative Näherung auf dieser Website',
+        body: [
+          'Das Paper definiert G als geglättetes Langfrist-Ertragsmass. Diese Website verwendet eine feste operative Näherung: G_approx = Mittelwert der letzten 8 verfügbaren Quartale, annualisiert (×4). Dasselbe G_approx wird identisch für RG8, RG10 und RG12 verwendet — nur der Kapitalisierungsfaktor N variiert.',
+          'Diese Näherung folgt der strukturellen Logik des Papers (ein einziges G, variierendes N), weicht jedoch in zwei Punkten von einer vollständigen Paper-Implementierung ab: (1) Das Glättungsfenster ist auf 8 Quartale fixiert, anstatt ggf. unternehmensspezifisch kalibriert zu sein; (2) wenn weniger als 8 echte Quartalsdaten vorliegen, wird die Reihe mit Jahresdaten geteilt durch 4 ergänzt.',
+          'Beobachtungen mit unzureichenden Quartalsdaten werden mit dataType = \"annual\" gekennzeichnet und aus dem historischen Verlaufschart ausgeschlossen. Das Feld smoothedEarnings sowie das Flag teIsApprox werden in jeder Beobachtung explizit gespeichert, sodass die Näherung stets nachvollziehbar bleibt.',
+        ],
+      },
       dataSources: {
         heading: 'Datenquellen',
         body: [
-          'Alle auf dieser Website angezeigten Finanzdaten — einschließlich Marktkapitalisierung, Nettogewinn und Buchwert — werden über yfinance abgerufen, eine Open-Source-Python-Bibliothek, die öffentlich verfügbare Daten von Yahoo Finance bezieht.',
+          'Alle auf dieser Website angezeigten Finanzdaten — einschließlich Marktkapitalisierung, Nettogewinn und tangibles Eigenkapital — werden über yfinance abgerufen, eine Open-Source-Python-Bibliothek, die öffentlich verfügbare Daten von Yahoo Finance bezieht.',
           'Yahoo Finance aggregiert Finanzdaten von Börsen und Unternehmensberichten. Die Daten können Fehler, Verzögerungen oder Lücken enthalten. Es wird keine unabhängige Überprüfung vorgenommen.',
           'Historische Marktkapitalisierungswerte sind Näherungswerte: Schlusskurse am Geschäftsjahresende multipliziert mit der aktuellen Aktienanzahl. Veränderungen der Aktienanzahl im Zeitverlauf sind nicht berücksichtigt.',
           'Die dargestellten RG-Werte sind berechnete Näherungen, keine geprüften Finanzkennzahlen. Sie dienen ausschließlich Forschungs- und Illustrationszwecken.',

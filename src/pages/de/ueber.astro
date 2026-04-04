@@ -41,6 +41,9 @@ const a = t.about;
         </a>
       </p>
 
+      <h2>{a.sections.websiteApproximation.heading}</h2>
+      {a.sections.websiteApproximation.body.map(p => <p>{p}</p>)}
+
       <h2>{a.sections.dataSources.heading}</h2>
       {a.sections.dataSources.body.map(p => <p>{p}</p>)}
 

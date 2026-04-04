@@ -82,7 +82,7 @@ export const en = {
       },
       variants: {
         heading: 'RG Variants: RG8, RG10, RG12',
-        body: 'The RG indicator is calculated using three different smoothing windows for earnings:',
+        body: 'The subscript N (8, 10, 12) is the capitalization factor — not a smoothing window. G is computed once using a single fixed rule and enters the formula with three different multiples:',
         items: [
           {
             label: 'RG8',
@@ -159,7 +159,7 @@ export const en = {
     author: 'Hanns-Steffen Rentschler',
     abstract: {
       heading: 'Abstract',
-      body: 'This paper introduces the Reality Gap (RG) indicator, a heuristic measure of the relationship between a company\'s market capitalisation and its estimated fundamental base. The fundamental base is constructed from a combination of smoothed earnings — averaged over 8, 10, or 12 quarterly periods — and tangible book equity. The resulting ratio provides a descriptive, period-specific view of how far market valuations extend beyond what the underlying fundamentals directly support. The paper presents the formal construction of the indicator, discusses its assumptions and limitations, and illustrates its application across a sample of publicly traded companies. RG is explicitly not a valuation model and does not generate price targets or investment recommendations.',
+      body: 'This paper introduces the Reality Gap (RG) indicator, a heuristic measure of the relationship between a company\'s market capitalisation and its estimated fundamental base. The fundamental base is FB\u2099 = TE + E\u2099 where TE is tangible equity and E\u2099 = N\u00d7G is the capitalised sustainable earning power (G = smoothed long-run earnings, N \u2208 {8, 10, 12} the capitalization factor). The resulting ratio provides a descriptive, period-specific view of how far market valuations extend beyond what the underlying fundamentals directly support. The paper presents the formal construction of the indicator, discusses its assumptions and limitations, and illustrates its application across a sample of publicly traded companies. RG is explicitly not a valuation model and does not generate price targets or investment recommendations.',
     },
     download: {
       heading: 'Download',
@@ -276,10 +276,18 @@ export const en = {
         email: 'rentschler@lbsmail.de',
         githubLabel: 'Project on GitHub',
       },
+      websiteApproximation: {
+        heading: 'Website Approximation Note',
+        body: [
+          'The paper defines G as the smoothed long-run earnings measure. This website uses a fixed operational approximation: G_approx = mean of the last 8 available quarterly net income figures, annualised (×4). The same G_approx is used identically for RG8, RG10, and RG12 — only the capitalization factor N changes.',
+          'This approximation is consistent with the paper\'s structural logic (single G, varying N) but differs from a full paper implementation in two respects: (1) the smoothing window is fixed at 8 quarters rather than potentially calibrated per company; (2) when fewer than 8 real quarterly observations are available, the series is extended with annual figures divided by 4 as a fallback.',
+          'Wherever real quarterly data is insufficient, the observation is labeled with dataType = "annual" and excluded from the historical chart. The smoothedEarnings field and teIsApprox flag are stored explicitly in each observation so the approximation is always traceable.',
+        ],
+      },
       dataSources: {
         heading: 'Data Sources',
         body: [
-          'All financial data displayed on this website — including market capitalisation, net income, and book equity — is retrieved via yfinance, an open-source Python library that accesses publicly available data from Yahoo Finance.',
+          'All financial data displayed on this website — including market capitalisation, net income, and tangible equity — is retrieved via yfinance, an open-source Python library that accesses publicly available data from Yahoo Finance.',
           'Yahoo Finance aggregates financial data from stock exchanges and company filings. The data may contain errors, delays, or gaps. No independent verification is performed.',
           'Historical market capitalisation values are approximations: closing prices at fiscal year-end multiplied by current shares outstanding. Share count changes over time are not reflected.',
           'The RG values shown are computed approximations, not audited financial figures. They are provided for research and illustrative purposes only.',
