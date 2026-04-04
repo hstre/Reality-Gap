@@ -309,6 +309,82 @@ export const en = {
     '-': 'Declining',
     '--': 'Strongly Declining',
   },
+
+  research: {
+    label: 'Exploratory Research',
+    heading: 'Historical Research',
+    subheading: 'Retrospective, cross-sectional, and sector-level observations from the current RG dataset. Preliminary and approximate.',
+    disclaimer: {
+      heading: 'Research Caveat',
+      body: 'This page presents exploratory observations based on an approximate, limited dataset. All results are preliminary. No predictive or causal claims are made. RG is a descriptive heuristic indicator — not a forecasting model and not investment advice. Sample sizes are small, data coverage is partial, and all values are approximations derived from public sources via yfinance. Do not draw strong conclusions from this analysis.',
+    },
+    indexSection: {
+      heading: '1. Cross-Index Snapshot',
+      note: 'Median RG10 and interquartile range by index for the most recent quarterly observation per company. Only companies with a valid, non-near-boundary RG10 are included.',
+      colIndex:  'Index',
+      colN:      'n',
+      colP25:    'P25',
+      colMedian: 'Median RG10',
+      colP75:    'P75',
+      footnote:  'Higher RG10 suggests the market is assigning a larger multiple to the fundamental base. Whether this reflects overvaluation, expected future earnings growth, or structural differences between markets cannot be determined from RG alone.',
+    },
+    distribution: {
+      heading: '2. Current RG10 Distribution',
+      note: 'Distribution of the most recent RG10 across {n} of {total} covered companies. {notCovered} classified as "not fundamentally covered" (FB ≤ 0 for all N). {nearBoundary} flagged as near-boundary and excluded from distribution.',
+      medianLabel: 'Median',
+      footnote:    'RG10 = Market Cap / Fundamental Base (N=10). Smoothed earnings G approximated from last 8 quarters. US companies adjusted for inflation (CPI-real). All values approximate.',
+    },
+    sectors: {
+      heading: '3. Sector Comparison',
+      note: 'Median RG10 by sector. Bar length represents median; n = number of companies. Sectors with fewer than 3 companies should be interpreted with particular caution.',
+      footnote: 'Sector differences may reflect structural characteristics (capital intensity, intangibles, leverage) rather than relative valuation stretch. Sectors are as classified in the dataset.',
+    },
+    timeSeries: {
+      heading: '4. Cross-Sectional Snapshot Over Time',
+      note: 'Median RG10 and interquartile range across all qualifying quarterly observations per period. Only periods with ≥ 15 qualifying companies are shown. This is not a panel dataset — the company composition varies across periods.',
+      colPeriod:  'Period',
+      colN:       'n',
+      colP25:     'P25',
+      colMedian:  'Median RG10',
+      colP75:     'P75',
+      noData:     'Insufficient data for time series (fewer than 15 qualifying companies per period).',
+      footnote:   'The dataset covers only 4 recent quarters of quarterly data plus a limited number of annual historical observations. No robust trend conclusions can be drawn from this sample.',
+    },
+    useCases: {
+      heading: '5. What Historical RG Analysis Might Reveal',
+      items: [
+        {
+          title: 'Market-wide valuation stretch',
+          body: 'If median RG rises consistently over multiple years, it could suggest that market prices are moving further from fundamental bases — a pattern reminiscent of valuation-stretch indicators like the Shiller CAPE. With the current 4-quarter dataset this cannot be assessed.',
+        },
+        {
+          title: 'Sector rotation signals',
+          body: 'Differences in median RG across sectors may reflect varying market expectations for earnings growth, capital intensity, or risk. Persistent high-RG sectors could be candidates for closer scrutiny in a longer historical study.',
+        },
+        {
+          title: 'Retrospective sorting analysis',
+          body: 'In a sufficiently long dataset, one could group companies by their RG quartile at a historical date and observe subsequent price performance. This is the approach used in academic factor research. The current dataset is too small and too short for such an analysis to be meaningful.',
+        },
+        {
+          title: 'Dispersion as a bubble indicator',
+          body: 'Widening dispersion between high-RG and low-RG companies — or rapid upper-tail expansion — could serve as an exploratory signal of concentrated valuation stretch. This requires multi-year historical data not yet available in this dataset.',
+        },
+      ],
+    },
+    limitations: {
+      heading: '6. Data Limitations',
+      items: [
+        'Coverage: 77 companies across three indices (S&P 500 top 30, Nikkei 225 top 19, DAX 40 top 28). This is not a complete index. Results do not generalise to index-level conclusions.',
+        'Earnings smoothing: G is approximated as the mean of the last 8 available quarterly net income figures, annualised. This is an operational simplification; the paper defines G more rigorously.',
+        'Tangible equity: TE may fall back to book equity when goodwill and intangibles are not separately available from the data source (yfinance). Affected observations are flagged teIsApprox = true.',
+        'CPI adjustment for US companies: Inflation adjustment uses FRED CPIAUCSL. Non-US companies use nominal earnings, which affects cross-index comparability.',
+        'Historical market cap: Annual historical observations use historical closing price × current shares outstanding. Share count changes are not reflected.',
+        'Historical tangible equity: Annual historical observations use the current TE snapshot (not historical TE). This introduces an approximation into all historical annual RG values.',
+        'No audited data: All values are derived from yfinance / Yahoo Finance public data. Figures may differ from audited financial statements.',
+        'No predictive validation: RG has not been validated as a predictive indicator. The relationship between RG values and future returns is unknown.',
+      ],
+    },
+  },
 } as const;
 
 export type Translations = typeof en;

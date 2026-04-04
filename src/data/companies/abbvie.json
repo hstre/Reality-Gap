@@ -104,7 +104,7 @@
       "netIncome": 4.9,
       "dataType": "annual",
       "teIsApprox": true,
-      "nearBoundary": false,
+      "nearBoundary": true,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings inflation-adjusted to current USD (CPIAUCSL). Approximation.",
       "dataQuality": "ok"
     }

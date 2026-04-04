@@ -1,0 +1,333 @@
+---
+import BaseLayout from '../components/layout/BaseLayout.astro';
+import { en } from '../i18n/en';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const t = en;
+const tc = t.research;
+
+// ── Load all company data at build time ──────────────────────────────────────
+const rawFiles = import.meta.glob('../data/companies/*.json', { eager: true });
+const allCompanies: any[] = Object.values(rawFiles).map((m: any) => m.default ?? m);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function median(arr: number[]): number {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 !== 0 ? s[mid]! : ((s[mid - 1]! + s[mid]!) / 2);
+}
+
+function quantile(arr: number[], q: number): number {
+  const s = [...arr].sort((a, b) => a - b);
+  const pos = q * (s.length - 1);
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return lo === hi ? s[lo]! : s[lo]! + (pos - lo) * (s[hi]! - s[lo]!);
+}
+
+function fmt(v: number | null | undefined, decimals = 2): string {
+  if (v == null) return '—';
+  return v.toFixed(decimals);
+}
+
+// ── Latest RG10 per company (most recent quarterly obs, or latest available) ──
+interface CompanySummary {
+  company: string;
+  sector: string;
+  index: string;
+  country: string;
+  rg10: number | null;
+  nearBoundary: boolean;
+  notCovered: boolean;
+}
+
+const summaries: CompanySummary[] = allCompanies.map((d) => {
+  const obs = [...d.observations].sort((a: any, b: any) =>
+    a.periodKey < b.periodKey ? 1 : -1
+  );
+  const latest = obs[0] as any;
+  return {
+    company:     d.company,
+    sector:      d.sector ?? '',
+    index:       d.index  ?? '',
+    country:     d.country ?? '',
+    rg10:        latest?.rg10 ?? null,
+    nearBoundary: latest?.nearBoundary === true,
+    notCovered:  latest?.rg10 == null,
+  };
+});
+
+// Valid = has rg10, not near-boundary
+const valid = summaries.filter(s => s.rg10 !== null && !s.nearBoundary);
+const validRG = valid.map(s => s.rg10 as number);
+const notCoveredCount = summaries.filter(s => s.notCovered).length;
+const nearBoundaryCount = summaries.filter(s => s.nearBoundary).length;
+
+// ── Distribution buckets ─────────────────────────────────────────────────────
+const buckets = [
+  { label: '< 1',   min: 0,  max: 1  },
+  { label: '1 – 2', min: 1,  max: 2  },
+  { label: '2 – 5', min: 2,  max: 5  },
+  { label: '5 – 10',min: 5,  max: 10 },
+  { label: '> 10',  min: 10, max: Infinity },
+].map(b => ({
+  ...b,
+  count: validRG.filter(v => v >= b.min && v < b.max).length,
+}));
+const maxBucketCount = Math.max(...buckets.map(b => b.count));
+const med = median(validRG);
+const p25 = quantile(validRG, 0.25);
+const p75 = quantile(validRG, 0.75);
+
+// ── Cross-index comparison ───────────────────────────────────────────────────
+const indexGroups: Record<string, number[]> = {};
+for (const s of valid) {
+  if (!indexGroups[s.index]) indexGroups[s.index] = [];
+  indexGroups[s.index].push(s.rg10 as number);
+}
+const indexStats = Object.entries(indexGroups)
+  .map(([idx, vals]) => ({
+    idx,
+    n:      vals.length,
+    med:    median(vals),
+    p25:    quantile(vals, 0.25),
+    p75:    quantile(vals, 0.75),
+  }))
+  .sort((a, b) => b.med - a.med);
+
+// ── Sector comparison ────────────────────────────────────────────────────────
+const sectorGroups: Record<string, number[]> = {};
+for (const s of valid) {
+  const sec = s.sector || 'Other';
+  if (!sectorGroups[sec]) sectorGroups[sec] = [];
+  sectorGroups[sec].push(s.rg10 as number);
+}
+const sectorStats = Object.entries(sectorGroups)
+  .map(([sector, vals]) => ({
+    sector,
+    n:    vals.length,
+    med:  median(vals),
+    min:  Math.min(...vals),
+    max:  Math.max(...vals),
+  }))
+  .sort((a, b) => b.med - a.med);
+const maxSectorMed = Math.max(...sectorStats.map(s => s.med));
+
+// ── Quarterly time series (cross-sectional medians) ──────────────────────────
+const qPeriodMap: Record<string, number[]> = {};
+for (const d of allCompanies) {
+  for (const o of d.observations as any[]) {
+    if (o.dataType !== 'quarterly') continue;
+    if (o.rg10 == null || o.nearBoundary) continue;
+    if (!qPeriodMap[o.periodKey]) qPeriodMap[o.periodKey] = [];
+    qPeriodMap[o.periodKey].push(o.rg10);
+  }
+}
+const timeSeries = Object.entries(qPeriodMap)
+  .filter(([, vals]) => vals.length >= 15)
+  .map(([pk, vals]) => ({
+    periodKey: pk,
+    label:     pk.replace(/^(\d{4})_q(\d)$/, 'Q$2 $1'),
+    n:         vals.length,
+    med:       median(vals),
+    p25:       quantile(vals, 0.25),
+    p75:       quantile(vals, 0.75),
+  }))
+  .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+---
+
+<BaseLayout
+  title="Historical Research — Reality Gap"
+  description="Exploratory retrospective analysis of Reality Gap data. Preliminary, approximate, and not investment advice."
+  altLangPath="/de/forschung"
+  altLang="de"
+>
+  <div class="max-w-5xl mx-auto px-6 py-10">
+
+    <!-- Page header -->
+    <div class="mb-8">
+      <p class="text-xs text-gray-400 uppercase tracking-widest mb-2">{tc.label}</p>
+      <h1 class="text-3xl font-light text-gray-900 mb-3" style="font-family: Georgia, serif;">
+        {tc.heading}
+      </h1>
+      <p class="text-gray-500 text-base max-w-2xl">{tc.subheading}</p>
+    </div>
+
+    <!-- Prominent disclaimer -->
+    <div class="border border-amber-300 bg-amber-50 rounded-md px-6 py-5 mb-10">
+      <p class="text-sm font-semibold text-amber-800 mb-2">{tc.disclaimer.heading}</p>
+      <p class="text-sm text-amber-700 leading-relaxed">{tc.disclaimer.body}</p>
+    </div>
+
+    <!-- ── 1. Cross-index snapshot ───────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.indexSection.heading}</h2>
+      <p class="text-sm text-gray-500 mb-5">{tc.indexSection.note}</p>
+
+      <div class="border border-gray-200 rounded-md overflow-hidden mb-3">
+        <table class="table-rg">
+          <thead>
+            <tr class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wide">
+              <th class="text-left px-4 py-2 font-medium">{tc.indexSection.colIndex}</th>
+              <th class="text-right px-4 py-2 font-medium">{tc.indexSection.colN}</th>
+              <th class="text-right px-4 py-2 font-medium">{tc.indexSection.colP25}</th>
+              <th class="text-right px-4 py-2 font-medium font-bold">{tc.indexSection.colMedian}</th>
+              <th class="text-right px-4 py-2 font-medium">{tc.indexSection.colP75}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {indexStats.map(row => (
+              <tr class="border-t border-gray-100">
+                <td class="px-4 py-2 text-gray-700 font-medium">{row.idx}</td>
+                <td class="px-4 py-2 text-right font-mono text-gray-500">{row.n}</td>
+                <td class="px-4 py-2 text-right font-mono text-gray-500">{fmt(row.p25)}</td>
+                <td class="px-4 py-2 text-right font-mono font-semibold text-gray-900">{fmt(row.med)}</td>
+                <td class="px-4 py-2 text-right font-mono text-gray-500">{fmt(row.p75)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs text-gray-400">{tc.indexSection.footnote}</p>
+    </section>
+
+    <!-- ── 2. Distribution ───────────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.distribution.heading}</h2>
+      <p class="text-sm text-gray-500 mb-5">
+        {tc.distribution.note
+          .replace('{n}', String(valid.length))
+          .replace('{total}', String(summaries.length))
+          .replace('{notCovered}', String(notCoveredCount))
+          .replace('{nearBoundary}', String(nearBoundaryCount))}
+      </p>
+
+      <!-- Bar chart -->
+      <div class="space-y-2 mb-5">
+        {buckets.map(b => (
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-mono text-gray-500 w-14 text-right shrink-0">{b.label}</span>
+            <div class="flex-1 bg-gray-100 rounded-sm h-6 relative">
+              <div
+                class="h-6 rounded-sm bg-accent/70"
+                style={`width: ${maxBucketCount > 0 ? Math.round((b.count / maxBucketCount) * 100) : 0}%`}
+              />
+            </div>
+            <span class="text-xs font-mono text-gray-700 w-8 shrink-0">{b.count}</span>
+          </div>
+        ))}
+      </div>
+
+      <div class="grid grid-cols-3 gap-4">
+        {[
+          { label: 'P25', value: fmt(p25) },
+          { label: tc.distribution.medianLabel, value: fmt(med) },
+          { label: 'P75', value: fmt(p75) },
+        ].map(item => (
+          <div class="border border-gray-200 rounded-md p-4 text-center">
+            <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">{item.label}</p>
+            <p class="text-2xl font-light text-gray-800" style="font-family: Georgia, serif;">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- ── 3. Sector comparison ──────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.sectors.heading}</h2>
+      <p class="text-sm text-gray-500 mb-5">{tc.sectors.note}</p>
+
+      <div class="space-y-2 mb-4">
+        {sectorStats.map(s => (
+          <div class="flex items-center gap-3">
+            <span
+              class="text-xs text-gray-600 shrink-0 text-right"
+              style="width: 200px; min-width: 200px;"
+            >
+              {s.sector}
+            </span>
+            <div class="flex-1 bg-gray-100 rounded-sm h-5 relative">
+              <div
+                class="h-5 rounded-sm bg-accent/60"
+                style={`width: ${maxSectorMed > 0 ? Math.round((s.med / maxSectorMed) * 100) : 0}%`}
+              />
+            </div>
+            <span class="text-xs font-mono font-semibold text-gray-800 w-10 shrink-0">{fmt(s.med)}</span>
+            <span class="text-xs font-mono text-gray-400 w-8 shrink-0">n={s.n}</span>
+          </div>
+        ))}
+      </div>
+      <p class="text-xs text-gray-400">{tc.sectors.footnote}</p>
+    </section>
+
+    <!-- ── 4. Time series ────────────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.timeSeries.heading}</h2>
+      <p class="text-sm text-gray-500 mb-5">{tc.timeSeries.note}</p>
+
+      {timeSeries.length > 0 ? (
+        <div class="border border-gray-200 rounded-md overflow-hidden mb-3">
+          <table class="table-rg">
+            <thead>
+              <tr class="bg-gray-50 text-xs uppercase text-gray-500 tracking-wide">
+                <th class="text-left px-4 py-2 font-medium">{tc.timeSeries.colPeriod}</th>
+                <th class="text-right px-4 py-2 font-medium">{tc.timeSeries.colN}</th>
+                <th class="text-right px-4 py-2 font-medium">{tc.timeSeries.colP25}</th>
+                <th class="text-right px-4 py-2 font-semibold text-gray-700">{tc.timeSeries.colMedian}</th>
+                <th class="text-right px-4 py-2 font-medium">{tc.timeSeries.colP75}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timeSeries.map(row => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-4 py-2 text-gray-700 font-medium">{row.label}</td>
+                  <td class="px-4 py-2 text-right font-mono text-gray-500">{row.n}</td>
+                  <td class="px-4 py-2 text-right font-mono text-gray-500">{fmt(row.p25)}</td>
+                  <td class="px-4 py-2 text-right font-mono font-semibold text-gray-900">{fmt(row.med)}</td>
+                  <td class="px-4 py-2 text-right font-mono text-gray-500">{fmt(row.p75)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div class="border border-gray-200 rounded-md px-5 py-6 text-center text-sm text-gray-400">
+          {tc.timeSeries.noData}
+        </div>
+      )}
+      <p class="text-xs text-gray-400">{tc.timeSeries.footnote}</p>
+    </section>
+
+    <!-- ── 5. What RG might be useful for ───────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">{tc.useCases.heading}</h2>
+      <div class="space-y-4">
+        {tc.useCases.items.map((item: { title: string; body: string }) => (
+          <div class="border-l-2 border-gray-200 pl-4">
+            <p class="text-sm font-semibold text-gray-700 mb-1">{item.title}</p>
+            <p class="text-sm text-gray-500">{item.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- ── 6. Limitations ────────────────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">{tc.limitations.heading}</h2>
+      <div class="border border-gray-200 rounded-md p-5">
+        <ul class="space-y-3">
+          {tc.limitations.items.map((item: string) => (
+            <li class="flex gap-3 text-sm text-gray-600">
+              <span class="text-gray-300 shrink-0 mt-0.5">–</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+
+    <!-- General disclaimer -->
+    <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">{t.companyDetail.disclaimer}</p>
+  </div>
+</BaseLayout>

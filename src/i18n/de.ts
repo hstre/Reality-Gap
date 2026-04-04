@@ -309,6 +309,82 @@ export const de = {
     '-': 'Sinkend',
     '--': 'Stark sinkend',
   },
+
+  research: {
+    label: 'Explorative Forschung',
+    heading: 'Historische Forschung',
+    subheading: 'Retrospektive, querschnittliche und sektorale Beobachtungen aus dem aktuellen RG-Datensatz. Vorläufig und approximiert.',
+    disclaimer: {
+      heading: 'Forschungsvorbehalt',
+      body: 'Diese Seite präsentiert explorative Beobachtungen auf Basis eines approximierten, begrenzten Datensatzes. Alle Ergebnisse sind vorläufig. Es werden keine prädiktiven oder kausalen Aussagen getroffen. RG ist ein deskriptiver heuristischer Indikator — kein Prognosemodell und keine Anlageberatung. Stichprobengrößen sind klein, die Datenabdeckung ist partiell, und alle Werte sind Näherungen aus öffentlichen Quellen (yfinance). Bitte keine starken Schlussfolgerungen aus dieser Analyse ziehen.',
+    },
+    indexSection: {
+      heading: '1. Indexvergleich (Momentaufnahme)',
+      note: 'Median-RG10 und Interquartilsabstand je Index für die aktuellste Quartalsbeobachtung pro Unternehmen. Nur Unternehmen mit gültigem, nicht grenzwertigem RG10 einbezogen.',
+      colIndex:  'Index',
+      colN:      'n',
+      colP25:    'P25',
+      colMedian: 'Median RG10',
+      colP75:    'P75',
+      footnote:  'Ein höherer RG10 deutet darauf hin, dass der Markt ein größeres Vielfaches der Fundamentalbasis bewertet. Ob dies Überbewerung, erwartetes Gewinnwachstum oder strukturelle Unterschiede zwischen den Märkten widerspiegelt, lässt sich allein aus RG nicht bestimmen.',
+    },
+    distribution: {
+      heading: '2. Aktuelle RG10-Verteilung',
+      note: 'Verteilung des aktuellsten RG10 über {n} von {total} erfassten Unternehmen. {notCovered} als „fundamental nicht abgedeckt" klassifiziert (FB ≤ 0 für alle N). {nearBoundary} als grenzwertig markiert und von der Verteilung ausgeschlossen.',
+      medianLabel: 'Median',
+      footnote:    'RG10 = Marktkapitalisierung / Fundamentale Basis (N=10). Geglätteter Gewinn G aus den letzten 8 Quartalen approximiert. US-Unternehmen inflationsbereinigt (CPI-real). Alle Werte approximiert.',
+    },
+    sectors: {
+      heading: '3. Sektorvergleich',
+      note: 'Median-RG10 je Sektor. Balkenlänge entspricht dem Median; n = Anzahl Unternehmen. Sektoren mit weniger als 3 Unternehmen sollten mit besonderer Vorsicht interpretiert werden.',
+      footnote: 'Sektorunterschiede können strukturelle Merkmale widerspiegeln (Kapitalintensität, immaterielle Werte, Verschuldung) und nicht notwendigerweise relative Bewertungsstreckung. Sektoren gemäß Datensatz-Klassifizierung.',
+    },
+    timeSeries: {
+      heading: '4. Querschnittliche Zeitreihe',
+      note: 'Median-RG10 und Interquartilsabstand über alle qualifizierenden Quartalsbeobachtungen je Periode. Nur Perioden mit ≥ 15 qualifizierenden Unternehmen werden angezeigt. Dies ist kein Paneldatensatz — die Unternehmenszusammensetzung variiert je Periode.',
+      colPeriod:  'Periode',
+      colN:       'n',
+      colP25:     'P25',
+      colMedian:  'Median RG10',
+      colP75:     'P75',
+      noData:     'Unzureichende Daten für Zeitreihe (weniger als 15 qualifizierende Unternehmen pro Periode).',
+      footnote:   'Der Datensatz umfasst nur 4 aktuelle Quartale an Quartalsdaten sowie eine begrenzte Anzahl historischer Jahresbeobachtungen. Keine belastbaren Trendschlüsse aus dieser Stichprobe möglich.',
+    },
+    useCases: {
+      heading: '5. Mögliche Anwendungsfelder historischer RG-Analysen',
+      items: [
+        {
+          title: 'Marktweite Bewertungsstreckung',
+          body: 'Ein dauerhaft steigender Median-RG über mehrere Jahre könnte darauf hindeuten, dass sich Marktpreise zunehmend von Fundamentalbasen entfernen — ein Muster ähnlich dem Shiller-CAPE. Mit dem aktuellen 4-Quartals-Datensatz lässt sich dies nicht beurteilen.',
+        },
+        {
+          title: 'Sektorrotationssignale',
+          body: 'Unterschiede im Median-RG zwischen Sektoren können unterschiedliche Markterwartungen hinsichtlich Gewinnwachstum, Kapitalintensität oder Risiko widerspiegeln. Anhaltend hohe RG-Sektoren könnten in einer längeren historischen Studie näher untersucht werden.',
+        },
+        {
+          title: 'Retrospektive Sortierungsanalyse',
+          body: 'Bei ausreichend langer Zeitreihe ließe sich prüfen, ob Unternehmen mit historisch hohem RG-Quartil eine andere Kursentwicklung zeigten. Dies entspricht dem Ansatz akademischer Faktorforschung. Der aktuelle Datensatz ist für eine solche Analyse zu klein und zu kurzfristig.',
+        },
+        {
+          title: 'Dispersion als Blasenindikator',
+          body: 'Eine wachsende Streuung zwischen hohem und niedrigem RG — oder eine rasche Ausweitung des oberen Quartils — könnte als explorativer Hinweis auf konzentrierte Bewertungsstreckung dienen. Dies erfordert mehrjährige historische Daten, die in diesem Datensatz noch nicht verfügbar sind.',
+        },
+      ],
+    },
+    limitations: {
+      heading: '6. Datenbeschränkungen',
+      items: [
+        'Abdeckung: 77 Unternehmen aus drei Indizes (S&P 500 Top 30, Nikkei 225 Top 19, DAX 40 Top 28). Dies ist keine vollständige Indexabdeckung. Ergebnisse lassen keine indexweiten Schlüsse zu.',
+        'Gewinnglättung: G wird als Mittelwert der letzten 8 verfügbaren Quartals-Nettoergebnisse annualisiert approximiert. Dies ist eine operative Vereinfachung; das Paper definiert G strenger.',
+        'Tangibles Eigenkapital: EK kann auf Buchwert zurückgreifen, wenn Goodwill und immaterielle Werte aus der Datenquelle (yfinance) nicht separat verfügbar sind. Betroffene Beobachtungen sind mit teIsApprox = true markiert.',
+        'CPI-Bereinigung für US-Unternehmen: Inflationsbereinigung verwendet FRED CPIAUCSL. Nicht-US-Unternehmen verwenden nominale Gewinne, was die Indexvergleichbarkeit einschränkt.',
+        'Historische Marktkapitalisierung: Jahreshistorische Beobachtungen verwenden historischen Schlusskurs × aktuelle Aktienanzahl. Änderungen der Aktienanzahl werden nicht berücksichtigt.',
+        'Historisches tangibles Eigenkapital: Jahreshistorische Beobachtungen verwenden den aktuellen EK-Snapshot (nicht historisch). Dies führt zu einer Approximation in allen historischen jährlichen RG-Werten.',
+        'Keine geprüften Daten: Alle Werte sind aus yfinance / Yahoo Finance öffentlichen Daten abgeleitet. Abweichungen von geprüften Jahresabschlüssen sind möglich.',
+        'Keine prädiktive Validierung: RG wurde nicht als prädiktiver Indikator validiert. Der Zusammenhang zwischen RG-Werten und künftigen Renditen ist unbekannt.',
+      ],
+    },
+  },
 } as const;
 
 export type DeTranslations = typeof de;

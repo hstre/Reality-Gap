@@ -324,17 +324,19 @@ def fundamental_base(smoothed_annual_b: Optional[float],
 NEAR_BOUNDARY_THRESHOLD = 0.10
 
 def is_near_boundary(G: Optional[float], tangible_eq_b: float) -> bool:
-    """True when G>0, TE<0, and FB8 < 10% of G×8 (near-singular denominator).
+    """True when any FB_N (N∈{8,10,12}) is positive but < 10% of G×N.
 
-    Flags cases where the N=8 fundamental base is positive but very small
-    relative to the earnings contribution — the two components nearly cancel.
-    A minor change in G would flip FB8 negative (not fundamentally covered).
+    Catches near-singular denominators across all three RG variants.
+    Example: a company where FB8 < 0 (RG8 null) but FB10 ≈ 0 (RG10 extreme).
     """
     if G is None or G <= 0 or tangible_eq_b >= 0:
         return False
-    E8  = G * 8
-    FB8 = tangible_eq_b + E8
-    return 0.0 < FB8 < E8 * NEAR_BOUNDARY_THRESHOLD
+    for N in [8, 10, 12]:
+        E  = G * N
+        FB = tangible_eq_b + E
+        if 0.0 < FB < E * NEAR_BOUNDARY_THRESHOLD:
+            return True
+    return False
 
 
 def build_ni_series(quarterly_ni: list[float], annual_ni: list[float],
