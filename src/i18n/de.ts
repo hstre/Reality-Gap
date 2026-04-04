@@ -82,25 +82,25 @@ export const de = {
       },
       variants: {
         heading: 'RG-Varianten: RG8, RG10, RG12',
-        body: 'Der RG-Indikator wird mit drei verschiedenen Glättungsfenstern für Gewinne berechnet:',
+        body: 'N im Subscript bezeichnet den Kapitalisierungsfaktor — nicht das Glättungsfenster. G wird einheitlich über die letzten 8 Quartale geglättet.',
         items: [
           {
             label: 'RG8',
             description:
-              'Verwendet eine geglättete Gewinnbasis über 8 Quartale (2 Jahre). Reagiert stärker auf aktuelle Gewinnveränderungen.',
+              'RG\u2088 = MC / (EK + 8\u00d7G). Konservative Annahme: nur 8 Jahresgewinne rechtfertigen die Gewinnkomponente. Ergibt den höchsten RG-Wert der drei Varianten.',
           },
           {
             label: 'RG10',
             description:
-              'Verwendet eine geglättete Gewinnbasis über 10 Quartale (2,5 Jahre). Die primäre Referenzvariante.',
+              'RG\u2081\u2080 = MC / (EK + 10\u00d7G). Primäre Referenzvariante.',
           },
           {
             label: 'RG12',
             description:
-              'Verwendet eine geglättete Gewinnbasis über 12 Quartale (3 Jahre). Stabiler, aber weniger sensibel gegenüber jüngsten Veränderungen.',
+              'RG\u2081\u2082 = MC / (EK + 12\u00d7G). Großzügige Annahme: 12 Jahresgewinne rechtfertigen die Gewinnkomponente. Ergibt den niedrigsten RG-Wert der drei Varianten.',
           },
         ],
-        note: 'RG10 wird als primäre Kennzahl für das Ranking verwendet. Der Vergleich von RG8, RG10 und RG12 liefert zusätzlichen Kontext über die Stabilität der Gewinne.',
+        note: 'Bei positivem G gilt stets: RG8 \u2265 RG10 \u2265 RG12. RG10 ist die primäre Kennzahl für das Ranking.',
       },
       trendCodes: {
         heading: 'Trendcodes',
@@ -197,15 +197,17 @@ export const de = {
     currency: 'Währung',
     metrics: {
       heading: 'RG-Kennzahlen',
-      notComputable: 'RG nicht berechenbar',
-      notComputableNote: 'Die fundamentale Basis ist null oder negativ: Das materielle Eigenkapital ist negativ und der geglättete Gewinn ist über alle Glättungsfenster (RG8, RG10, RG12) hinweg negativ. Nach der RG-Methodik bedeutet eine nicht-positive fundamentale Basis, dass die Gewinnhistorie keine fundamentale Abdeckung bei der aktuellen Marktkapitalisierung bietet. RG ist undefiniert.',
+      notComputable: 'Fundamental nicht abgedeckt',
+      notComputableNote: 'FB\u2099 = EK + E\u2099 \u2264 0 für alle Kapitalisierungsfaktoren N \u2208 {8,10,12}. Das tangible Eigenkapital ist negativ und der geglättete Gewinn G reicht nicht aus, um eine positive fundamentale Basis zu erzeugen. Nach der Papierdefinition ist RG für dieses Unternehmen in diesem Zeitraum undefiniert.',
     },
     supportingData: {
       heading: 'Zusatzdaten',
       marketCap: 'Marktkapitalisierung (ca.)',
-      bookEquity: 'Buchwert Eigenkapital (ca.)',
+      tangibleEquity: 'Tangibles Eigenkapital (EK)',
+      smoothedEarnings: 'Geglätteter Gewinn G (ann.)',
       netIncome: 'Nettoeinkommen (ca.)',
-      fundamentalBase: 'Fundamentale Basis (ca.)',
+      fundamentalBase: 'Fundamentale Basis FB\u2081\u2080',
+      teApprox: 'EK als Buchwert angenähert (Goodwill/immaterielle Vermögenswerte nicht separat aus der Datenquelle verfügbar).',
       billions: 'in Milliarden',
     },
     trend: 'Trend',

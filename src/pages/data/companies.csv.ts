@@ -24,11 +24,12 @@ export const GET: APIRoute = async () => {
   const header = [
     'ticker', 'company', 'sector', 'index', 'country', 'currency',
     'period', 'rg8', 'rg10', 'rg12', 'trend',
-    'marketCap_bn', 'bookEquity_bn', 'netIncome_bn', 'fundamentalBase_bn',
+    'marketCap_bn', 'tangibleEquity_bn', 'smoothedEarnings_bn',
+    'fundamentalBaseRG10_bn', 'netIncome_bn',
   ].join(',');
 
   const rows = companies.map(c => {
-    const obs = getLatestObservation(c);
+    const obs = getLatestObservation(c) as any;
     return [
       esc(c.ticker),
       esc(c.company),
@@ -42,9 +43,10 @@ export const GET: APIRoute = async () => {
       esc(obs?.rg12),
       esc(obs?.trend),
       esc(obs?.marketCap),
-      esc(obs?.bookEquity),
+      esc(obs?.tangibleEquity),
+      esc(obs?.smoothedEarnings),
+      esc(obs?.fundamentalBaseRG10),
       esc(obs?.netIncome),
-      esc(obs?.fundamentalBaseApprox),
     ].join(',');
   });
 

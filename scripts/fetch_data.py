@@ -193,26 +193,32 @@ def trend_code(current: Optional[float], previous: Optional[float]) -> Optional[
 
 
 def calc_rg(market_cap_b: float, smoothed_annual_b: Optional[float],
-            tangible_eq_b: float, multiplier: int = 10) -> Optional[float]:
-    """RG_N = marketCap / (max(tangibleEquity,0) + smoothedAnnualEarnings * N)
+            tangible_eq_b: float, multiplier: int) -> Optional[float]:
+    """RG_N = MC / FB_N  (paper definition)
 
-    The subscript N (8, 10, 12) is the capitalization factor — how many years
-    of smoothed earnings are assumed to represent 'fair value' of the earnings
-    component.  A larger N implies a more generous valuation assumption, so
-    RG8 >= RG10 >= RG12 for any company with positive smoothed earnings.
+    FB_N = TE + E_N
+    E_N  = N * G  if G > 0,  else  0   (negative earnings do NOT reduce FB)
+    TE   = tangible equity (enters as-is; not floored to zero)
 
-    Smoothed earnings are always derived from the same fixed 8-quarter window;
-    only the capitalization multiple varies across RG8/10/12.
-
-    Returns None when smoothed earnings are None or when the fundamental
-    base is zero or negative.
+    Returns None ("not fundamentally covered") when FB_N <= 0.
     """
     if smoothed_annual_b is None:
         return None
-    fb = max(tangible_eq_b, 0.0) + smoothed_annual_b * multiplier
-    if fb <= 0:
+    E  = max(smoothed_annual_b, 0.0) * multiplier   # E = N*G if G>0 else 0
+    FB = tangible_eq_b + E                           # TE is not floored
+    if FB <= 0:
         return None
-    return round(market_cap_b / fb, 2)
+    return round(market_cap_b / FB, 2)
+
+
+def fundamental_base(smoothed_annual_b: Optional[float],
+                     tangible_eq_b: float, multiplier: int) -> Optional[float]:
+    """Return FB_N = TE + E_N, or None when FB_N <= 0."""
+    if smoothed_annual_b is None:
+        return None
+    E  = max(smoothed_annual_b, 0.0) * multiplier
+    FB = tangible_eq_b + E
+    return round(FB, 4) if FB > 0 else None
 
 
 def build_ni_series(quarterly_ni: list[float], annual_ni: list[float],
@@ -272,11 +278,13 @@ def build_historical_annual_obs(
     shares: float,                     # current shares outstanding
     tangible_eq_b: float,
     current_mc_b: float,
+    te_is_approx: bool = True,        # historical obs always use current TE
 ) -> list[dict]:
     """
     Build one RG observation per available fiscal-year-end using:
       - Annual NI rolling window (oldest data extends backwards)
       - Historical market cap = price at FY-end × current shares (approx)
+      - TE is the current tangible equity (not historical — always approximate)
 
     Returns observations oldest-first.
     """
@@ -289,54 +297,57 @@ def build_historical_annual_obs(
     observations: list[dict] = []
 
     for i, date in enumerate(dates):
-        # NI series available UP TO this year (index 0..i), convert to quarterly equiv
         avail_annual  = annual_values_b[: i + 1]   # oldest to this year
-        # Build per-quarter synthetic values (each annual = 4 quarters)
         q_synthetic   = [v / 4.0 for v in avail_annual for _ in range(4)]
         n_q = len(q_synthetic)
 
-        # Need at least 8 synthetic quarters for smoothed earnings
         if n_q < 8:
             continue
 
-        # Historical market cap
+        # Historical market cap (approx: historical price × current shares)
         hist_price = price_at_date(price_history, date)
         if hist_price and shares > 0:
             hist_mc_b = to_billions(hist_price * shares)
         else:
-            hist_mc_b = current_mc_b  # fallback
+            hist_mc_b = current_mc_b
 
-        # Single smoothed earnings: mean of the 8 most-recent synthetic quarters × 4
-        # N in RG_N is the capitalization factor, not the smoothing window.
+        # G = smoothed long-run earnings: mean of last 8 synthetic quarters × 4
         window8 = q_synthetic[-8:]
-        se = round(sum(window8) / 8 * 4, 4)
+        G = round(sum(window8) / 8 * 4, 4)
 
-        rg8  = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=8)
-        rg10 = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=10)
-        rg12 = calc_rg(hist_mc_b, se, tangible_eq_b, multiplier=12)
+        # FB_N = TE + E_N  where E_N = N*G if G>0 else 0  (paper §4)
+        fb8  = fundamental_base(G, tangible_eq_b, 8)
+        fb10 = fundamental_base(G, tangible_eq_b, 10)
+        fb12 = fundamental_base(G, tangible_eq_b, 12)
 
-        # Skip annual historical obs where RG8 is not computable (fundamental base ≤ 0)
-        if rg8 is None:
+        rg8  = calc_rg(hist_mc_b, G, tangible_eq_b, multiplier=8)
+        rg10 = calc_rg(hist_mc_b, G, tangible_eq_b, multiplier=10)
+        rg12 = calc_rg(hist_mc_b, G, tangible_eq_b, multiplier=12)
+
+        # Skip historical obs where even RG8 is not computable (FB ≤ 0)
+        if rg8 is None and rg10 is None and rg12 is None:
             continue
 
-        _fb_raw = max(tangible_eq_b, 0) + se * 10
-        fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
-
         obs: dict = {
-            "periodKey":             period_key(date),
-            "periodLabel":           period_label(date),
-            "rg8":   rg8,
-            "rg10":  rg10,
-            "rg12":  rg12,
-            "trend": None,
-            "marketCap":             round(hist_mc_b, 1),
-            "bookEquity":            round(tangible_eq_b, 1),
-            "netIncome":             round(avail_annual[-1] if avail_annual else 0, 1),
-            "fundamentalBaseApprox": fb,
-            "dataType":              "annual",
+            "periodKey":            period_key(date),
+            "periodLabel":          period_label(date),
+            "rg8":                  rg8,
+            "rg10":                 rg10,
+            "rg12":                 rg12,
+            "trend":                None,
+            "marketCap":            round(hist_mc_b, 1),
+            "tangibleEquity":       round(tangible_eq_b, 1),
+            "smoothedEarnings":     G,
+            "fundamentalBaseRG8":   round(fb8, 2) if fb8 is not None else None,
+            "fundamentalBaseRG10":  round(fb10, 2) if fb10 is not None else None,
+            "fundamentalBaseRG12":  round(fb12, 2) if fb12 is not None else None,
+            "netIncome":            round(avail_annual[-1] if avail_annual else 0, 1),
+            "dataType":             "annual",
+            "teIsApprox":           True,  # historical TE is always current snapshot
             "note": (
                 "Annual historical observation. Market cap approximated from "
                 "historical close price × current shares outstanding. "
+                "TE uses current balance sheet (not historical). "
                 "Earnings smoothed from available annual data. Approximation."
             ),
         }
@@ -351,24 +362,18 @@ def build_historical_annual_obs(
 
 def validate_and_annotate_observations(observations: list[dict]) -> list[dict]:
     """
-    Validate each observation for internal consistency and add a 'dataQuality' field.
+    Validate each observation per paper specification and add a 'dataQuality' field.
 
-    Convention (post-fix): RG_N = mc / (max(TE,0) + se × N) where se is fixed
-    (mean of last 8 quarters × 4) and N ∈ {8,10,12} is the capitalization factor.
-    With se > 0 this guarantees RG8 >= RG10 >= RG12 mathematically.
+    Paper rules checked:
+      1. RG ordering: with G > 0, RG8 >= RG10 >= RG12 must hold.
+      2. FB–RG round-trip: RG10 ≈ MC / fundamentalBaseRG10.
+      3. Not-covered consistency: if all RG are null, no FB should be positive.
 
     Values:
-      "ok"                        – all checks pass
-      "negative_earnings_ordering"– se < 0 so the RG ordering inverts (RG8 ≤ RG10 ≤ RG12);
-                                     the company had negative smoothed earnings at this
-                                     observation but a large enough tangible equity to keep
-                                     all three fundamental bases positive. Mathematically
-                                     correct; not a formula error.
-      "fb_rg_inconsistency"       – RG10 × fundamentalBaseApprox ≠ marketCap by more than
-                                     5% AND 0.10 absolute (indicates stale/placeholder data)
-      "positive_rg_no_fb"         – RG is positive but fundamentalBase is null or ≤ 0
-                                     (can occur at boundary observations where se is not
-                                     storable via the N=10 base; informational only)
+      "ok"                    – all checks pass
+      "ordering_violation"    – RG8 < RG10 or RG10 < RG12 when G > 0 (formula error)
+      "fb_rg_inconsistency"   – RG10 × fundamentalBaseRG10 ≠ marketCap by >5% AND >0.10
+      "not_covered_fb_leak"   – all RG null but a positive FB was stored (shouldn't happen)
     Multiple issues are joined with "|".
     """
     for obs in observations:
@@ -376,30 +381,32 @@ def validate_and_annotate_observations(observations: list[dict]) -> list[dict]:
         rg10 = obs.get("rg10")
         rg12 = obs.get("rg12")
         mc   = obs.get("marketCap")
-        fb   = obs.get("fundamentalBaseApprox")
+        fb10 = obs.get("fundamentalBaseRG10")
+        G    = obs.get("smoothedEarnings")
 
         issues: list[str] = []
 
-        # 1. Detect negative-earnings ordering inversion
-        #    With positive se: RG8 >= RG10 >= RG12 (normal)
-        #    With negative se: RG8 <= RG10 <= RG12 (inverted, but mathematically correct)
-        if rg8 is not None and rg10 is not None:
-            if rg8 < rg10 - 0.005:          # strictly inverted (beyond rounding)
-                issues.append("negative_earnings_ordering")
+        # 1. RG ordering: must be RG8 >= RG10 >= RG12 when G > 0
+        #    (paper guarantee; G <= 0 means E=0 so all three denominators equal → all equal)
+        if G is not None and G > 0 and rg8 is not None and rg10 is not None:
+            if rg8 < rg10 - 0.005:
+                issues.append("ordering_violation")
+        if G is not None and G > 0 and rg10 is not None and rg12 is not None:
+            if rg10 < rg12 - 0.005:
+                issues.append("ordering_violation")
 
-        # 2. FB–RG10 round-trip: rg10 ≈ marketCap / fundamentalBaseApprox
-        #    Require BOTH >5% relative AND >0.10 absolute to avoid rounding false positives.
-        if rg10 is not None and mc is not None and fb is not None and fb > 0:
-            implied = mc / fb
+        # 2. FB–RG10 round-trip (tolerance: >5% AND >0.10 to absorb 2-decimal rounding)
+        if rg10 is not None and mc is not None and fb10 is not None and fb10 > 0:
+            implied = mc / fb10
             rel_err = abs(implied - rg10) / max(abs(rg10), 1e-9)
             abs_err = abs(implied - rg10)
             if rel_err > 0.05 and abs_err > 0.10:
                 issues.append("fb_rg_inconsistency")
 
-        # 3. Positive RG values with no positive fundamental base stored
-        has_positive_rg = any(v is not None and v > 0 for v in [rg8, rg10, rg12])
-        if has_positive_rg and (fb is None or fb <= 0):
-            issues.append("positive_rg_no_fb")
+        # 3. Not-covered leak check
+        all_null = rg8 is None and rg10 is None and rg12 is None
+        if all_null and fb10 is not None and fb10 > 0:
+            issues.append("not_covered_fb_leak")
 
         obs["dataQuality"] = "|".join(issues) if issues else "ok"
 
@@ -462,27 +469,37 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             pass
 
         # --- Tangible equity --------------------------------------------------
+        # TE = EQ - GW - IA  (paper definition)
+        # If GW or IA are unavailable from yfinance, TE falls back to EQ
+        # and te_is_approx is set to True to label the observation.
         tangible_eq_b = 0.0
+        te_is_approx  = True   # assume approximation until proven otherwise
         try:
             q_bs = stock.quarterly_balance_sheet
             if q_bs is not None and not q_bs.empty:
                 col = sorted(q_bs.columns)[-1]
 
-                def bs(keys: list[str]) -> float:
+                def bs_val(keys: list[str]) -> tuple[float, bool]:
+                    """Return (value, found_in_data)."""
                     for k in keys:
                         if k in q_bs.index:
                             v = q_bs.loc[k, col]
                             if pd.notna(v):
-                                return float(v)
-                    return 0.0
+                                return float(v), True
+                    return 0.0, False
 
-                eq    = bs(["Stockholders Equity", "Total Stockholders Equity",
-                             "Common Stock Equity"])
-                gw    = bs(["Goodwill"])
-                intan = bs(["Other Intangible Assets",
-                             "Net Intangible Assets Including Goodwill",
-                             "Intangible Assets"])
+                eq,    _        = bs_val(["Stockholders Equity",
+                                          "Total Stockholders Equity",
+                                          "Common Stock Equity"])
+                gw,    gw_found = bs_val(["Goodwill"])
+                intan, ia_found = bs_val(["Other Intangible Assets",
+                                          "Net Intangible Assets Including Goodwill",
+                                          "Intangible Assets"])
                 tangible_eq_b = to_billions(eq - gw - intan)
+                # TE is exact when at least one intangible item was explicitly
+                # deducted (even if zero); it is approximate when both were
+                # missing from the balance sheet.
+                te_is_approx = not (gw_found or ia_found)
         except Exception:
             pass
 
@@ -520,61 +537,60 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
             avail_q = q_values[obs_idx:]
 
-            # Single smoothed earnings from a fixed 8-quarter window.
-            # N in RG_N is the capitalization factor (not the smoothing window),
-            # ensuring RG8 >= RG10 >= RG12 for any company with positive earnings.
+            # G = smoothed long-run earnings (paper §4)
+            # Fixed 8-quarter window; N in RG_N is the capitalization factor.
             s8, used_annual = build_ni_series(avail_q, a_values, 8)
-            se = round(sum(s8) / len(s8) * 4, 4) if len(s8) >= 8 else None
+            G: Optional[float] = round(sum(s8) / len(s8) * 4, 4) if len(s8) >= 8 else None
 
-            # Three RG variants: same smoothed earnings, different multipliers
-            rg8  = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=8)
-            rg10 = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=10)
-            rg12 = calc_rg(market_cap_b, se, tangible_eq_b, multiplier=12)
+            # E_N = N * G if G > 0, else 0  (paper §4: negative earnings → E = 0)
+            # FB_N = TE + E_N  (TE enters as-is, not floored)
+            fb8  = fundamental_base(G, tangible_eq_b, 8)
+            fb10 = fundamental_base(G, tangible_eq_b, 10)
+            fb12 = fundamental_base(G, tangible_eq_b, 12)
 
-            # fundamentalBaseApprox stores the N=10 base for reference
-            _fb_raw = max(tangible_eq_b, 0) + (se or 0) * 10
-            fb: Optional[float] = round(_fb_raw, 2) if _fb_raw > 0 else None
+            rg8  = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=8)
+            rg10 = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=10)
+            rg12 = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=12)
 
             note = "Computed via yfinance."
             if used_annual:
-                note += (" Older quarters estimated from annual NI / 4."
-                         " Historical market cap not adjusted.")
+                note += " Older quarters estimated from annual NI / 4."
+            if te_is_approx:
+                note += " TE approximated as book equity (GW/IA not separately available)."
             note += " Approximation."
 
+            not_covered = rg8 is None and rg10 is None and rg12 is None
+            if not_covered:
+                note = (
+                    "Not fundamentally covered: fundamental base FB_N = TE + E_N ≤ 0 "
+                    "for all capitalization factors. "
+                    "TE is negative and smoothed earnings G ≤ 0 (or G × N < |TE|)."
+                )
+
             recent_obs.append({
-                "periodKey":             pk,
-                "periodLabel":           pl,
-                "rg8":  rg8,
-                "rg10": rg10,
-                "rg12": rg12,
-                "trend": None,
-                "marketCap":             round(market_cap_b, 1),
-                "bookEquity":            round(tangible_eq_b, 1),
-                "netIncome":             round((avail_q[0] if avail_q else 0) * 4, 1),
-                "fundamentalBaseApprox": fb,
-                "dataType":              "quarterly",
-                "note": note,
+                "periodKey":            pk,
+                "periodLabel":          pl,
+                "rg8":                  rg8,
+                "rg10":                 rg10,
+                "rg12":                 rg12,
+                "trend":                None,
+                "marketCap":            round(market_cap_b, 1),
+                "tangibleEquity":       round(tangible_eq_b, 1),
+                "smoothedEarnings":     G,
+                "fundamentalBaseRG8":   round(fb8, 2) if fb8 is not None else None,
+                "fundamentalBaseRG10":  round(fb10, 2) if fb10 is not None else None,
+                "fundamentalBaseRG12":  round(fb12, 2) if fb12 is not None else None,
+                "netIncome":            round((avail_q[0] if avail_q else 0) * 4, 1),
+                "dataType":             "quarterly",
+                "teIsApprox":           te_is_approx,
+                "note":                 note,
             })
 
-        # Trend codes for recent obs (computed from rg10; null-rg obs get null trend)
+        # Trend codes across all recent obs (rg10-based; null → null)
         for i in range(len(recent_obs)):
             curr = recent_obs[i]["rg10"]
             prev = recent_obs[i + 1]["rg10"] if i + 1 < len(recent_obs) else None
             recent_obs[i]["trend"] = trend_code(curr, prev)
-
-        # Keep observations even when RG is None (negative fundamental base).
-        # Filtering them out would leave stale data on disk. Instead, include
-        # them with a clear note so the detail page can explain the situation.
-        has_any_rg = any(o.get("rg10") is not None for o in recent_obs)
-        if not has_any_rg:
-            # Add explicit explanation to each null-RG observation
-            for o in recent_obs:
-                o["note"] = (
-                    "RG values not computable: fundamental base is zero or negative "
-                    "(tangible equity negative and smoothed earnings negative across "
-                    "all window sizes). The company's earnings do not provide a "
-                    "positive fundamental base at any smoothing horizon."
-                )
 
         # --- Historical annual observations (for chart) ----------------------
         hist_obs: list[dict] = []

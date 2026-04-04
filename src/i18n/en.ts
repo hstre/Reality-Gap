@@ -87,20 +87,20 @@ export const en = {
           {
             label: 'RG8',
             description:
-              'Uses an 8-quarter (2-year) smoothed earnings base. More responsive to recent earnings changes.',
+              'RG\u2088 = MC / (TE + 8\u00d7G). Uses a capitalization factor of 8. The most conservative assumption: only 8 years of smoothed earnings are assumed to justify the earnings component. With the same G and TE, RG8 \u2265 RG10 \u2265 RG12.',
           },
           {
             label: 'RG10',
             description:
-              'Uses a 10-quarter (2.5-year) smoothed earnings base. The primary reference variant.',
+              'RG\u2081\u2080 = MC / (TE + 10\u00d7G). Uses a capitalization factor of 10. The primary reference variant.',
           },
           {
             label: 'RG12',
             description:
-              'Uses a 12-quarter (3-year) smoothed earnings base. More stable but less sensitive to recent shifts.',
+              'RG\u2081\u2082 = MC / (TE + 12\u00d7G). Uses a capitalization factor of 12. The most generous assumption: 12 years of smoothed earnings justify the earnings component. Produces the lowest RG of the three.',
           },
         ],
-        note: 'RG10 is used as the primary ranking metric. Comparing RG8, RG10, and RG12 together provides additional context about earnings stability.',
+        note: 'G is smoothed over the last 8 available quarters (annualized). N is the capitalization factor — not the averaging window. RG10 is the primary ranking metric.',
       },
       trendCodes: {
         heading: 'Trend Codes',
@@ -197,15 +197,17 @@ export const en = {
     currency: 'Currency',
     metrics: {
       heading: 'RG Metrics',
-      notComputable: 'RG Not Computable',
-      notComputableNote: 'The fundamental base is zero or negative: tangible book equity is negative and smoothed earnings are negative across all smoothing windows (RG8, RG10, RG12). Under the RG methodology, a non-positive fundamental base means the company\'s earnings history does not provide fundamental coverage at the current market capitalisation. RG is undefined.',
+      notComputable: 'Not Fundamentally Covered',
+      notComputableNote: 'FB\u2099 = TE + E\u2099 \u2264 0 for all capitalization factors N \u2208 {8,10,12}. Tangible equity is negative and smoothed earnings G are not large enough to produce a positive fundamental base. Under the paper definition, RG is undefined for this company at this period.',
     },
     supportingData: {
       heading: 'Supporting Data',
       marketCap: 'Market Cap (approx.)',
-      bookEquity: 'Book Equity (approx.)',
+      tangibleEquity: 'Tangible Equity (TE)',
+      smoothedEarnings: 'Smoothed Earnings G (ann.)',
       netIncome: 'Net Income (approx.)',
-      fundamentalBase: 'Fundamental Base (approx.)',
+      fundamentalBase: 'Fundamental Base FB\u2081\u2080',
+      teApprox: 'TE approximated as book equity (goodwill/intangibles not separately available from data source).',
       billions: 'in billions',
     },
     trend: 'Trend',

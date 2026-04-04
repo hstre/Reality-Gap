@@ -108,7 +108,7 @@ const trendLabel = obs?.trend ? (trendLabelsDE[obs.trend] ?? obs.trend) : undefi
           <TrendBadge trend={obs.trend} label={trendLabel} />
         </div>
 
-        {(obs.marketCap !== undefined || obs.bookEquity !== undefined || obs.netIncome !== undefined || obs.fundamentalBaseApprox !== undefined) && (
+        {(obs.marketCap !== undefined || obs.tangentialEquity !== undefined || (obs as any).smoothedEarnings !== undefined || obs.fundamentalBaseRG10 !== undefined) && (
           <div class="mb-8">
             <h2 class="text-lg font-semibold text-gray-800 mb-4">{tc.supportingData.heading}</h2>
             <div class="border border-gray-200 rounded-md overflow-hidden">
@@ -120,28 +120,31 @@ const trendLabel = obs?.trend ? (trendLabelsDE[obs.trend] ?? obs.trend) : undefi
                       <td class="text-right font-mono">{formatBillions(obs.marketCap, company.currency)}</td>
                     </tr>
                   )}
-                  {obs.bookEquity !== undefined && (
+                  {(obs as any).tangibleEquity !== undefined && (
                     <tr>
-                      <td class="text-gray-600">{tc.supportingData.bookEquity}</td>
-                      <td class="text-right font-mono">{formatBillions(obs.bookEquity, company.currency)}</td>
+                      <td class="text-gray-600">{tc.supportingData.tangibleEquity}{(obs as any).teIsApprox ? ' *' : ''}</td>
+                      <td class="text-right font-mono">{formatBillions((obs as any).tangibleEquity, company.currency)}</td>
                     </tr>
                   )}
-                  {obs.netIncome !== undefined && (
+                  {(obs as any).smoothedEarnings !== undefined && (obs as any).smoothedEarnings !== null && (
                     <tr>
-                      <td class="text-gray-600">{tc.supportingData.netIncome}</td>
-                      <td class="text-right font-mono">{formatBillions(obs.netIncome, company.currency)}</td>
+                      <td class="text-gray-600">{tc.supportingData.smoothedEarnings}</td>
+                      <td class="text-right font-mono">{formatBillions((obs as any).smoothedEarnings, company.currency)}</td>
                     </tr>
                   )}
-                  {obs.fundamentalBaseApprox !== undefined && (
+                  {(obs as any).fundamentalBaseRG10 !== undefined && (
                     <tr>
                       <td class="text-gray-600">{tc.supportingData.fundamentalBase}</td>
-                      <td class="text-right font-mono">{formatBillions(obs.fundamentalBaseApprox, company.currency)}</td>
+                      <td class="text-right font-mono">{formatBillions((obs as any).fundamentalBaseRG10, company.currency)}</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <p class="text-xs text-gray-400 mt-2">{tc.supportingData.billions}.</p>
+            {(obs as any).teIsApprox && (
+              <p class="text-xs text-gray-400 mt-1">* {tc.supportingData.teApprox}</p>
+            )}
+            <p class="text-xs text-gray-400 mt-1">{tc.supportingData.billions}.</p>
           </div>
         )}
 
