@@ -100,7 +100,7 @@
       "netIncome": 33621.4,
       "dataType": "annual",
       "teIsApprox": true,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings smoothed from available annual data. Approximation.",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     },
     {
@@ -110,7 +110,7 @@
       "rg10": 0.55,
       "rg12": 0.51,
       "trend": null,
-      "marketCap": 409374.2,
+      "marketCap": 409374.3,
       "tangibleEquity": 394832.7,
       "smoothedEarnings": 34601.7095,
       "fundamentalBaseRG8": 671646.37,
@@ -119,7 +119,7 @@
       "netIncome": 14473.4,
       "dataType": "annual",
       "teIsApprox": true,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings smoothed from available annual data. Approximation.",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     }
   ]

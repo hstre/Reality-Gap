@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import re
 import time
@@ -38,7 +39,35 @@ REPO_ROOT    = Path(__file__).resolve().parent.parent
 DATA_DIR     = REPO_ROOT / "src" / "data" / "companies"
 INDEX_FILE   = REPO_ROOT / "src" / "data" / "companies.index.json"
 SECTORS_FILE = REPO_ROOT / "src" / "data" / "sectors.json"
+CPI_FILE     = REPO_ROOT / "src" / "data" / "reference" / "cpi_us_monthly.csv"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# CPI data (US CPIAUCSL from FRED, 1947–present)
+# Used to inflation-adjust the 8-quarter smoothing window for US companies.
+# ---------------------------------------------------------------------------
+
+def _load_cpi() -> dict:
+    """Return {(year, month): cpi_value} from the local FRED CSV."""
+    data: dict = {}
+    try:
+        with open(CPI_FILE, newline="") as f:
+            for row in csv.DictReader(f):
+                try:
+                    # Support both "date" and "observation_date" column names
+                    date_str = row.get("date") or row.get("observation_date", "")
+                    val_str  = row.get("value") or row.get("CPIAUCSL", "")
+                    y = int(date_str[:4])
+                    m = int(date_str[5:7])
+                    data[(y, m)] = float(val_str)
+                except (ValueError, KeyError):
+                    pass
+    except (FileNotFoundError, OSError):
+        pass
+    return data
+
+_CPI: dict = _load_cpi()
+_CPI_CURRENT: Optional[float] = _CPI[max(_CPI)] if _CPI else None
 
 # ---------------------------------------------------------------------------
 # Index member definitions  (ticker, name, sector, index, country, currency)
@@ -181,6 +210,77 @@ def to_billions(value: float) -> float:
     return round(value / 1e9, 4)
 
 
+def cpi_at(date: pd.Timestamp) -> Optional[float]:
+    """Return CPI for the month of *date*, searching up to ±3 months if needed."""
+    if not _CPI:
+        return None
+    for delta in [0, -1, 1, -2, 2, -3, 3]:
+        m = date.month + delta
+        y = date.year
+        while m < 1:
+            m += 12
+            y -= 1
+        while m > 12:
+            m -= 12
+            y += 1
+        if (y, m) in _CPI:
+            return _CPI[(y, m)]
+    return None
+
+
+def build_dated_ni_series(
+    q_dates: list,           # pd.Timestamp list, newest-first
+    q_values_b: list[float], # NI in billions, newest-first (same length as q_dates)
+    annual_oldest_first: Optional[pd.Series],  # annual income stmt, oldest-first
+    n_needed: int,
+) -> list[tuple]:
+    """
+    Build a newest-first list of (ni_value_b, date) tuples for n_needed quarters.
+
+    Fills actual quarterly observations first; supplements with annual/4 estimates
+    (using FY-end dates staggered by 3 months per sub-quarter) if needed.
+    """
+    result: list[tuple] = list(zip(q_values_b, q_dates))
+    if len(result) >= n_needed or annual_oldest_first is None:
+        return result[:n_needed]
+
+    ann_vals_newest  = list(reversed(annual_oldest_first.values))
+    ann_dates_newest = list(reversed(annual_oldest_first.index))
+    for ann_val, fy_date in zip(ann_vals_newest, ann_dates_newest):
+        per_q = to_billions(float(ann_val)) / 4.0
+        for q_off in range(4):
+            if len(result) >= n_needed:
+                break
+            approx_date = fy_date - pd.DateOffset(months=3 * q_off)
+            result.append((per_q, approx_date))
+        if len(result) >= n_needed:
+            break
+    return result[:n_needed]
+
+
+def compute_g(
+    dated_quarters: list[tuple],  # [(ni_b, date), ...] newest-first, already length-8
+    apply_cpi: bool = False,
+) -> Optional[float]:
+    """
+    Compute smoothed annual earnings G = mean(window) × 4.
+
+    When apply_cpi=True and CPI data is available, each quarter is scaled to
+    current-dollar terms before averaging (Shiller-CAPE style).
+    """
+    n = len(dated_quarters)
+    if n == 0:
+        return None
+    if apply_cpi and _CPI_CURRENT is not None:
+        total = 0.0
+        for v, date in dated_quarters:
+            c = cpi_at(date)
+            total += v * (_CPI_CURRENT / c) if (c and c > 0) else v
+    else:
+        total = sum(v for v, _ in dated_quarters)
+    return round(total / n * 4, 4)
+
+
 def trend_code(current: Optional[float], previous: Optional[float]) -> Optional[str]:
     if current is None or previous is None or previous == 0:
         return None
@@ -279,12 +379,15 @@ def build_historical_annual_obs(
     tangible_eq_b: float,
     current_mc_b: float,
     te_is_approx: bool = True,        # historical obs always use current TE
+    use_cpi: bool = False,            # inflation-adjust earnings (US only)
 ) -> list[dict]:
     """
     Build one RG observation per available fiscal-year-end using:
       - Annual NI rolling window (oldest data extends backwards)
       - Historical market cap = price at FY-end × current shares (approx)
       - TE is the current tangible equity (not historical — always approximate)
+      - use_cpi: if True, each quarter's earnings are scaled to current dollars
+        via CPIAUCSL before computing the 8-quarter smoothed G
 
     Returns observations oldest-first.
     """
@@ -298,10 +401,17 @@ def build_historical_annual_obs(
 
     for i, date in enumerate(dates):
         avail_annual  = annual_values_b[: i + 1]   # oldest to this year
-        q_synthetic   = [v / 4.0 for v in avail_annual for _ in range(4)]
-        n_q = len(q_synthetic)
+        avail_dates   = dates[: i + 1]
 
-        if n_q < 8:
+        # Build dated synthetic quarters: newest-first, 4 quarters per FY
+        dated_synthetic: list[tuple] = []
+        for fy_b, fy_date in zip(reversed(avail_annual), reversed(avail_dates)):
+            per_q = fy_b / 4.0
+            for q_off in range(4):
+                approx_date = fy_date - pd.DateOffset(months=3 * q_off)
+                dated_synthetic.append((per_q, approx_date))
+
+        if len(dated_synthetic) < 8:
             continue
 
         # Historical market cap (approx: historical price × current shares)
@@ -312,8 +422,9 @@ def build_historical_annual_obs(
             hist_mc_b = current_mc_b
 
         # G = smoothed long-run earnings: mean of last 8 synthetic quarters × 4
-        window8 = q_synthetic[-8:]
-        G = round(sum(window8) / 8 * 4, 4)
+        # CPI adjustment: scale each quarter to current dollars if use_cpi=True
+        window8_dated = dated_synthetic[:8]
+        G = compute_g(window8_dated, apply_cpi=use_cpi)
 
         # FB_N = TE + E_N  where E_N = N*G if G>0 else 0  (paper §4)
         fb8  = fundamental_base(G, tangible_eq_b, 8)
@@ -328,6 +439,7 @@ def build_historical_annual_obs(
         if rg8 is None and rg10 is None and rg12 is None:
             continue
 
+        cpi_note = " Earnings inflation-adjusted to current USD (CPIAUCSL)." if use_cpi else ""
         obs: dict = {
             "periodKey":            period_key(date),
             "periodLabel":          period_label(date),
@@ -347,8 +459,9 @@ def build_historical_annual_obs(
             "note": (
                 "Annual historical observation. Market cap approximated from "
                 "historical close price × current shares outstanding. "
-                "TE uses current balance sheet (not historical). "
-                "Earnings smoothed from available annual data. Approximation."
+                "TE uses current balance sheet (not historical)." +
+                cpi_note +
+                " Approximation."
             ),
         }
         observations.append(obs)
@@ -527,6 +640,11 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
         recent_obs: list[dict] = []
         n_obs = min(4, max(1, len(q_values))) if q_values else 1
+        # Dates for actual quarterly observations (newest-first list of Timestamps)
+        q_dates_newest: list = (
+            list(reversed(q_ni_series.index)) if q_ni_series is not None else []
+        )
+        use_cpi = (country == "US") and bool(_CPI_CURRENT)
 
         for obs_idx in range(n_obs):
             if q_ni_series is not None and obs_idx >= len(q_ni_series):
@@ -535,12 +653,18 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             pk   = period_key(date)
             pl   = period_label(date)
 
-            avail_q = q_values[obs_idx:]
+            avail_q       = q_values[obs_idx:]
+            avail_q_dates = q_dates_newest[obs_idx:]
 
             # G = smoothed long-run earnings (paper §4)
             # Fixed 8-quarter window; N in RG_N is the capitalization factor.
-            s8, used_annual = build_ni_series(avail_q, a_values, 8)
-            G: Optional[float] = round(sum(s8) / len(s8) * 4, 4) if len(s8) >= 8 else None
+            # For US companies: each quarter scaled to current dollars (CPIAUCSL)
+            # before averaging → Shiller-CAPE style real smoothed earnings.
+            dated_s8 = build_dated_ni_series(avail_q_dates, avail_q, a_series_sorted, 8)
+            used_annual = len(dated_s8) > len(avail_q_dates) or (
+                len(dated_s8) == 8 and len(avail_q) < 8
+            )
+            G: Optional[float] = compute_g(dated_s8, apply_cpi=use_cpi) if len(dated_s8) >= 8 else None
 
             # E_N = N * G if G > 0, else 0  (paper §4: negative earnings → E = 0)
             # FB_N = TE + E_N  (TE enters as-is, not floored)
@@ -555,6 +679,8 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             note = "Computed via yfinance."
             if used_annual:
                 note += " Older quarters estimated from annual NI / 4."
+            if use_cpi:
+                note += " Earnings inflation-adjusted to current USD (CPIAUCSL)."
             if te_is_approx:
                 note += " TE approximated as book equity (GW/IA not separately available)."
             note += " Approximation."
@@ -597,7 +723,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
         if a_series_sorted is not None and shares > 0:
             hist_obs = build_historical_annual_obs(
                 a_series_sorted, price_hist, shares,
-                tangible_eq_b, market_cap_b)
+                tangible_eq_b, market_cap_b, use_cpi=use_cpi)
 
         # --- Merge: combine recent quarterly + historical annual -------------
         # Deduplicate by periodKey; quarterly takes priority over annual
@@ -660,7 +786,18 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.ticker:
-        result = fetch_company(args.ticker, args.ticker, "Unknown", "Debug", "XX", "USD")
+        # Look up full metadata from member lists before fetching
+        all_members = [m for members in INDEX_MAP.values() for m in members]
+        member_meta = next(
+            (m for m in all_members if m[0].upper() == args.ticker.upper()), None
+        )
+        if member_meta:
+            t, name, sector, idx, country, currency = member_meta
+        else:
+            t, name, sector, idx, country, currency = (
+                args.ticker, args.ticker, "Unknown", "Debug", "XX", "USD"
+            )
+        result = fetch_company(t, name, sector, idx, country, currency)
         if result:
             print(json.dumps(result, indent=2, default=str))
         return

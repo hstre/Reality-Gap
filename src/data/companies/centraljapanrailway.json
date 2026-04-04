@@ -43,7 +43,7 @@
       "netIncome": 384.4,
       "dataType": "annual",
       "teIsApprox": true,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings smoothed from available annual data. Approximation.",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     },
     {
@@ -62,7 +62,7 @@
       "netIncome": 219.4,
       "dataType": "annual",
       "teIsApprox": true,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Earnings smoothed from available annual data. Approximation.",
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
     }
   ]
