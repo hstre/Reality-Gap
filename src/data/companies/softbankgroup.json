@@ -20,7 +20,8 @@
       "netIncome": 0,
       "fundamentalBaseApprox": 7678.04,
       "dataType": "quarterly",
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
+      "dataQuality": "ok"
     }
   ]
 }

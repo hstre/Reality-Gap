@@ -20,7 +20,8 @@
       "netIncome": 0.4,
       "fundamentalBaseApprox": 1.61,
       "dataType": "quarterly",
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
+      "dataQuality": "ok"
     },
     {
       "periodKey": "2025_q2",
@@ -34,7 +35,8 @@
       "netIncome": 0.1,
       "fundamentalBaseApprox": 1.32,
       "dataType": "quarterly",
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
+      "dataQuality": "ok"
     },
     {
       "periodKey": "2025_q1",
@@ -48,7 +50,8 @@
       "netIncome": 0.2,
       "fundamentalBaseApprox": 1.28,
       "dataType": "quarterly",
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
+      "dataQuality": "window_boundary_artifact"
     },
     {
       "periodKey": "2024_q4",
@@ -62,7 +65,8 @@
       "netIncome": 0.2,
       "fundamentalBaseApprox": 1.17,
       "dataType": "quarterly",
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation."
+      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Historical market cap not adjusted. Approximation.",
+      "dataQuality": "window_boundary_artifact"
     },
     {
       "periodKey": "2023_q4",
@@ -76,7 +80,8 @@
       "netIncome": 0.2,
       "fundamentalBaseApprox": null,
       "dataType": "annual",
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation."
+      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. Earnings smoothed from available annual data. Approximation.",
+      "dataQuality": "positive_rg_no_fb"
     }
   ]
 }

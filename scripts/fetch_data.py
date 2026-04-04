@@ -132,10 +132,17 @@ DAX_MEMBERS: list[tuple] = [
     ("SRT.DE",  "Sartorius",           "Healthcare",              "DAX 40", "DE", "EUR"),
 ]
 
+# Samsung Electronics is not part of the three covered indices but was
+# included in the initial dataset. Fetched separately as KOSPI company.
+KOSPI_MEMBERS: list[tuple] = [
+    ("005930.KS", "Samsung", "Technology / Consumer Electronics", "KOSPI", "KR", "KRW"),
+]
+
 INDEX_MAP = {
-    "SP500": SP500_MEMBERS,
-    "N225":  NIKKEI_MEMBERS,
-    "DAX":   DAX_MEMBERS,
+    "SP500":  SP500_MEMBERS,
+    "N225":   NIKKEI_MEMBERS,
+    "DAX":    DAX_MEMBERS,
+    "KOSPI":  KOSPI_MEMBERS,
 }
 
 NI_LABELS = [
@@ -333,6 +340,63 @@ def build_historical_annual_obs(
         observations.append(obs)
 
     return observations  # oldest-first
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+def validate_and_annotate_observations(observations: list[dict]) -> list[dict]:
+    """
+    Validate each observation for internal consistency and add a 'dataQuality' field.
+
+    Values:
+      "ok"                      – all checks pass
+      "window_boundary_artifact"– RG8/10/12 not monotone; expected when the
+                                   annual-supplement boundary falls at a
+                                   different position across window sizes
+                                   (obs_idx 1-3 only, not a formula error)
+      "fb_rg_inconsistency"     – RG10 × fundamentalBaseApprox ≠ marketCap
+                                   (indicates stale/placeholder data)
+      "positive_rg_no_fb"       – RG is positive but fundamentalBase is null
+                                   or non-positive (should not occur)
+    Multiple issues are joined with "|".
+    """
+    for obs in observations:
+        rg8  = obs.get("rg8")
+        rg10 = obs.get("rg10")
+        rg12 = obs.get("rg12")
+        mc   = obs.get("marketCap")
+        fb   = obs.get("fundamentalBaseApprox")
+
+        issues: list[str] = []
+
+        # 1. Monotonicity: must be weakly monotone in either direction
+        if rg8 is not None and rg10 is not None and rg12 is not None:
+            eps = 1e-6
+            monotone_up   = (rg8 <= rg10 + eps) and (rg10 <= rg12 + eps)
+            monotone_down = (rg8 >= rg10 - eps) and (rg10 >= rg12 - eps)
+            if not monotone_up and not monotone_down:
+                issues.append("window_boundary_artifact")
+
+        # 2. FB–RG10 round-trip: rg10 ≈ marketCap / fundamentalBaseApprox
+        #    Require BOTH >5% relative AND >0.1 absolute deviation to flag,
+        #    so that rounding to 2 decimal places doesn't produce false positives.
+        if rg10 is not None and mc is not None and fb is not None and fb > 0:
+            implied = mc / fb
+            rel_err = abs(implied - rg10) / max(abs(rg10), 1e-9)
+            abs_err = abs(implied - rg10)
+            if rel_err > 0.05 and abs_err > 0.10:
+                issues.append("fb_rg_inconsistency")
+
+        # 3. Positive RG values with no positive fundamental base stored
+        has_positive_rg = any(v is not None and v > 0 for v in [rg8, rg10, rg12])
+        if has_positive_rg and (fb is None or fb <= 0):
+            issues.append("positive_rg_no_fb")
+
+        obs["dataQuality"] = "|".join(issues) if issues else "ok"
+
+    return observations
 
 
 # ---------------------------------------------------------------------------
@@ -540,6 +604,9 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             next_obs = all_sorted[i + 1] if i + 1 < len(all_sorted) else None
             obs["trend"] = trend_code(obs.get("rg10"), next_obs.get("rg10") if next_obs else None)
 
+        # --- Validate and annotate each observation --------------------------
+        all_sorted = validate_and_annotate_observations(all_sorted)
+
         slug = slug_override or slugify(display_name)
         company = {
             "company":      display_name,
@@ -570,7 +637,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch RG data via yfinance")
-    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "ALL"], default="ALL")
+    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "KOSPI", "ALL"], default="ALL")
     parser.add_argument("--limit",  type=int, default=0)
     parser.add_argument("--ticker", default="")
     parser.add_argument("--delay",  type=float, default=1.0)
