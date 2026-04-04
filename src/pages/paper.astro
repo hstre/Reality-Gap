@@ -7,8 +7,8 @@ const t = en;
 const p = t.paper;
 
 const year = new Date().getFullYear();
-const citationAPA = `Stre, H. (${year}). ${p.paperTitle}. Working Paper.`;
-const pdfPath = `${base}/papers/reality-gap-working-paper.pdf`;
+const citationAPA = `Rentschler, H.-S. (${year}). ${p.paperTitle}. Working Paper.`;
+const pdfPath = `${base}/reality-gap-paper.pdf`;
 ---
 
 <BaseLayout
@@ -45,7 +45,6 @@ const pdfPath = `${base}/papers/reality-gap-working-paper.pdf`;
           {p.download.button}
         </a>
       </div>
-      <p class="text-xs text-gray-400 mt-4 italic">{p.download.placeholder}</p>
     </div>
 
     <!-- Citation -->
