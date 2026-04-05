@@ -350,8 +350,63 @@ export const en = {
       noData:     'Insufficient data for time series (fewer than 15 qualifying companies per period).',
       footnote:   'The dataset covers only 4 recent quarters of quarterly data plus a limited number of annual historical observations. No robust trend conclusions can be drawn from this sample.',
     },
+    fragility: {
+      heading: '5. Valuation Fragility Divergence',
+      subheading: 'Is the upper RG segment separating from the conservative core over time? A widening divergence may indicate increasing valuation fragility — structural vulnerability to abrupt repricing.',
+      panelNote: (n: number, periods: number, method: string) =>
+        `Balanced panel of ${n} companies with valid RG10 in all ${periods} target periods. Grouping: ${method}.`,
+      methodQuartile: 'bottom quartile = Conservative RG Group; top quartile = High-RG Group',
+      methodThird: 'bottom third = Conservative RG Group; top third = High-RG Group',
+      dataTypeNote: 'FY 2023 and FY 2024 use historical closing prices (annual observations). Q1–Q4 2025 use current market cap (as of data fetch, approx. early 2026) — within-2025 variation reflects changes in smoothed earnings G only, not quarterly price movements.',
+      signalHeading: 'Fragility Snapshot',
+      peakSpreadLabel: 'Peak RG Fragility Spread',
+      currentSpreadLabel: 'Current RG Fragility Spread',
+      peakRatioLabel: 'Peak RG Fragility Ratio',
+      currentRatioLabel: 'Current RG Fragility Ratio',
+      divergenceChartHeading: 'Conservative vs High-RG Median Over Time',
+      divergenceLegendCons: 'RG Conservative Median',
+      divergenceLegendHigh: 'RG High Median',
+      spreadChartHeading: 'RG Fragility Spread Over Time',
+      ratioChartHeading: 'RG Fragility Ratio Over Time',
+      tableHeading: 'Full Fragility Metrics by Period',
+      colPeriod: 'Period',
+      colType: 'Data',
+      colConsMedian: 'Cons. Median',
+      colHighMedian: 'High Median',
+      colSpread: 'Spread',
+      colRatio: 'Ratio',
+      colSpreadChange: 'Spread Δ',
+      colRatioChange: 'Ratio Δ',
+      colUpperTail: '>3.0 share',
+      peakAnnotation: 'peak',
+      annualLabel: 'annual',
+      quarterlyLabel: 'quarterly',
+      interpretation: {
+        heading: 'How to read RG Fragility Divergence',
+        items: [
+          {
+            title: 'Rising spread or ratio',
+            body: 'A widening gap between the high-RG and conservative-RG medians suggests that the most fundamentals-distant valuations are moving further from the anchored core. In this dataset, the fragility spread peaked in FY 2024, approximately 45% above the FY 2023 level.',
+          },
+          {
+            title: 'Rapid divergence growth',
+            body: 'Accelerating spread growth — as observed from FY 2023 to FY 2024 — may indicate increasing speculative concentration in the high-RG segment. This does not prove a crash or correction, but increases structural vulnerability if the divergence cannot be sustained by earnings growth.',
+          },
+          {
+            title: 'Subsequent contraction',
+            body: 'The fragility spread contracted sharply from its FY 2024 peak to the current level. The conservative core rose slightly throughout. The high-RG group fell significantly from its 2024 peak. This is consistent with repricing of the most overvalued names, though the causal interpretation is unclear.',
+          },
+          {
+            title: 'What this does not prove',
+            body: 'This analysis does not establish that RG fragility predicted any market event. The dataset is small (31 balanced-panel companies), spans only three meaningful historical points, and uses approximate market cap data. No causal, predictive, or investment-relevant claim is made.',
+          },
+        ],
+      },
+      limitationNote: 'Panel limitation: Only 31 of 77 covered companies appear in all 6 target periods. The balanced panel overrepresents companies with consistently aligned fiscal-year reporting. The annual periods (FY 2023, FY 2024) and quarterly periods (2025) use structurally different market cap sources; this is a methodological break in the time series, not a continuous panel.',
+    },
+
     useCases: {
-      heading: '5. What Historical RG Analysis Might Reveal',
+      heading: '6. What Historical RG Analysis Might Reveal',
       items: [
         {
           title: 'Market-wide valuation stretch',
@@ -372,7 +427,7 @@ export const en = {
       ],
     },
     limitations: {
-      heading: '6. Data Limitations',
+      heading: '7. Data Limitations',
       items: [
         'Coverage: 77 companies across three indices (S&P 500 top 30, Nikkei 225 top 19, DAX 40 top 28). This is not a complete index. Results do not generalise to index-level conclusions.',
         'Earnings smoothing: G is approximated as the mean of the last 8 available quarterly net income figures, annualised. This is an operational simplification; the paper defines G more rigorously.',

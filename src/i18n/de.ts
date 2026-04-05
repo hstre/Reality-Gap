@@ -350,8 +350,63 @@ export const de = {
       noData:     'Unzureichende Daten für Zeitreihe (weniger als 15 qualifizierende Unternehmen pro Periode).',
       footnote:   'Der Datensatz umfasst nur 4 aktuelle Quartale an Quartalsdaten sowie eine begrenzte Anzahl historischer Jahresbeobachtungen. Keine belastbaren Trendschlüsse aus dieser Stichprobe möglich.',
     },
+    fragility: {
+      heading: '5. Bewertungsfragilität und Divergenz',
+      subheading: 'Trennt sich das obere RG-Segment im Zeitverlauf vom konservativen Kern? Eine wachsende Divergenz kann auf zunehmende Bewertungsfragilität hinweisen — strukturelle Anfälligkeit für abrupte Neubewertungen.',
+      panelNote: (n: number, periods: number, method: string) =>
+        `Balanciertes Panel von ${n} Unternehmen mit gültigem RG10 in allen ${periods} Zielperioden. Gruppierung: ${method}.`,
+      methodQuartile: 'unteres Quartil = Conservative RG Group; oberes Quartil = High-RG Group',
+      methodThird: 'unteres Drittel = Conservative RG Group; oberes Drittel = High-RG Group',
+      dataTypeNote: 'GJ 2023 und GJ 2024 verwenden historische Schlusskurse (Jahresbeobachtungen). Q1–Q4 2025 verwenden die aktuelle Marktkapitalisierung (Stand Datenabruf, ca. Anfang 2026) — Variation innerhalb 2025 spiegelt Änderungen im geglätteten Gewinn G wider, keine Quartalspreisentwicklung.',
+      signalHeading: 'Fragilitäts-Momentaufnahme',
+      peakSpreadLabel: 'Spitze RG Fragility Spread',
+      currentSpreadLabel: 'Aktueller RG Fragility Spread',
+      peakRatioLabel: 'Spitze RG Fragility Ratio',
+      currentRatioLabel: 'Aktuelle RG Fragility Ratio',
+      divergenceChartHeading: 'Conservative vs. High-RG Median im Zeitverlauf',
+      divergenceLegendCons: 'RG Conservative Median',
+      divergenceLegendHigh: 'RG High Median',
+      spreadChartHeading: 'RG Fragility Spread im Zeitverlauf',
+      ratioChartHeading: 'RG Fragility Ratio im Zeitverlauf',
+      tableHeading: 'Vollständige Fragilitätskennzahlen je Periode',
+      colPeriod: 'Periode',
+      colType: 'Daten',
+      colConsMedian: 'Cons. Median',
+      colHighMedian: 'High Median',
+      colSpread: 'Spread',
+      colRatio: 'Ratio',
+      colSpreadChange: 'Spread Δ',
+      colRatioChange: 'Ratio Δ',
+      colUpperTail: '>3,0 Anteil',
+      peakAnnotation: 'Spitze',
+      annualLabel: 'jährlich',
+      quarterlyLabel: 'quartalsweise',
+      interpretation: {
+        heading: 'Wie die RG-Divergenz zu lesen ist',
+        items: [
+          {
+            title: 'Steigender Spread oder Ratio',
+            body: 'Eine wachsende Lücke zwischen dem High-RG- und dem Conservative-RG-Median deutet darauf hin, dass die fundamentalsfernsten Bewertungen sich vom verankerten Kern entfernen. Im vorliegenden Datensatz erreichte der Fragility Spread in GJ 2024 seinen Höchststand — ca. 45 % über dem GJ-2023-Niveau.',
+          },
+          {
+            title: 'Schnelles Divergenzwachstum',
+            body: 'Beschleunigtes Spread-Wachstum — wie von GJ 2023 auf GJ 2024 beobachtet — kann auf zunehmende spekulative Konzentration im High-RG-Segment hinweisen. Dies beweist keinen Absturz oder eine Korrektur, erhöht aber die strukturelle Anfälligkeit, wenn die Divergenz nicht durch Gewinnwachstum gedeckt werden kann.',
+          },
+          {
+            title: 'Nachfolgende Kontraktion',
+            body: 'Der Fragility Spread ist von seinem GJ-2024-Höchststand deutlich auf das aktuelle Niveau zurückgegangen. Der konservative Kern stieg leicht an, das High-RG-Segment fiel signifikant. Dies ist konsistent mit einer Neubewertung der am stärksten überbewerteten Namen, wobei die kausale Interpretation unklar bleibt.',
+          },
+          {
+            title: 'Was dies nicht beweist',
+            body: 'Diese Analyse belegt nicht, dass RG-Fragilität ein Marktereignis vorhergesagt hat. Der Datensatz ist klein (31 Panel-Unternehmen), umfasst nur drei aussagekräftige historische Punkte und verwendet approximierte Marktkapitalisierungsdaten. Es werden keine kausalen, prädiktiven oder anlagerelevanten Aussagen gemacht.',
+          },
+        ],
+      },
+      limitationNote: 'Panel-Einschränkung: Nur 31 von 77 erfassten Unternehmen erscheinen in allen 6 Zielperioden. Das balancierte Panel überrepräsentiert Unternehmen mit konsistenter Geschäftsjahresausrichtung. Jahres- (GJ 2023, GJ 2024) und Quartalsperioden (2025) verwenden strukturell unterschiedliche Marktkapitalisierungsquellen — dies ist ein methodischer Bruch in der Zeitreihe, kein kontinuierliches Panel.',
+    },
+
     useCases: {
-      heading: '5. Mögliche Anwendungsfelder historischer RG-Analysen',
+      heading: '6. Mögliche Anwendungsfelder historischer RG-Analysen',
       items: [
         {
           title: 'Marktweite Bewertungsstreckung',
@@ -372,7 +427,7 @@ export const de = {
       ],
     },
     limitations: {
-      heading: '6. Datenbeschränkungen',
+      heading: '7. Datenbeschränkungen',
       items: [
         'Abdeckung: 77 Unternehmen aus drei Indizes (S&P 500 Top 30, Nikkei 225 Top 19, DAX 40 Top 28). Dies ist keine vollständige Indexabdeckung. Ergebnisse lassen keine indexweiten Schlüsse zu.',
         'Gewinnglättung: G wird als Mittelwert der letzten 8 verfügbaren Quartals-Nettoergebnisse annualisiert approximiert. Dies ist eine operative Vereinfachung; das Paper definiert G strenger.',
