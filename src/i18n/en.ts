@@ -318,6 +318,60 @@ export const en = {
       heading: 'Research Caveat',
       body: 'This page presents exploratory observations based on an approximate, limited dataset. All results are preliminary. No predictive or causal claims are made. RG is a descriptive heuristic indicator — not a forecasting model and not investment advice. Sample sizes are small, data coverage is partial, and all values are approximations derived from public sources via yfinance. Do not draw strong conclusions from this analysis.',
     },
+
+    takeaways: {
+      heading: 'What the current evidence tentatively suggests',
+      windowNote: (n: number) => `n = ${n} companies · historical anchor: 2023 · current prices approx. early 2026 · exploratory only`,
+      items: [
+        { kind: 'suggests', text: 'Low-RG companies (bottom half by RG10) returned +83% on average vs +36% for the top half — a visible gap in this 71-company sample over the 2023→current window.' },
+        { kind: 'suggests', text: 'P/G (a simpler earnings-multiple) produces a nearly identical split (+82% vs +34%). RG10 and P/G have a rank correlation of 0.87 — they are currently measuring closely related things.' },
+        { kind: 'suggests', text: 'Market-to-Book (M/TE) shows a monotonic quartile gradient (+93%, +65%, +59%, +37%) — a somewhat cleaner pattern than RG, though with a smaller low-high spread.' },
+        { kind: 'limits', text: 'Exceptions are real and frequent. Broadcom (RG10 4.6, +250%), Alphabet (RG10 0.7, +342%), and Tesla (RG10 3.0, +93%) all break the simple pattern. Any average conceals wide individual variance.' },
+        { kind: 'open', text: 'Whether RG adds signal beyond P/G in this sample is unclear. Resolving this requires the GFC cycle (2007–2009), where TE variation is structurally different from the current period.' },
+      ],
+      kindLabels: { suggests: 'tentative', limits: 'exception', open: 'open question' },
+    },
+
+    metricComparison: {
+      heading: '6. RG vs Simpler Metrics: Retrospective Grouping',
+      subheading: 'Four valuation metrics measured at the 2023 historical anchor for 71 companies. Returns approximate price change from that date to current (approx. early 2026). Low group = companies in the bottom half by metric value; High group = top half. Quartile detail also shown.',
+      sampleNote: 'Return = (current market cap − 2023 market cap) / 2023 market cap. Market cap approximated as historical closing price × current shares outstanding. 2023 anchor period: 2023-Q4 (n=45) with fallback to 2023-Q3/Q2/Q1.',
+      comparisonTableHeading: 'Low vs High Group: Avg Approximate Return',
+      colMetric: 'Metric',
+      colN: 'n',
+      colLowAvg: 'Low group avg',
+      colHighAvg: 'High group avg',
+      colSpread: 'Spread',
+      colRho: 'ρ (return)',
+      quartileHeading: 'Quartile Breakdown',
+      colQuartile: 'Quartile',
+      colAvgRet: 'Avg return',
+      colRange: 'Metric range',
+      colN2: 'n',
+      metricDescriptions: {
+        rg10: 'RG10 — Reality Gap (smoothed earnings + TE base)',
+        pg:   'P/G — Market cap / (G × 10), simple earnings multiple',
+        mte:  'M/TE — Market cap / tangible equity (when TE > 0)',
+        ey:   'EY — Earnings yield: G / Market cap × 100 (inverted scale)',
+      },
+      eyNote: 'EY is inverted: high EY = cheap. Its grouping pattern is the mirror image of the others.',
+      verdictHeading: 'Assessment',
+      verdictBody: 'RG10 and P/G produce nearly identical low/high splits on this sample (spread ~47–49%). Their rank correlation is 0.87 — they are measuring closely related quantities. M/TE shows a cleaner monotonic gradient. EY behaves as expected (high EY = cheap = better returns). Whether RG adds information beyond P/G cannot be determined from this window.',
+      casesHeading: 'Illustrative cases',
+      casesNote: 'Selected observations from the retrospective analysis. Not representative — shown to ground the aggregate results in concrete examples.',
+      colCompany: 'Company',
+      colRG10: 'RG10',
+      colPG: 'P/G',
+      colMTE: 'M/TE',
+      colReturn: '≈Return',
+      colCase: 'Case type',
+      caseTypes: {
+        consistent: 'Consistent with pattern',
+        exception: 'Exception to pattern',
+        ambiguous: 'Ambiguous',
+      },
+    },
+
     indexSection: {
       heading: '1. Cross-Index Snapshot',
       note: 'Median RG10 and interquartile range by index for the most recent quarterly observation per company. Only companies with a valid, non-near-boundary RG10 are included.',
@@ -406,7 +460,7 @@ export const en = {
     },
 
     useCases: {
-      heading: '6. What Historical RG Analysis Might Reveal',
+      heading: '7. What Historical RG Analysis Might Reveal',
       items: [
         {
           title: 'Market-wide valuation stretch',
@@ -427,7 +481,7 @@ export const en = {
       ],
     },
     coverage: {
-      heading: '7. Historical Coverage Status',
+      heading: '8. Historical Coverage Status',
       subheading: 'The current RG dataset covers only a short modern slice of market history. The two most important historical stress tests — the dot-com cycle and the global financial crisis — are outside the current observation window. This section documents the coverage gap, what partial data exists, and what each extension phase requires.',
       currentSliceNote: 'Current observation window: 2023–2026 only. All fragility and retrospective analysis on this page is based on this narrow modern period. No conclusions about long-run RG behaviour or historical crisis dynamics can be drawn from this window.',
       timelineHeading: 'Dataset Coverage Timeline (1995–2026)',
@@ -502,7 +556,7 @@ export const en = {
     },
 
     limitations: {
-      heading: '8. Data Limitations',
+      heading: '9. Data Limitations',
       items: [
         'Coverage: 77 companies across three indices (S&P 500 top 30, Nikkei 225 top 19, DAX 40 top 28). This is not a complete index. Results do not generalise to index-level conclusions.',
         'Earnings smoothing: G is approximated as the mean of the last 8 available quarterly net income figures, annualised. This is an operational simplification; the paper defines G more rigorously.',

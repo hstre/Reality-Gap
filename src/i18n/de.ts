@@ -318,6 +318,60 @@ export const de = {
       heading: 'Forschungsvorbehalt',
       body: 'Diese Seite präsentiert explorative Beobachtungen auf Basis eines approximierten, begrenzten Datensatzes. Alle Ergebnisse sind vorläufig. Es werden keine prädiktiven oder kausalen Aussagen getroffen. RG ist ein deskriptiver heuristischer Indikator — kein Prognosemodell und keine Anlageberatung. Stichprobengrößen sind klein, die Datenabdeckung ist partiell, und alle Werte sind Näherungen aus öffentlichen Quellen (yfinance). Bitte keine starken Schlussfolgerungen aus dieser Analyse ziehen.',
     },
+
+    takeaways: {
+      heading: 'Was die aktuellen Daten vorläufig nahelegen',
+      windowNote: (n: number) => `n = ${n} Unternehmen · historischer Ankerpunkt: 2023 · aktuelle Kurse ca. Anfang 2026 · explorativ`,
+      items: [
+        { kind: 'suggests', text: 'Niedrig-RG-Unternehmen (untere Hälfte nach RG10) erzielten im Schnitt +83 % vs. +36 % für die obere Hälfte — eine sichtbare Lücke in dieser 71-Unternehmen-Stichprobe über das Fenster 2023→aktuell.' },
+        { kind: 'suggests', text: 'P/G (einfacheres Gewinnmultiple) liefert eine nahezu identische Aufteilung (+82 % vs. +34 %). RG10 und P/G haben eine Rangkorrelation von 0,87 — sie messen derzeit eng verwandte Größen.' },
+        { kind: 'suggests', text: 'Market-to-Book (M/TE) zeigt ein monotones Quartilsmuster (+93 %, +65 %, +59 %, +37 %) — ein etwas klareres Muster als RG, mit jedoch kleinerem Spread.' },
+        { kind: 'limits', text: 'Ausnahmen sind real und häufig. Broadcom (RG10 4,6; +250 %), Alphabet (RG10 0,7; +342 %) und Tesla (RG10 3,0; +93 %) brechen das einfache Muster. Jeder Durchschnitt verbirgt eine breite individuelle Streuung.' },
+        { kind: 'open', text: 'Ob RG gegenüber P/G in dieser Stichprobe Zusatzinformation liefert, ist unklar. Dies erfordert den GFC-Zyklus (2007–2009), wo die TE-Variation strukturell anders ist als heute.' },
+      ],
+      kindLabels: { suggests: 'vorläufig', limits: 'Ausnahme', open: 'offene Frage' },
+    },
+
+    metricComparison: {
+      heading: '6. RG vs. einfachere Metriken: Retrospektiver Gruppenvergleich',
+      subheading: 'Vier Bewertungsmetriken, gemessen am historischen Ankerpunkt 2023 für 71 Unternehmen. Renditen approximieren die Kursentwicklung von diesem Datum bis aktuell (ca. Anfang 2026). Niedrige Gruppe = untere Hälfte nach Metrikwert; Hohe Gruppe = obere Hälfte.',
+      sampleNote: 'Rendite = (aktuelle Marktkapitalisierung − Marktkapitalisierung 2023) / Marktkapitalisierung 2023. Marktkapitalisierung als historischer Schlusskurs × aktuelle Aktienanzahl approximiert.',
+      comparisonTableHeading: 'Niedrig- vs. Hoch-Gruppe: Ø Approximierte Rendite',
+      colMetric: 'Metrik',
+      colN: 'n',
+      colLowAvg: 'Ø Niedrig-Gruppe',
+      colHighAvg: 'Ø Hoch-Gruppe',
+      colSpread: 'Spread',
+      colRho: 'ρ (Rendite)',
+      quartileHeading: 'Quartilsaufschlüsselung',
+      colQuartile: 'Quartil',
+      colAvgRet: 'Ø Rendite',
+      colRange: 'Metrikbereich',
+      colN2: 'n',
+      metricDescriptions: {
+        rg10: 'RG10 — Reality Gap (geglättete Gewinne + EK-Basis)',
+        pg:   'P/G — Marktkap. / (G × 10), einfaches Gewinnmultiple',
+        mte:  'M/TE — Marktkap. / tangibles Eigenkapital (TE > 0)',
+        ey:   'EY — Gewinnrendite: G / Marktkap. × 100 (invertiert)',
+      },
+      eyNote: 'EY ist invertiert: hohe EY = günstig. Das Gruppierungsmuster ist das Spiegelbild der anderen Metriken.',
+      verdictHeading: 'Einschätzung',
+      verdictBody: 'RG10 und P/G liefern auf dieser Stichprobe nahezu identische Niedrig-/Hoch-Splits (Spread ~47–49 %). Ihre Rangkorrelation beträgt 0,87 — sie messen eng verwandte Größen. M/TE zeigt einen klareren monotonen Gradienten. EY verhält sich erwartungsgemäß. Ob RG gegenüber P/G Zusatzinformation liefert, lässt sich aus diesem Beobachtungsfenster nicht ableiten.',
+      casesHeading: 'Illustrative Einzelfälle',
+      casesNote: 'Ausgewählte Beobachtungen aus der retrospektiven Analyse. Nicht repräsentativ — zur Verankerung der Aggregatergebnisse in konkreten Beispielen.',
+      colCompany: 'Unternehmen',
+      colRG10: 'RG10',
+      colPG: 'P/G',
+      colMTE: 'M/TE',
+      colReturn: '≈ Rendite',
+      colCase: 'Falltyp',
+      caseTypes: {
+        consistent: 'Konsistent mit Muster',
+        exception: 'Ausnahme',
+        ambiguous: 'Mehrdeutig',
+      },
+    },
+
     indexSection: {
       heading: '1. Indexvergleich (Momentaufnahme)',
       note: 'Median-RG10 und Interquartilsabstand je Index für die aktuellste Quartalsbeobachtung pro Unternehmen. Nur Unternehmen mit gültigem, nicht grenzwertigem RG10 einbezogen.',
@@ -406,7 +460,7 @@ export const de = {
     },
 
     useCases: {
-      heading: '6. Mögliche Anwendungsfelder historischer RG-Analysen',
+      heading: '7. Mögliche Anwendungsfelder historischer RG-Analysen',
       items: [
         {
           title: 'Marktweite Bewertungsstreckung',
@@ -427,7 +481,7 @@ export const de = {
       ],
     },
     coverage: {
-      heading: '7. Stand der historischen Datenbasis',
+      heading: '8. Stand der historischen Datenbasis',
       subheading: 'Der aktuelle RG-Datensatz deckt nur einen kurzen modernen Ausschnitt der Marktgeschichte ab. Die beiden wichtigsten historischen Stresstests — der Dot-com-Zyklus und die globale Finanzkrise — liegen außerhalb des aktuellen Beobachtungsfensters. Dieser Abschnitt dokumentiert die Datenlücke, welche Teilbestände bereits vorhanden sind und was jede Erweiterungsphase erfordert.',
       currentSliceNote: 'Aktuelles Beobachtungsfenster: nur 2023–2026. Alle Fragilitäts- und Retrospektivanalysen auf dieser Seite basieren auf diesem engen modernen Zeitraum. Keine Schlussfolgerungen über langfristiges RG-Verhalten oder historische Krisendynamiken können aus diesem Fenster abgeleitet werden.',
       timelineHeading: 'Datenbasis-Zeitstrahl (1995–2026)',
@@ -502,7 +556,7 @@ export const de = {
     },
 
     limitations: {
-      heading: '8. Datenbeschränkungen',
+      heading: '9. Datenbeschränkungen',
       items: [
         'Abdeckung: 77 Unternehmen aus drei Indizes (S&P 500 Top 30, Nikkei 225 Top 19, DAX 40 Top 28). Dies ist keine vollständige Indexabdeckung. Ergebnisse lassen keine indexweiten Schlüsse zu.',
         'Gewinnglättung: G wird als Mittelwert der letzten 8 verfügbaren Quartals-Nettoergebnisse annualisiert approximiert. Dies ist eine operative Vereinfachung; das Paper definiert G strenger.',

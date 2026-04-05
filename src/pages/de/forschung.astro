@@ -203,6 +203,88 @@ const maxFRatio  = Math.max(...fragSeries.map(r => r.ratio));
 const maxFHigh   = Math.max(...fragSeries.map(r => r.highMedian));
 const fragPeak   = fragSeries.find(r => r.spread === maxFSpread)!;
 const fragLatest = fragSeries[fragSeries.length - 1]!;
+
+// ── Retrospective metric comparison ─────────────────────────────────────────
+const RETRO_ANCHORS = ['2023_q4', '2023_q3', '2023_q2', '2023_q1'];
+
+interface RetroEntry {
+  company: string; sector: string; period: string;
+  rg10: number; pg: number | null; mte: number | null; ey: number | null;
+  ret: number;
+}
+const retroEntries: RetroEntry[] = [];
+for (const d of allCompanies) {
+  const obs = d.observations as any[];
+  let histObs: any = null;
+  for (const pk of RETRO_ANCHORS) {
+    histObs = obs.find((o: any) => o.periodKey === pk && o.rg10 != null && !o.nearBoundary);
+    if (histObs) break;
+  }
+  if (!histObs) continue;
+  const curObs = [...obs]
+    .filter((o: any) => o.dataType === 'quarterly' && o.marketCap != null)
+    .sort((a: any, b: any) => b.periodKey.localeCompare(a.periodKey))[0];
+  if (!curObs) continue;
+  const hMC = histObs.marketCap as number;
+  const cMC = curObs.marketCap as number;
+  if (!hMC || !cMC || hMC <= 0) continue;
+  const G  = histObs.smoothedEarnings as number;
+  const TE = histObs.tangibleEquity as number;
+  retroEntries.push({
+    company: d.company, sector: d.sector ?? '', period: histObs.periodKey,
+    rg10: histObs.rg10 as number,
+    pg:  (G > 0) ? hMC / (G * 10) : null,
+    mte: (TE > 0) ? hMC / TE : null,
+    ey:  (hMC > 0) ? (G / hMC) * 100 : null,
+    ret: (cMC - hMC) / hMC * 100,
+  });
+}
+
+function spearmanRho(entries: RetroEntry[], key: keyof RetroEntry): number | null {
+  const valid = entries.filter(e => e[key] != null) as RetroEntry[];
+  const n = valid.length;
+  if (n < 5) return null;
+  const byKey = [...valid].sort((a, b) => (a[key] as number) - (b[key] as number));
+  const byRet = [...valid].sort((a, b) => a.ret - b.ret);
+  const kR = new Map<string, number>(); const rR = new Map<string, number>();
+  byKey.forEach((e, i) => kR.set(e.company, i + 1));
+  byRet.forEach((e, i) => rR.set(e.company, i + 1));
+  let d2 = 0;
+  for (const e of valid) d2 += (kR.get(e.company)! - rR.get(e.company)!) ** 2;
+  return 1 - (6 * d2) / (n * (n * n - 1));
+}
+interface QS { n: number; avgRet: number; lo: number; hi: number; }
+interface MR { key: string; label: string; n: number; lowAvg: number; highAvg: number; spread: number; rho: number | null; q1: QS; q2: QS; q3: QS; q4: QS; inverted: boolean; }
+function computeMetric(key: keyof RetroEntry, label: string, inverted = false): MR | null {
+  const valid = retroEntries.filter(e => e[key] != null).sort((a, b) => (a[key] as number) - (b[key] as number));
+  const n = valid.length;
+  if (n < 8) return null;
+  const q = Math.floor(n / 4);
+  const qs = [valid.slice(0,q), valid.slice(q,2*q), valid.slice(2*q,3*q), valid.slice(3*q)];
+  const avgR = (arr: RetroEntry[]) => arr.reduce((s, e) => s + e.ret, 0) / arr.length;
+  const toQ = (arr: RetroEntry[]): QS => ({ n: arr.length, avgRet: avgR(arr), lo: arr[0]![key] as number, hi: arr[arr.length-1]![key] as number });
+  const lowAvg = avgR([...qs[0]!, ...qs[1]!]); const highAvg = avgR([...qs[2]!, ...qs[3]!]);
+  return { key, label, n, lowAvg, highAvg, spread: lowAvg - highAvg, rho: spearmanRho(retroEntries, key), q1: toQ(qs[0]!), q2: toQ(qs[1]!), q3: toQ(qs[2]!), q4: toQ(qs[3]!), inverted };
+}
+const retroMetrics = [
+  computeMetric('rg10', tc.metricComparison.metricDescriptions.rg10),
+  computeMetric('pg',   tc.metricComparison.metricDescriptions.pg),
+  computeMetric('mte',  tc.metricComparison.metricDescriptions.mte),
+  computeMetric('ey',   tc.metricComparison.metricDescriptions.ey, true),
+].filter(Boolean) as MR[];
+const maxAbsSpread = Math.max(...retroMetrics.map(m => Math.abs(m.spread)));
+const maxAvgRet    = Math.max(...retroMetrics.flatMap(m => [m.lowAvg, m.highAvg]));
+const illustrativeCases = [
+  { company: 'Mitsubishi UFJ', rg10: 0.27, pg: 0.78, mte: 0.4,  ret: +255, caseType: 'consistent' as const },
+  { company: 'Deutsche Bank',  rg10: 0.18, pg: 0.43, mte: 0.3,  ret: +125, caseType: 'consistent' as const },
+  { company: 'Toyota Motor',   rg10: 0.34, pg: 0.84, mte: 0.6,  ret:  +91, caseType: 'consistent' as const },
+  { company: 'Daiichi Sankyo', rg10: 3.70, pg: 9.20, mte: 6.2,  ret:  -35, caseType: 'consistent' as const },
+  { company: 'Adidas',         rg10: 4.53, pg:11.51, mte: 7.5,  ret:  -23, caseType: 'consistent' as const },
+  { company: 'Broadcom',       rg10: 4.61, pg: 3.03, mte: null, ret: +250, caseType: 'exception'  as const },
+  { company: 'Alphabet',       rg10: 0.73, pg: 0.93, mte: null, ret: +342, caseType: 'ambiguous'  as const },
+  { company: 'UnitedHealth',   rg10: 2.27, pg: 2.42, mte: null, ret:  -43, caseType: 'ambiguous'  as const },
+];
+const retroN = retroEntries.length;
 ---
 
 <BaseLayout
@@ -226,6 +308,28 @@ const fragLatest = fragSeries[fragSeries.length - 1]!;
       <p class="text-sm font-semibold text-amber-800 mb-2">{tc.disclaimer.heading}</p>
       <p class="text-sm text-amber-700 leading-relaxed">{tc.disclaimer.body}</p>
     </div>
+
+    <!-- Takeaways -->
+    <section class="mb-10">
+      <div class="flex items-baseline gap-3 mb-3">
+        <h2 class="text-base font-semibold text-gray-800">{tc.takeaways.heading}</h2>
+        <span class="text-xs text-gray-400">{tc.takeaways.windowNote(retroN)}</span>
+      </div>
+      <div class="space-y-2">
+        {tc.takeaways.items.map((item: { kind: string; text: string }) => {
+          const kindLabel = (tc.takeaways.kindLabels as any)[item.kind] ?? item.kind;
+          const kindColor = item.kind === 'suggests' ? 'bg-teal-50 border-teal-200 text-teal-700'
+            : item.kind === 'limits' ? 'bg-orange-50 border-orange-200 text-orange-700'
+            : 'bg-gray-50 border-gray-200 text-gray-500';
+          return (
+            <div class="flex items-start gap-3 border rounded-md px-4 py-3 text-sm">
+              <span class={`text-xs font-medium px-1.5 py-0.5 rounded shrink-0 mt-0.5 border ${kindColor}`}>{kindLabel}</span>
+              <span class="text-gray-700">{item.text}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
 
     <!-- 1. Cross-index -->
     <section class="mb-12">
@@ -527,7 +631,118 @@ const fragLatest = fragSeries[fragSeries.length - 1]!;
       </p>
     </section>
 
-    <!-- 6. Use cases -->
+    <!-- 6. RG vs Simpler Metrics -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.metricComparison.heading}</h2>
+      <p class="text-sm text-gray-500 mb-2">{tc.metricComparison.subheading}</p>
+      <p class="text-xs text-gray-400 mb-6">{tc.metricComparison.sampleNote}</p>
+
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.metricComparison.comparisonTableHeading}</h3>
+      <div class="border border-gray-200 rounded-md overflow-hidden mb-8 text-xs">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+              <th class="text-left px-3 py-2 font-medium">{tc.metricComparison.colMetric}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colN}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colLowAvg}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colHighAvg}</th>
+              <th class="px-3 py-2 font-medium" style="width:120px;">Visual</th>
+              <th class="text-right px-3 py-2 font-medium font-semibold text-gray-700">{tc.metricComparison.colSpread}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colRho}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {retroMetrics.map(m => (
+              <tr class="border-t border-gray-100">
+                <td class="px-3 py-2"><span class="text-xs font-semibold text-gray-800">{m.key.toUpperCase()}</span></td>
+                <td class="px-3 py-2 text-right font-mono text-gray-500">{m.n}</td>
+                <td class={`px-3 py-2 text-right font-mono font-semibold ${m.inverted ? 'text-gray-600' : 'text-teal-700'}`}>
+                  {m.inverted ? '' : '+'}{fmt(m.lowAvg, 0)}%
+                </td>
+                <td class={`px-3 py-2 text-right font-mono ${m.inverted ? 'text-teal-700 font-semibold' : 'text-gray-600'}`}>
+                  {m.inverted ? '+' : ''}{fmt(m.highAvg, 0)}%
+                </td>
+                <td class="px-3 py-2">
+                  <div class="flex items-center gap-1" style="height:14px;">
+                    <div class="bg-teal-400/60 rounded-sm" style={`height:10px; width:${Math.round((m.inverted ? m.highAvg : m.lowAvg) / maxAvgRet * 60)}px;`} />
+                    <div class="bg-gray-300/80 rounded-sm" style={`height:10px; width:${Math.round((m.inverted ? m.lowAvg : m.highAvg) / maxAvgRet * 60)}px;`} />
+                  </div>
+                </td>
+                <td class={`px-3 py-2 text-right font-mono font-semibold ${Math.abs(m.spread) >= 30 ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {m.spread >= 0 ? '+' : ''}{fmt(m.spread, 0)}%
+                </td>
+                <td class="px-3 py-2 text-right font-mono text-gray-600">
+                  {m.rho != null ? (m.rho >= 0 ? '+' : '') + m.rho.toFixed(2) : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.metricComparison.quartileHeading}</h3>
+      <div class="grid grid-cols-1 gap-6 mb-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        {retroMetrics.slice(0, 3).map(m => (
+          <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+            <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">{m.key.toUpperCase()} — {tc.metricComparison.quartileHeading}</div>
+            <div class="p-3 space-y-2">
+              {[m.q1, m.q2, m.q3, m.q4].map((q, i) => (
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-400 w-4 shrink-0">Q{i+1}</span>
+                  <div class="flex-1 bg-gray-100 rounded-sm h-5 relative">
+                    <div class={`h-5 rounded-sm ${q.avgRet >= 70 ? 'bg-teal-400/70' : q.avgRet >= 40 ? 'bg-accent/60' : 'bg-gray-300'}`}
+                      style={`width: ${maxAvgRet > 0 ? Math.round(Math.max(0, q.avgRet) / maxAvgRet * 100) : 0}%`} />
+                  </div>
+                  <span class={`font-mono w-14 text-right shrink-0 ${q.avgRet >= 70 ? 'text-teal-700 font-semibold' : 'text-gray-600'}`}>
+                    {q.avgRet >= 0 ? '+' : ''}{fmt(q.avgRet, 0)}%
+                  </span>
+                  <span class="text-gray-400 w-5 shrink-0 text-center">n={q.n}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="border border-gray-200 rounded-md bg-gray-50/50 px-5 py-4 mb-8">
+        <p class="text-sm font-semibold text-gray-700 mb-1">{tc.metricComparison.verdictHeading}</p>
+        <p class="text-sm text-gray-600">{tc.metricComparison.verdictBody}</p>
+      </div>
+
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">{tc.metricComparison.casesHeading}</h3>
+      <p class="text-xs text-gray-400 mb-3">{tc.metricComparison.casesNote}</p>
+      <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+              <th class="text-left px-3 py-2 font-medium">{tc.metricComparison.colCompany}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colRG10}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colPG}</th>
+              <th class="text-right px-3 py-2 font-medium">{tc.metricComparison.colMTE}</th>
+              <th class="text-right px-3 py-2 font-medium font-semibold text-gray-700">{tc.metricComparison.colReturn}</th>
+              <th class="text-left px-3 py-2 font-medium">{tc.metricComparison.colCase}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {illustrativeCases.map(c => {
+              const cc = c.caseType === 'consistent' ? 'text-teal-600' : c.caseType === 'exception' ? 'text-orange-600' : 'text-gray-400';
+              return (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-2 font-medium text-gray-700">{c.company}</td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-600">{c.rg10.toFixed(2)}</td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-600">{c.pg != null ? c.pg.toFixed(2) : '—'}</td>
+                  <td class="px-3 py-2 text-right font-mono text-gray-600">{c.mte != null ? c.mte.toFixed(1) : '—'}</td>
+                  <td class={`px-3 py-2 text-right font-mono font-semibold ${c.ret > 0 ? 'text-gray-800' : 'text-gray-500'}`}>{c.ret > 0 ? '+' : ''}{c.ret}%</td>
+                  <td class={`px-3 py-2 text-xs ${cc}`}>{(tc.metricComparison.caseTypes as any)[c.caseType]}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7. Use cases -->
     <section class="mb-12">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">{tc.useCases.heading}</h2>
       <div class="space-y-4">
@@ -597,48 +812,63 @@ const fragLatest = fragSeries[fragSeries.length - 1]!;
         ))}
       </div>
 
-      <h3 class="text-sm font-semibold text-gray-700 mb-4">{tc.coverage.phasesHeading}</h3>
-      <div class="space-y-6 mb-7">
-        {tc.coverage.phases.map((phase: any) => (
-          <div class={`border rounded-md p-5 ${phase.status === 'missing' ? 'border-gray-300 bg-gray-50/40' : phase.status === 'partial' ? 'border-amber-200 bg-amber-50/30' : 'border-teal-200 bg-teal-50/30'}`}>
-            <div class="flex items-start justify-between gap-4 mb-3">
-              <div>
-                <p class="font-semibold text-gray-800 text-sm">{phase.label}</p>
-                <p class="text-xs text-gray-500">{phase.period}</p>
-              </div>
-              <span class={`text-xs px-2 py-1 rounded shrink-0 ${phase.status === 'missing' ? 'bg-gray-200 text-gray-600' : phase.status === 'partial' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-teal-100 text-teal-700'}`}>
-                {phase.statusLabel}
-              </span>
-            </div>
-            {phase.subPeriods && phase.subPeriods.length > 0 && (
-              <div class="flex flex-wrap gap-2 mb-3">
-                {phase.subPeriods.map((sp: any) => (
-                  <span class="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-600">
-                    {sp.label} <span class="text-gray-400">{sp.years}</span>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div class="space-y-2 text-sm text-gray-600">
-              <p><span class="font-medium text-gray-700">Verfügbare Daten: </span>{phase.dataAvailable}</p>
-              <p><span class="font-medium text-gray-700">Benötigte Daten: </span>{phase.dataNeeded}</p>
-              <p><span class="font-medium text-gray-700">Akquisitionspfad: </span>{phase.acquisitionPath}</p>
-            </div>
-          </div>
-        ))}
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.coverage.phasesHeading}</h3>
+      <div class="border border-gray-200 rounded-md overflow-hidden mb-6 text-xs">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+              <th class="text-left px-3 py-2 font-medium">Phase</th>
+              <th class="text-left px-3 py-2 font-medium">Zeitraum</th>
+              <th class="text-left px-3 py-2 font-medium">Status</th>
+              <th class="text-left px-3 py-2 font-medium">Vorhanden</th>
+              <th class="text-left px-3 py-2 font-medium">Fehlend</th>
+              <th class="text-left px-3 py-2 font-medium">Nächster Schritt</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-t border-gray-100 bg-gray-50/30">
+              <td class="px-3 py-2 font-medium text-gray-700">Dot-com</td>
+              <td class="px-3 py-2 font-mono text-gray-600">1995–2003</td>
+              <td class="px-3 py-2"><span class="bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded">Keine Daten</span></td>
+              <td class="px-3 py-2 text-gray-500">Nichts</td>
+              <td class="px-3 py-2 text-gray-500">Alle Fundamentaldaten + Kurse</td>
+              <td class="px-3 py-2 text-gray-500">Neue Quelle erforderlich (Compustat / WRDS)</td>
+            </tr>
+            <tr class="border-t border-gray-100 bg-amber-50/20">
+              <td class="px-3 py-2 font-medium text-gray-700">GFC</td>
+              <td class="px-3 py-2 font-mono text-gray-600">2004–2011</td>
+              <td class="px-3 py-2"><span class="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded border border-amber-200">Partiell</span></td>
+              <td class="px-3 py-2 text-amber-700">fundamentals.db: 30 US-Titel, Erträge + EK ab 2007</td>
+              <td class="px-3 py-2 text-gray-500">Historische Schlusskurse</td>
+              <td class="px-3 py-2 text-teal-700 font-medium">Kurse via yfinance abrufen → RG aus fundamentals.db berechnen</td>
+            </tr>
+            <tr class="border-t border-gray-100 bg-amber-50/20">
+              <td class="px-3 py-2 font-medium text-gray-700">Moderne Erweiterung</td>
+              <td class="px-3 py-2 font-mono text-gray-600">2012–2022</td>
+              <td class="px-3 py-2"><span class="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded border border-amber-200">Partiell</span></td>
+              <td class="px-3 py-2 text-amber-700">fundamentals.db: vollständige 30-Titel-Abdeckung</td>
+              <td class="px-3 py-2 text-gray-500">Historische Schlusskurse</td>
+              <td class="px-3 py-2 text-teal-700 font-medium">Wie GFC — nur Kurse fehlen</td>
+            </tr>
+            <tr class="border-t border-gray-100 bg-teal-50/20">
+              <td class="px-3 py-2 font-medium text-gray-700">Aktuell</td>
+              <td class="px-3 py-2 font-mono text-gray-600">2023–2026</td>
+              <td class="px-3 py-2"><span class="bg-teal-100 text-teal-700 text-xs px-1.5 py-0.5 rounded">Vollständig</span></td>
+              <td class="px-3 py-2 text-teal-700">77 Unternehmen, alle Indizes, quartalsweise + jährlich</td>
+              <td class="px-3 py-2 text-gray-400">—</td>
+              <td class="px-3 py-2 text-gray-400">Aktive Abdeckung</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      <div class="border border-gray-200 rounded-md bg-gray-50 px-5 py-4 mb-7 text-sm text-gray-600">
-        <p class="font-semibold text-gray-700 mb-1">Hinweis zur vorhandenen Infrastruktur</p>
-        <p>{tc.coverage.fundamentalsDbNote}</p>
-      </div>
+      <p class="text-xs text-gray-400 mb-7">{tc.coverage.fundamentalsDbNote}</p>
 
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.coverage.whatWeWouldSee}</h3>
-      <div class="space-y-3 mb-5">
+      <div class="space-y-2 mb-5">
         {tc.coverage.whatWeWouldSeeItems.map((item: { title: string; body: string }) => (
-          <div class="border-l-2 border-gray-200 pl-4">
-            <p class="text-sm font-semibold text-gray-700 mb-0.5">{item.title}</p>
-            <p class="text-sm text-gray-500">{item.body}</p>
+          <div class="flex gap-3 text-sm">
+            <span class="text-gray-300 shrink-0 mt-0.5">–</span>
+            <span><span class="font-medium text-gray-700">{item.title}: </span><span class="text-gray-500">{item.body}</span></span>
           </div>
         ))}
       </div>
