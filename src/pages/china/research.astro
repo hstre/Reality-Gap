@@ -1,0 +1,422 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import type { Company } from '../../lib/rg';
+import { getLatestObservation } from '../../lib/rg';
+import chinaSlugJson from '../../data/companies.china.index.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const slugs: string[] = chinaSlugJson;
+const companies: Company[] = await Promise.all(
+  slugs.map(slug =>
+    import(`../../data/companies/${slug}.json`).then(m => m.default as Company)
+  )
+);
+
+// ── Helper ───────────────────────────────────────────────
+function parsePeriod(key: string): number {
+  const m = key.match(/^(\d{4})_q(\d)$/);
+  return m ? parseInt(m[1]!) * 10 + parseInt(m[2]!) : 0;
+}
+
+// ── Per-company data for comparison table ────────────────
+interface CompanyRow {
+  slug: string;
+  name: string;
+  ticker: string;
+  sector: string;
+  period: string;
+  mc: number | null;
+  te: number | null;
+  g: number | null;
+  ni: number | null;
+  gw: number | null;
+  ia: number | null;
+  rg8: number | null;
+  rg10: number | null;
+  rg12: number | null;
+  obs: any[];
+}
+
+const rows: CompanyRow[] = companies.map(c => {
+  const obs = getLatestObservation(c);
+  const allObs = [...c.observations].sort((a,b) => parsePeriod(b.periodKey) - parsePeriod(a.periodKey));
+  return {
+    slug: c.slug,
+    name: c.company,
+    ticker: c.ticker,
+    sector: c.sector,
+    period: obs?.periodLabel ?? '—',
+    mc: (obs as any)?.marketCap ?? null,
+    te: (obs as any)?.tangibleEquity ?? null,
+    g: (obs as any)?.smoothedEarnings ?? null,
+    ni: (obs as any)?.netIncome ?? null,
+    gw: (obs as any)?.goodwill ?? null,
+    ia: (obs as any)?.intangibles ?? null,
+    rg8: obs?.rg8 ?? null,
+    rg10: obs?.rg10 ?? null,
+    rg12: obs?.rg12 ?? null,
+    obs: allObs,
+  };
+});
+
+// Sort by RG10 descending
+const rowsSorted = [...rows].sort((a,b) => (b.rg10 ?? -999) - (a.rg10 ?? -999));
+
+// ── RG10 range for bar chart scaling ─────────────────────
+const maxRG10 = Math.max(...rowsSorted.map(r => r.rg10 ?? 0), 0.1);
+
+// ── Historical series for trend chart ────────────────────
+// All periods across all companies
+const allPeriodKeys = [...new Set(
+  companies.flatMap(c => c.observations.map(o => o.periodKey))
+)].sort((a,b) => parsePeriod(a) - parsePeriod(b));
+
+// Per-company RG10 by period
+const seriesByCompany = rows.map(r => ({
+  name: r.name,
+  slug: r.slug,
+  data: allPeriodKeys.map(pk => {
+    const o = r.obs.find(x => x.periodKey === pk);
+    return o?.rg10 ?? null;
+  }),
+}));
+
+// ── Key findings ─────────────────────────────────────────
+// Below-1 companies (fundamental coverage >= market cap)
+const below1 = rowsSorted.filter(r => r.rg10 !== null && r.rg10 < 1.0);
+const above1 = rowsSorted.filter(r => r.rg10 !== null && r.rg10 >= 1.0);
+
+// Biggest RG move: Tencent FY2021 vs FY2024
+function rgMove(slug: string): { from: number|null, to: number|null, pFrom: string, pTo: string } {
+  const c = rows.find(r => r.slug === slug);
+  if (!c) return { from: null, to: null, pFrom: '', pTo: '' };
+  const sorted = c.obs.slice().sort((a,b) => parsePeriod(a.periodKey) - parsePeriod(b.periodKey));
+  const oldest = sorted.find(o => o.rg10 != null);
+  const newest = sorted.slice().reverse().find(o => o.rg10 != null);
+  return { from: oldest?.rg10 ?? null, to: newest?.rg10 ?? null, pFrom: oldest?.periodLabel ?? '', pTo: newest?.periodLabel ?? '' };
+}
+
+const cnoocMove = rgMove('cnooc');
+const meituanMove = rgMove('meituan');
+
+// ── Bar width helper ──────────────────────────────────────
+function pct(v: number | null, max: number): string {
+  if (v === null) return '0%';
+  return Math.min(100, Math.round((v / max) * 100)) + '%';
+}
+---
+
+<BaseLayout
+  title="China Research — Reality Gap"
+  description="Analytical research page: Reality Gap values for major HK-listed Chinese companies. RG10 comparison, trends, sector patterns, and methodology notes."
+  lang="en"
+  canonicalPath="/china/research"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <!-- Header -->
+  <div class="mb-2">
+    <a href={`${base}/china`} class="text-sm text-gray-400 hover:text-accent no-underline">← China Companies</a>
+  </div>
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    China — RG Research
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Reality Gap analysis for 7 major HK-listed Chinese companies.
+    Pilot dataset · 4 annual periods · All values in HKD billions.
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Prototype-grade data</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Source: yfinance / Yahoo Finance</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">H-share market cap basis</span>
+  </div>
+
+  <!-- ── Section 1: Preliminary Findings ─────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">1. Preliminary Findings</h2>
+    <div class="space-y-2">
+      {[
+        { kind: 'tentative', text: `State-owned energy and telecom (CNOOC RG10 ${cnoocMove.to?.toFixed(2)}, China Mobile 0.68) trade with market caps at or below their RG fundamental base — a structural pattern absent from US large-cap tech.` },
+        { kind: 'tentative', text: `Chinese tech names (Tencent 1.74, Meituan 2.59, Alibaba 1.43) show RG10 above 1.0, but remain well below comparable US tech multiples. The gap appears structurally smaller on the Hang Seng.` },
+        { kind: 'finding', text: `CNOOC's RG10 moved from ${cnoocMove.from?.toFixed(2)} (${cnoocMove.pFrom}) to ${cnoocMove.to?.toFixed(2)} (${cnoocMove.pTo}) — a full re-rating driven by oil price recovery and dividend increases, not intangible value creation.` },
+        { kind: 'finding', text: `Meituan's RG10 compressed from ${meituanMove.from?.toFixed(2)} (${meituanMove.pFrom}) to ${meituanMove.to?.toFixed(2)} (${meituanMove.pTo}) as the company moved from heavy losses to profitability, collapsing the smoothed-earnings denominator problem.` },
+        { kind: 'open', text: `BYD (RG10 2.08) is harder to interpret: a capital-intensive manufacturer with rapidly growing intangibles (R&D capitalisation). Whether the RG formula handles this correctly under ASBE accounting standards requires further analysis.` },
+      ].map(({ kind, text }) => (
+        <div class="flex gap-3 items-start">
+          <span class={[
+            'flex-shrink-0 text-xs font-medium rounded px-2 py-0.5 mt-0.5',
+            kind === 'tentative' ? 'bg-teal-50 text-teal-700 border border-teal-200' :
+            kind === 'finding'   ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                   'bg-gray-50 text-gray-500 border border-gray-200'
+          ].join(' ')}>
+            {kind === 'tentative' ? 'tentative' : kind === 'finding' ? 'finding' : 'open'}
+          </span>
+          <p class="text-sm text-gray-700">{text}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- ── Section 2: RG10 Comparison ─────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">2. RG10 Comparison — Current Period</h2>
+    <p class="text-sm text-gray-500 mb-6">Sorted by RG10 descending. Bar width proportional to RG10 value.</p>
+
+    <div class="space-y-3">
+      {rowsSorted.map(r => (
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <a href={`${base}/china/${r.slug}`} class="text-sm font-medium text-gray-800 hover:text-accent no-underline">
+              {r.name}
+            </a>
+            <div class="flex items-center gap-4 text-xs text-gray-500">
+              <span class="font-mono">{r.ticker}</span>
+              <span>{r.sector}</span>
+              <span class="font-mono font-semibold text-gray-800 w-12 text-right">
+                {r.rg10 != null ? r.rg10.toFixed(2) : '—'}
+              </span>
+            </div>
+          </div>
+          <div class="relative h-5 bg-gray-100 rounded overflow-hidden">
+            <!-- Reference line at RG10=1.0 -->
+            <div
+              class="absolute top-0 bottom-0 w-px bg-gray-400 z-10"
+              style={`left: ${pct(1.0, maxRG10)}`}
+              title="RG10 = 1.0"
+            />
+            {r.rg10 != null && (
+              <div
+                class={[
+                  'h-full rounded transition-all',
+                  r.rg10 < 1.0 ? 'bg-emerald-400' :
+                  r.rg10 < 2.0 ? 'bg-blue-400' :
+                  r.rg10 < 4.0 ? 'bg-amber-400' : 'bg-red-400'
+                ].join(' ')}
+                style={`width: ${pct(r.rg10, maxRG10)}`}
+              />
+            )}
+          </div>
+          <div class="flex justify-between text-xs text-gray-400 mt-0.5">
+            <span>RG8 {r.rg8?.toFixed(1) ?? '—'} · RG10 {r.rg10?.toFixed(1) ?? '—'} · RG12 {r.rg12?.toFixed(1) ?? '—'}</span>
+            <span>{r.period}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="flex items-center gap-4 mt-4 text-xs text-gray-400">
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-emerald-400"></span> RG10 &lt; 1.0 (fundamental cover)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-blue-400"></span> 1–2</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-amber-400"></span> 2–4</span>
+      <span class="flex items-center gap-1"><span class="w-px h-4 bg-gray-400 inline-block"></span> RG10 = 1.0 reference</span>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Full Data Table ─────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">3. Full Metrics Table</h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium whitespace-nowrap">Company</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">MC (B HKD)</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">TE (B HKD)</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">Goodwill</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">Intangibles</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">G (4yr avg)</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">Net Income</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">RG8</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">RG10</th>
+            <th class="text-right text-xs text-gray-500 font-medium whitespace-nowrap">RG12</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rowsSorted.map(r => (
+            <tr>
+              <td class="whitespace-nowrap">
+                <a href={`${base}/china/${r.slug}`} class="font-medium text-sm text-gray-800 hover:text-accent no-underline">{r.name}</a>
+                <span class="text-xs text-gray-400 ml-1">{r.ticker}</span>
+              </td>
+              <td class="text-right font-mono text-sm">{r.mc != null ? r.mc.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>
+              <td class="text-right font-mono text-sm">{r.te != null ? r.te.toLocaleString('en-US', {maximumFractionDigits: 0}) : '—'}</td>
+              <td class="text-right font-mono text-sm text-gray-500">{r.gw != null ? r.gw.toFixed(0) : '—'}</td>
+              <td class="text-right font-mono text-sm text-gray-500">{r.ia != null ? r.ia.toFixed(0) : '—'}</td>
+              <td class="text-right font-mono text-sm">{r.g != null ? r.g.toFixed(0) : '—'}</td>
+              <td class="text-right font-mono text-sm text-gray-500">{r.ni != null ? r.ni.toFixed(0) : '—'}</td>
+              <td class="text-right font-mono text-sm">{r.rg8 != null ? r.rg8.toFixed(2) : '—'}</td>
+              <td class="text-right font-mono text-sm font-semibold text-accent">{r.rg10 != null ? r.rg10.toFixed(2) : '—'}</td>
+              <td class="text-right font-mono text-sm">{r.rg12 != null ? r.rg12.toFixed(2) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-xs text-gray-400 mt-2">Current period data. G = 4-year average net income (smoothed earnings). All in HKD billions.</p>
+  </section>
+
+  <!-- ── Section 4: Historical RG10 per company ────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">4. RG10 Over Time — Per Company</h2>
+    <p class="text-sm text-gray-500 mb-6">4 annual periods. Bar = RG10 value. Reference line at 1.0.</p>
+
+    {rows.map(r => {
+      const obsNewestFirst = r.obs.filter(o => o.rg10 != null);
+      const obsOldestFirst = [...obsNewestFirst].reverse();
+      const localMax = Math.max(...obsOldestFirst.map(o => o.rg10 ?? 0), 1.1);
+      return (
+        <div class="mb-6 p-4 border border-gray-200 rounded-md">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <a href={`${base}/china/${r.slug}`} class="text-sm font-semibold text-gray-800 hover:text-accent no-underline">{r.name}</a>
+              <span class="text-xs text-gray-400 ml-2">{r.ticker} · {r.sector}</span>
+            </div>
+            <span class="text-xs text-gray-500">Current RG10: <strong class="text-accent">{r.rg10?.toFixed(2) ?? '—'}</strong></span>
+          </div>
+          <div class="flex items-end gap-2 h-16">
+            {obsOldestFirst.map(o => {
+              const h = Math.round((o.rg10 / localMax) * 100);
+              const refH = Math.round((1.0 / localMax) * 100);
+              const isAbove1 = o.rg10 >= 1.0;
+              return (
+                <div class="flex-1 flex flex-col items-center justify-end h-full gap-0.5 relative" title={`${o.periodLabel}: RG10 = ${o.rg10.toFixed(2)}`}>
+                  {/* Reference line at 1.0 */}
+                  <div
+                    class="absolute left-0 right-0 border-t border-dashed border-gray-300 pointer-events-none"
+                    style={`bottom: ${refH}%`}
+                  />
+                  <div
+                    class={`w-full rounded-sm ${isAbove1 ? 'bg-blue-400' : 'bg-emerald-400'}`}
+                    style={`height: ${h}%`}
+                  />
+                  <span class="text-xs text-gray-500 whitespace-nowrap" style="font-size: 10px;">{o.periodLabel}</span>
+                  <span class="text-xs font-mono font-semibold text-gray-700" style="font-size: 10px;">{o.rg10.toFixed(2)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </section>
+
+  <!-- ── Section 5: Sector patterns ─────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">5. Structural Patterns</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="border border-gray-200 rounded-md p-5">
+        <h3 class="text-sm font-semibold text-gray-800 mb-2">Fundamental-covered (RG10 &lt; 1.0)</h3>
+        <p class="text-xs text-gray-500 mb-3">Market cap at or below estimated fundamental base.</p>
+        {below1.map(r => (
+          <div class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0">
+            <span class="text-gray-700">{r.name}</span>
+            <span class="font-mono font-semibold text-emerald-700">{r.rg10?.toFixed(2)}</span>
+          </div>
+        ))}
+        {below1.length === 0 && <p class="text-xs text-gray-400">None in current period.</p>}
+        <p class="text-xs text-gray-400 mt-3">
+          State-owned enterprises with large tangible asset bases and steady earnings tend to cluster here.
+          On US and EU markets this is rare among large-caps.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-md p-5">
+        <h3 class="text-sm font-semibold text-gray-800 mb-2">Fundamental gap (RG10 ≥ 1.0)</h3>
+        <p class="text-xs text-gray-500 mb-3">Market cap exceeds estimated fundamental base.</p>
+        {above1.map(r => (
+          <div class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0">
+            <span class="text-gray-700">{r.name}</span>
+            <span class="font-mono font-semibold text-blue-700">{r.rg10?.toFixed(2)}</span>
+          </div>
+        ))}
+        <p class="text-xs text-gray-400 mt-3">
+          Internet/tech and fast-growth names. Even here, RG10 is markedly lower than comparable
+          US tech (Apple 2.9, Microsoft ~12, NVIDIA ≫ 10). The Hang Seng premium appears structurally compressed.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 6: Methodology and Limitations ──────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">6. Methodology and Limitations</h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Dimension</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Status</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['Source', 'yfinance / Yahoo Finance', 'Re-aggregated from HKEX filings. Not audited. Prototype-grade only.'],
+            ['Coverage', '7 companies, HK-listed', 'H-share basis. A-share-dominant SOEs (ICBC, PetroChina) excluded due to inconsistent market cap reconstruction.'],
+            ['Historical depth', '4 annual periods (FY2021–FY2024/25)', 'Insufficient for long-horizon fragility analysis. SEC XBRL covers US back to 2009.'],
+            ['Market cap', 'Current MC or shares × year-end close', 'Historical MC approximated using current shares outstanding × year-end price. Share count drift not corrected.'],
+            ['Earnings smoothing', '4-year average net income', 'Fixed across all periods (same G for all obs). True rolling smoothing not applied in this pilot.'],
+            ['Currency', 'HKD billions throughout', 'No CNY/HKD FX adjustment. No CPI inflation adjustment (unlike US dataset).'],
+            ['Accounting standards', 'ASBE (Chinese GAAP)', 'Differs from IFRS/US GAAP: goodwill impairment, R&D capitalisation, minority interest treatment. RG interpretation may require adjustment.'],
+            ['Goodwill & intangibles', 'Present for 6/7 companies', 'ICBC: no goodwill/intangibles reported in yfinance schema (bank balance sheet structure).'],
+          ].map(([dim, status, note]) => (
+            <tr>
+              <td class="text-sm font-medium text-gray-700 whitespace-nowrap">{dim}</td>
+              <td class="text-sm text-gray-600 whitespace-nowrap">{status}</td>
+              <td class="text-xs text-gray-500">{note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Section 7: Next steps roadmap ──────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">7. Extension Roadmap</h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Phase</th>
+            <th class="text-left text-xs text-gray-500 font-medium">What</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Source</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['1 — Current', '7 HK-listed large-caps, FY2021–FY2024, H-share basis', 'yfinance / Yahoo Finance', 'live'],
+            ['2 — Deepen', 'Tushare Pro free token → A-share fundamentals 2007–present for 30+ companies', 'Tushare Pro (free registration)', 'planned'],
+            ['3 — Broaden', 'Expand to CSI 300 constituents, add HKEX historical prices', 'AKShare / Baostock (Chinese IP required)', 'planned'],
+            ['4 — Cross-market', 'RG comparison: Hang Seng vs S&P 500 vs Nikkei 225 vs DAX 40 on unified basis', 'All existing sources + Phase 2–3', 'exploratory'],
+          ].map(([phase, what, source, status]) => (
+            <tr>
+              <td class="text-sm font-medium text-gray-700 whitespace-nowrap">{phase}</td>
+              <td class="text-sm text-gray-600">{what}</td>
+              <td class="text-xs text-gray-500">{source}</td>
+              <td class="whitespace-nowrap">
+                <span class={[
+                  'text-xs rounded px-2 py-0.5 font-medium',
+                  status === 'live'        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                  status === 'planned'     ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                             'bg-gray-50 text-gray-500 border border-gray-200'
+                ].join(' ')}>
+                  {status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Footer note -->
+  <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+    All data is illustrative and for research purposes only. Not investment advice.
+    Data sourced via yfinance / Yahoo Finance from HKEX-reported financials. 
+    Values in HKD billions. RG = Market Cap / (Tangible Equity + N × Smoothed Earnings).
+  </p>
+
+</div>
+</BaseLayout>

@@ -1,0 +1,63 @@
+{
+  "company": "Alibaba",
+  "ticker": "9988.HK",
+  "slug": "alibaba-hk",
+  "sector": "Consumer Discretionary",
+  "currency": "HKD",
+  "country": "CN",
+  "index": "Hang Seng",
+  "description": "Data sourced via yfinance / Yahoo Finance. HK-listed. Values in HKD billions. Approximation.",
+  "observations": [
+    {
+      "periodKey": "2025_q1",
+      "periodLabel": "FY2025 (Mar)",
+      "rg8": 1.61,
+      "rg10": 1.43,
+      "rg12": 1.29,
+      "trend": "+",
+      "marketCap": 2263.27,
+      "tangibleEquity": 720.56,
+      "smoothedEarnings": 85.92,
+      "netIncome": 129.47,
+      "goodwill": 255.5,
+      "intangibles": 33.8,
+      "bookEquity": 1009.86,
+      "dataType": "current",
+      "note": "HK-listed (Hang Seng). yfinance / Yahoo Finance. MC: current market cap (latest) or shares × year-end close (historical). 4-year window. All values in HKD billions. Approximation."
+    },
+    {
+      "periodKey": "2024_q1",
+      "periodLabel": "FY2024 (Mar)",
+      "rg8": 1.04,
+      "rg10": 0.93,
+      "rg12": 0.84,
+      "trend": "-",
+      "marketCap": 1437.03,
+      "tangibleEquity": 687.84,
+      "smoothedEarnings": 85.92,
+      "netIncome": 79.74,
+      "goodwill": 259.68,
+      "intangibles": 39.02,
+      "bookEquity": 986.54,
+      "dataType": "annual",
+      "note": "HK-listed (Hang Seng). yfinance / Yahoo Finance. MC: current market cap (latest) or shares × year-end close (historical). 4-year window. All values in HKD billions. Approximation."
+    },
+    {
+      "periodKey": "2023_q1",
+      "periodLabel": "FY2023 (Mar)",
+      "rg8": 1.21,
+      "rg10": 1.07,
+      "rg12": 0.96,
+      "trend": null,
+      "marketCap": 1636.62,
+      "tangibleEquity": 665.75,
+      "smoothedEarnings": 85.92,
+      "netIncome": 72.51,
+      "goodwill": 268.09,
+      "intangibles": 55.82,
+      "bookEquity": 989.66,
+      "dataType": "annual",
+      "note": "HK-listed (Hang Seng). yfinance / Yahoo Finance. MC: current market cap (latest) or shares × year-end close (historical). 4-year window. All values in HKD billions. Approximation."
+    }
+  ]
+}

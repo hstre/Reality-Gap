@@ -1,0 +1,200 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import MetricBlock from '../../components/ui/MetricBlock.astro';
+import TrendBadge from '../../components/ui/TrendBadge.astro';
+import RGChart from '../../components/ui/RGChart.astro';
+import type { Company } from '../../lib/rg';
+import { getLatestObservation, formatRGCapped, formatRGLabel } from '../../lib/rg';
+import { formatBillions } from '../../lib/format';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+export async function getStaticPaths() {
+  const slugs: string[] = (await import('../../data/companies.china.index.json')).default;
+  return Promise.all(
+    slugs.map(async slug => {
+      const company: Company = (await import(`../../data/companies/${slug}.json`)).default;
+      return { params: { slug }, props: { company } };
+    })
+  );
+}
+
+interface Props { company: Company; }
+const { company } = Astro.props;
+const obs = getLatestObservation(company);
+
+// All observations sorted newest-first
+const allObs = [...company.observations].sort(
+  (a, b) => {
+    const pa = parseInt(a.periodKey.replace('_q', '')) * 10 + parseInt(a.periodKey.slice(-1));
+    const pb = parseInt(b.periodKey.replace('_q', '')) * 10 + parseInt(b.periodKey.slice(-1));
+    return pb - pa;
+  }
+);
+---
+
+<BaseLayout
+  title={`${company.company} — Reality Gap China`}
+  description={`Reality Gap values for ${company.company} (${company.ticker}), HK-listed. RG10 = ${obs?.rg10?.toFixed(1) ?? '—'} (${obs?.periodLabel ?? 'latest'}).`}
+  lang="en"
+  canonicalPath={`/china/${company.slug}`}
+>
+  <div class="max-w-4xl mx-auto px-6 py-12">
+    <!-- Back -->
+    <a href={`${base}/china`} class="text-sm text-gray-400 hover:text-accent no-underline mb-6 block">
+      ← Back to China
+    </a>
+
+    <!-- Header -->
+    <div class="mb-8">
+      <div class="flex flex-wrap items-start gap-4 justify-between">
+        <div>
+          <h1 class="text-3xl font-normal text-gray-900" style="font-family: Georgia, serif;">
+            {company.company}
+          </h1>
+          <p class="text-gray-500 mt-1">
+            <span class="font-mono text-sm">{company.ticker}</span>
+            {' · '}<span>{company.sector}</span>
+            {' · '}<span>Hang Seng</span>
+            {' · '}<span>{company.currency}</span>
+          </p>
+        </div>
+        {obs && (
+          <div class="text-right">
+            <p class="text-xs text-gray-400 mb-1">Latest observation</p>
+            <p class="text-sm font-medium text-gray-700">{obs.periodLabel}</p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {obs ? (
+      <>
+        <!-- RG Metrics -->
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Reality Gap Values</h2>
+        {obs.rg10 === null ? (
+          <div class="border border-amber-200 bg-amber-50 rounded-md px-5 py-4 mb-8">
+            <p class="text-sm font-semibold text-amber-800 mb-1">Not computable</p>
+            <p class="text-sm text-amber-700">Insufficient data for RG calculation in this period.</p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <MetricBlock label={formatRGLabel(8, obs.periodLabel)}  value={formatRGCapped(obs.rg8)} />
+            <MetricBlock label={formatRGLabel(10, obs.periodLabel)} value={formatRGCapped(obs.rg10)} highlight={true} />
+            <MetricBlock label={formatRGLabel(12, obs.periodLabel)} value={formatRGCapped(obs.rg12)} />
+          </div>
+        )}
+
+        <!-- Trend -->
+        <div class="mb-8">
+          <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Trend (RG10 vs prior period)</p>
+          <TrendBadge trend={obs.trend} />
+        </div>
+
+        <!-- Supporting data -->
+        <div class="mb-8">
+          <h2 class="text-lg font-semibold text-gray-800 mb-4">Supporting Data ({obs.periodLabel})</h2>
+          <div class="border border-gray-200 rounded-md overflow-hidden">
+            <table class="table-rg">
+              <tbody>
+                {obs.marketCap != null && (
+                  <tr>
+                    <td class="text-gray-600">Market Capitalisation</td>
+                    <td class="text-right font-mono">{formatBillions(obs.marketCap, company.currency)}</td>
+                  </tr>
+                )}
+                {(obs as any).tangibleEquity != null && (
+                  <tr>
+                    <td class="text-gray-600">Tangible Equity (TE)</td>
+                    <td class="text-right font-mono">{formatBillions((obs as any).tangibleEquity, company.currency)}</td>
+                  </tr>
+                )}
+                {(obs as any).goodwill != null && (
+                  <tr>
+                    <td class="text-gray-600 pl-8 text-xs">of which: Goodwill</td>
+                    <td class="text-right font-mono text-xs text-gray-500">{formatBillions((obs as any).goodwill, company.currency)}</td>
+                  </tr>
+                )}
+                {(obs as any).intangibles != null && (
+                  <tr>
+                    <td class="text-gray-600 pl-8 text-xs">of which: Intangible Assets</td>
+                    <td class="text-right font-mono text-xs text-gray-500">{formatBillions((obs as any).intangibles, company.currency)}</td>
+                  </tr>
+                )}
+                {(obs as any).smoothedEarnings != null && (
+                  <tr>
+                    <td class="text-gray-600">Smoothed Earnings G (4yr avg)</td>
+                    <td class="text-right font-mono">{formatBillions((obs as any).smoothedEarnings, company.currency)}</td>
+                  </tr>
+                )}
+                {(obs as any).netIncome != null && (
+                  <tr>
+                    <td class="text-gray-600 pl-8 text-xs">Net Income (this period)</td>
+                    <td class="text-right font-mono text-xs text-gray-500">{formatBillions((obs as any).netIncome, company.currency)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Values in {company.currency} billions.</p>
+        </div>
+
+        <!-- Historical table -->
+        {allObs.length > 1 && (
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Historical RG Overview</h2>
+            <div class="border border-gray-200 rounded-md overflow-hidden">
+              <table class="table-rg">
+                <thead>
+                  <tr class="bg-gray-50">
+                    <th class="text-left text-xs text-gray-500 font-medium">Period</th>
+                    <th class="text-right text-xs text-gray-500 font-medium">Mkt Cap (HKD B)</th>
+                    <th class="text-right text-xs text-gray-500 font-medium">TE (HKD B)</th>
+                    <th class="text-right text-xs text-gray-500 font-medium">RG8</th>
+                    <th class="text-right text-xs text-gray-500 font-medium">RG10</th>
+                    <th class="text-right text-xs text-gray-500 font-medium">RG12</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allObs.map(o => (
+                    <tr class={o.periodKey === obs.periodKey ? 'bg-blue-50/40' : ''}>
+                      <td class="text-gray-700 font-medium text-sm">{o.periodLabel}</td>
+                      <td class="text-right font-mono text-sm text-gray-600">{o.marketCap != null ? o.marketCap.toLocaleString('en-US') : '—'}</td>
+                      <td class="text-right font-mono text-sm text-gray-600">{(o as any).tangibleEquity != null ? (o as any).tangibleEquity.toLocaleString('en-US') : '—'}</td>
+                      <td class="text-right font-mono text-sm">{o.rg8 != null ? o.rg8.toFixed(1) : '—'}</td>
+                      <td class="text-right font-mono text-sm font-medium text-accent">{o.rg10 != null ? o.rg10.toFixed(1) : '—'}</td>
+                      <td class="text-right font-mono text-sm">{o.rg12 != null ? o.rg12.toFixed(1) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <!-- RG chart -->
+        <RGChart
+          company={company}
+          headingLabel="RG10 Trend"
+          noDataLabel="No chart data available."
+          shorterHistLabel="Shorter history than other companies."
+        />
+
+        <!-- Data note -->
+        {obs.note && (
+          <div class="border-l-2 border-amber-200 pl-4 py-1 mb-8 mt-8">
+            <p class="text-xs text-gray-500 font-medium mb-1">Data Note</p>
+            <p class="text-sm text-gray-600">{obs.note}</p>
+          </div>
+        )}
+      </>
+    ) : (
+      <p class="text-gray-500">No data available.</p>
+    )}
+
+    <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+      All data is illustrative and for research purposes only. Not investment advice.
+      Market cap for historical periods approximated as shares outstanding × year-end closing price (H-share basis).
+    </p>
+  </div>
+</BaseLayout>
