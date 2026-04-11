@@ -203,6 +203,72 @@ const maxFRatio  = Math.max(...fragSeries.map(r => r.ratio));
 const maxFHigh   = Math.max(...fragSeries.map(r => r.highMedian));
 const fragPeak   = fragSeries.find(r => r.spread === maxFSpread)!;
 const fragLatest = fragSeries[fragSeries.length - 1]!;
+const fragFirst  = fragSeries[0]!;
+
+// ── Offenes Panel für SVG-Diagramm (unbalanciert, alle Unternehmen je Quartal)
+const OPEN_PERIODS = ['2023_q4', '2024_q1', '2024_q4', '2025_q1', '2025_q2', '2025_q3', '2025_q4'];
+const OPEN_LABELS: Record<string, string> = {
+  '2023_q4': 'Q4 2023', '2024_q1': 'Q1 2024', '2024_q4': 'Q4 2024',
+  '2025_q1': 'Q1 2025', '2025_q2': 'Q2 2025', '2025_q3': 'Q3 2025', '2025_q4': 'Q4 2025',
+};
+interface OpenFragRow {
+  pk: string; label: string; n: number;
+  consMedian: number; highMedian: number; spread: number;
+}
+const openFragSeries: OpenFragRow[] = [];
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies) {
+    for (const o of (d.observations as any[])) {
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) {
+        vals.push(o.rg10 as number);
+      }
+    }
+  }
+  vals.sort((a, b) => a - b);
+  const n = vals.length;
+  if (n < 15) continue;
+  let consVals: number[], highVals: number[];
+  if (n >= 30) {
+    const q1v = quantile(vals, 0.25), q3v = quantile(vals, 0.75);
+    consVals = vals.filter(v => v <= q1v);
+    highVals = vals.filter(v => v >= q3v);
+  } else {
+    const t = Math.floor(n / 3);
+    consVals = vals.slice(0, t);
+    highVals = vals.slice(n - t);
+  }
+  openFragSeries.push({ pk, label: OPEN_LABELS[pk]!, n,
+    consMedian: median(consVals), highMedian: median(highVals),
+    spread: median(highVals) - median(consVals) });
+}
+
+const SVG_W = 620, SVG_H = 230;
+const SVG_PL = 40, SVG_PR = 15, SVG_PT = 16, SVG_PB = 52;
+const SVG_IW = SVG_W - SVG_PL - SVG_PR;
+const SVG_IH = SVG_H - SVG_PT - SVG_PB;
+const oN = openFragSeries.length;
+const svgMaxY = oN > 0 ? Math.ceil(Math.max(...openFragSeries.map(r => r.highMedian)) + 0.5) : 10;
+const svgMinY = 0;
+const svgYTicks = Array.from({ length: svgMaxY + 1 }, (_, i) => i);
+function svgX(i: number): number {
+  return oN > 1 ? SVG_PL + (i / (oN - 1)) * SVG_IW : SVG_PL + SVG_IW / 2;
+}
+function svgY(v: number): number {
+  return SVG_PT + (1 - (v - svgMinY) / (svgMaxY - svgMinY)) * SVG_IH;
+}
+const svgCorePoints = openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.consMedian).toFixed(1)}`).join(' ');
+const svgHighPoints = openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.highMedian).toFixed(1)}`).join(' ');
+const svgFillPts = [
+  ...openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.consMedian).toFixed(1)}`),
+  ...[...openFragSeries].reverse().map((r, i) => `${svgX(oN - 1 - i).toFixed(1)},${svgY(r.highMedian).toFixed(1)}`),
+].join(' ');
+const svgSpreadMaxY = oN > 0 ? Math.ceil(Math.max(...openFragSeries.map(r => r.spread)) * 1.2 * 10) / 10 : 5;
+const svgSpreadPts = openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${(SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH).toFixed(1)}`).join(' ');
+const svgSpreadFillPts = [
+  ...openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${(SVG_PT + SVG_IH).toFixed(1)}`),
+  ...[...openFragSeries].reverse().map((r, i) => `${svgX(oN - 1 - i).toFixed(1)},${(SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH).toFixed(1)}`),
+].join(' ');
 
 // ── Retrospective metric comparison ─────────────────────────────────────────
 const RETRO_ANCHORS = ['2023_q4', '2023_q3', '2023_q2', '2023_q1'];
@@ -510,6 +576,121 @@ const retroN = retroEntries.length;
         ))}
       </div>
 
+      <!-- ── SVG: Core RG vs Narrative RG Zeitverlauf ────────────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Core RG vs. Narrative RG — Zeitverlauf</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Offenes Panel (alle Unternehmen mit gültigem RG10 je Quartal, n variiert). Q1 2024 nur 21 Unternehmen (Drittel-Methode).
+        Spreizungsfläche = Narrative RG − Core RG.
+      </p>
+      <!-- Legende -->
+      <div class="flex items-center gap-5 mb-2 text-xs text-gray-500">
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-0.5 rounded" style="background:rgb(20,184,166);"></span>
+          Core RG (unteres Quartil)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-0.5 rounded" style="background:rgb(234,88,12);"></span>
+          Narrative RG (oberes Quartil)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-3 rounded-sm opacity-30" style="background:rgb(249,115,22);"></span>
+          Spreizung
+        </span>
+      </div>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-4 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y-Raster + Beschriftung */}
+          {svgYTicks.map(y => (
+            <>
+              <line x1={SVG_PL} y1={svgY(y)} x2={SVG_W - SVG_PR} y2={svgY(y)} stroke="#f3f4f6" stroke-width="1" />
+              <text x={SVG_PL - 5} y={svgY(y) + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y}</text>
+            </>
+          ))}
+          {/* Vertikale Führungslinien */}
+          {openFragSeries.map((_, i) => (
+            <line x1={svgX(i)} y1={SVG_PT} x2={svgX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Spreizungsfläche */}
+          {svgFillPts && <polygon points={svgFillPts} fill="rgba(249,115,22,0.10)" />}
+          {/* Core-Linie */}
+          {svgCorePoints && <polyline points={svgCorePoints} fill="none" stroke="rgb(20,184,166)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Narrative-Linie */}
+          {svgHighPoints && <polyline points={svgHighPoints} fill="none" stroke="rgb(234,88,12)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Punkte + Wertebeschriftungen */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <circle cx={svgX(i)} cy={svgY(r.consMedian)} r="3.5" fill="rgb(20,184,166)" />
+              <text x={svgX(i)} y={svgY(r.consMedian) + 14} text-anchor="middle" font-size="9" fill="rgb(13,148,136)">{r.consMedian.toFixed(1)}</text>
+              <circle cx={svgX(i)} cy={svgY(r.highMedian)} r="3.5" fill="rgb(234,88,12)" />
+              <text x={svgX(i)} y={svgY(r.highMedian) - 6} text-anchor="middle" font-size="9" fill="rgb(194,65,12)">{r.highMedian.toFixed(1)}</text>
+            </>
+          ))}
+          {/* X-Beschriftungen + n */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          {/* Y-Achsenbeschriftung */}
+          <text
+            transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">RG10</text>
+        </svg>
+      </div>
+
+      <!-- ── SVG: Spreizung (Narrative RG − Core RG) ───────────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Fragility Spread — Zeitverlauf</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Narrative RG minus Core RG. Höherer Wert = größere strukturelle Spaltung des Markts.
+      </p>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-8 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y-Raster + Beschriftung */}
+          {Array.from({ length: Math.ceil(svgSpreadMaxY / 0.5) + 1 }, (_, i) => i * 0.5).map(y => (
+            <>
+              <line x1={SVG_PL} y1={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH} stroke="#f3f4f6" stroke-width="1" />
+              {(y * 10) % 5 === 0 && (
+                <text x={SVG_PL - 5} y={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y.toFixed(1)}</text>
+              )}
+            </>
+          ))}
+          {/* Vertikale Führungslinien */}
+          {openFragSeries.map((_, i) => (
+            <line x1={svgX(i)} y1={SVG_PT} x2={svgX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Fläche */}
+          {svgSpreadFillPts && <polygon points={svgSpreadFillPts} fill="rgba(234,88,12,0.12)" />}
+          {/* Basislinie */}
+          <line x1={SVG_PL} y1={SVG_PT + SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + SVG_IH} stroke="#e5e7eb" stroke-width="1" />
+          {/* Spreizungslinie */}
+          {svgSpreadPts && <polyline points={svgSpreadPts} fill="none" stroke="rgb(234,88,12)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Punkte + Wertebeschriftungen */}
+          {openFragSeries.map((r, i) => {
+            const cy = SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH;
+            const isPeak = r.spread === Math.max(...openFragSeries.map(x => x.spread));
+            return (
+              <>
+                <circle cx={svgX(i)} cy={cy} r="3.5" fill={isPeak ? 'rgb(185,28,28)' : 'rgb(234,88,12)'} />
+                <text x={svgX(i)} y={cy - 7} text-anchor="middle" font-size="9" fill={isPeak ? 'rgb(185,28,28)' : 'rgb(194,65,12)'}
+                  font-weight={isPeak ? 'bold' : 'normal'}>{r.spread.toFixed(2)}{isPeak ? ' ↑' : ''}</text>
+              </>
+            );
+          })}
+          {/* X-Beschriftungen + n */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          <text
+            transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">Spread</text>
+        </svg>
+      </div>
+
+      <!-- ── Divergenzdiagramm ──────────────────────────────────────────── -->
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.divergenceChartHeading}</h3>
       <div class="flex items-center gap-5 mb-3 text-xs text-gray-500">
         <span class="flex items-center gap-1.5">
