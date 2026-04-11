@@ -8,6 +8,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 interface CapePoint { date: string; cape: number; rg10: number; }
 interface CapeData {
   source: string; url: string; fetched: string; note: string;
+  sources: string[];
+  yale_cutoff: string;
+  supplement_url: string | null;
+  series_standard: string;
+  long_run_avg_rg10: number;
+  long_run_max_rg10: number;
+  long_run_min_rg10: number;
   current: { date: string; cape: number; rg10: number; trend: string; };
   series: CapePoint[];
   peaks: Array<{ date: string; note: string; cape?: number; rg10?: number; }>;
@@ -15,11 +22,16 @@ interface CapeData {
 
 const data = capeRaw as unknown as CapeData;
 
-// ── Aktueller Wert ───────────────────────────────────────────────────────────
+// ── Aktueller Wert — letzte monatliche Beobachtung ───────────────────────────
 const cur     = data.current;
 const rg10    = cur.rg10;
 const trend   = cur.trend;
 const display = `${rg10.toFixed(2)}${trend}`;
+
+// ── Langfristiger Durchschnitt (aus JSON) ────────────────────────────────────
+const avgRg10 = data.long_run_avg_rg10;
+const maxRg10 = data.long_run_max_rg10;
+const minRg10 = data.long_run_min_rg10;
 
 // ── Interpretation ───────────────────────────────────────────────────────────
 function bandFor(v: number): { label: string; color: string; bg: string; border: string; } {
@@ -41,31 +53,18 @@ const bands = [
   { lo: 0,   hi: 1.0, rg: '< 1.0',   cape: '< 10',  label: 'Unter langfr. Durchschnitt / historisch attraktiv', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', ctx: 'Selten außerhalb großer Bärenmärkte. 1982, 2009 kurzzeitig.' },
   { lo: 1.0, hi: 1.8, rg: '1,0–1,8', cape: '10–18', label: 'Um den langfristigen Durchschnitt — normale Zone',  color: 'bg-blue-50 text-blue-700 border-blue-200',           ctx: 'Langfristiger CAPE-Mittelwert ~17. Typisch in Erholungsphasen.' },
   { lo: 1.8, hi: 2.5, rg: '1,8–2,5', cape: '18–25', label: 'Über dem Durchschnitt — Vorsicht',                  color: 'bg-amber-50 text-amber-700 border-amber-200',         ctx: 'Häufig in anhaltenden Bullenmärkten (1960er, 1990er, 2010er).' },
-  { lo: 2.5, hi: 3.5, rg: '2,5–3,5', cape: '25–35', label: 'Deutlich gestreckt — erhöhtes Risiko',              color: 'bg-orange-50 text-orange-700 border-orange-200',      ctx: 'Vor der GFC 2007 (~2,7), post-COVID 2021 (~3,9), heute (~3,1).' },
-  { lo: 3.5, hi: 999, rg: '≥ 3,5',   cape: '≥ 35',  label: 'Historisch sehr heiß — seltenes Terrain',           color: 'bg-red-50 text-red-700 border-red-200',               ctx: 'Dotcom-Gipfel 2000 (~4,4), Ende 2021 (~3,9). Sehr selten.' },
+  { lo: 2.5, hi: 3.5, rg: '2,5–3,5', cape: '25–35', label: 'Deutlich gestreckt — erhöhtes Risiko',              color: 'bg-orange-50 text-orange-700 border-orange-200',      ctx: 'Vor der GFC 2007 (~2,7), post-COVID 2021 (~3,9).' },
+  { lo: 3.5, hi: 999, rg: '≥ 3,5',   cape: '≥ 35',  label: 'Historisch sehr heiß — seltenes Terrain',           color: 'bg-red-50 text-red-700 border-red-200',               ctx: 'Dotcom-Gipfel 2000 (~4,4), Ende 2021 (~3,9), heute (~3,9).' },
 ];
 const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
 
-// ── Jahresserie für Chart ────────────────────────────────────────────────────
-const byYear = new Map<number, CapePoint>();
-for (const pt of data.series) {
-  const yr = parseInt(pt.date.slice(0, 4));
-  if (!byYear.has(yr)) byYear.set(yr, pt);
-}
-const annualSeries: CapePoint[] = Array.from(byYear.values())
-  .sort((a, b) => a.date.localeCompare(b.date));
-
-// ── Langfristiger Durchschnitt ───────────────────────────────────────────────
-const allRg10 = data.series.map(s => s.rg10);
-const avgRg10 = allRg10.reduce((a, b) => a + b, 0) / allRg10.length;
-const maxRg10 = Math.max(...allRg10);
-const minRg10 = Math.min(...allRg10);
-
-// ── Chart-Daten serialisieren ────────────────────────────────────────────────
-const chartLabels = annualSeries.map(p => p.date.slice(0, 4));
-const chartRg10   = annualSeries.map(p => p.rg10);
-const chartAvg    = annualSeries.map(() => parseFloat(avgRg10.toFixed(3)));
+// ── Monatsserie für Chart — selber Standard wie aktueller Wert ───────────────
+const chartLabels = data.series.map(p => p.date);
+const chartRg10   = data.series.map(p => p.rg10);
+const chartAvg    = data.series.map(() => parseFloat(avgRg10.toFixed(3)));
 const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg });
+
+const hasMultpl = data.sources.includes('multpl_supplement');
 
 function fmt2(v: number): string { return v.toFixed(2); }
 ---
@@ -93,8 +92,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
   </p>
   <div class="flex flex-wrap gap-2 mb-8">
     <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Makro-Näherung — kein vollständiger RG</span>
-    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Quelle: Shiller / Yale CAPE-Datensatz</span>
-    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Abgerufen: {data.fetched}</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Monatliche Reihe · {data.series.length} Beobachtungen</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Daten bis {cur.date} · abgerufen {data.fetched}</span>
     <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Materielles Eigenkapital nicht enthalten</span>
   </div>
 
@@ -183,11 +182,15 @@ function fmt2(v: number): string { return v.toFixed(2); }
   <!-- ── Abschnitt 3: Historischer Chart ────────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
-      3. M(S&amp;P 500)RG10 — Historische Zeitreihe (1881–{cur.date.slice(0,4)})
+      3. M(S&amp;P 500)RG10 — Monatliche Zeitreihe (1881–{cur.date})
     </h2>
-    <p class="text-sm text-gray-500 mb-4">
-      Jahreswerte. Gestrichelte Linie = langfristiger Durchschnitt ({fmt2(avgRg10)}×).
-      Daten: Shiller ie_data.xls / Yale.
+    <p class="text-sm text-gray-500 mb-1">
+      <strong>Monatliche Beobachtungen</strong> — selber Standard wie der aktuelle Wert oben.
+      Gestrichelte Linie = langfristiger Durchschnitt ({fmt2(avgRg10)}×).
+    </p>
+    <p class="text-xs text-gray-400 mb-4">
+      Primärquelle: Yale ie_data.xls (1881-01 – {data.yale_cutoff}).
+      {hasMultpl && `Ergänzt mit multpl.com (${data.yale_cutoff} – ${cur.date}).`}
     </p>
 
     <!-- Legende -->
@@ -223,8 +226,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
       ></canvas>
     </div>
     <p class="text-xs text-gray-400 mt-2">
-      Jahreswerte (Januar). Gesamtspanne: {fmt2(minRg10)}× – {fmt2(maxRg10)}×.
-      Hinweis: Die CAPE-Reihe beginnt 1881 (erfordert 10 Jahre Gewinnhistorie ab 1871).
+      Monatliche Werte · {data.series.length} Datenpunkte · Spanne {fmt2(minRg10)}× – {fmt2(maxRg10)}×.
+      CAPE-Reihe beginnt 1881 (erfordert 10 Jahre Gewinnhistorie ab 1871).
     </p>
   </section>
 
@@ -335,14 +338,19 @@ function fmt2(v: number): string { return v.toFixed(2); }
         </thead>
         <tbody>
           {[
-            ['Bezeichnung',          'M(S&P 500)RG10 — M für Makro, (S&P 500) für das Universum, RG10 für den Kapitalisierungsfaktor N=10'],
-            ['Formel',               'M(S&P 500)RG10 = CAPE / 10. CAPE = P / (10-Jahres-Realgewinn-Durchschnitt).'],
-            ['Was enthalten ist',    'Preis relativ zu langfristigen inflationsbereinigten Gewinnen (CAPE). Erfasst Konjunkturbereinigung und Gewinnglättung.'],
-            ['Was NICHT enthalten ist', 'Das materielle Eigenkapital fehlt. Der vollständige RG lautet MC / (TE + N·G). Auf Makroebene ist aggregiertes materiales Eigenkapital nicht zuverlässig verfügbar. Daher liegt die Makronäherung systematisch über einem vollständigen RG-Wert.'],
-            ['Langfristiger Mittelwert', `Langfristiger CAPE-Mittelwert ≈ ${(avgRg10 * 10).toFixed(1)} (1881–${cur.date.slice(0,4)}), was einem M(S&P500)RG10-Mittelwert von ≈ ${avgRg10.toFixed(2)} entspricht. Die „normale" Zone liegt bei ~1,7, nicht bei 1,0.`],
-            ['Datenquelle',          'Robert Shiller, Yale University. ie_data.xls, monatlich aktualisiert. Historische Reihe ab 1871; CAPE-Reihe ab 1881.'],
-            ['Trendberechnung',      '12-Monats-Veränderung in Prozent des CAPE-Werts.'],
-            ['Interpretation',       'Die Bänder sind heuristische Orientierungspunkte, keine Kauf-/Verkaufssignale. Hohe CAPE-Werte können jahrelang anhalten. Niedrige CAPE-Werte garantieren keine kurzfristige Outperformance.'],
+            ['Bezeichnung',           'M(S&P 500)RG10 — M für Makro, (S&P 500) für das Universum, RG10 für den Kapitalisierungsfaktor N=10'],
+            ['Formel',                'M(S&P 500)RG10 = CAPE / 10. CAPE = P / (10-Jahres-Realgewinn-Durchschnitt).'],
+            ['Was enthalten ist',     'Preis relativ zu langfristigen inflationsbereinigten Gewinnen (CAPE). Erfasst Konjunkturbereinigung und Gewinnglättung.'],
+            ['Was NICHT enthalten ist','Das materielle Eigenkapital fehlt. Der vollständige RG lautet MC / (TE + N·G). Daher liegt die Makronäherung systematisch über einem vollständigen RG-Wert.'],
+            ['Reihenstandard',        `Alle Werte — aktueller Wert und Chart — verwenden dieselbe <strong>monatliche</strong> Reihe. Kein Jahres-Downsampling. ${data.series.length} monatliche Beobachtungen (1881-01 – ${cur.date}).`],
+            ['Aktueller Wert',        `Letzte monatliche Beobachtung: ${cur.date}, CAPE = ${cur.cape.toFixed(2)}, M(S&P500)RG10 = ${rg10.toFixed(3)}. Trend (${trend}) = 12-Monats-Veränderung des CAPE.`],
+            ['Langfristiger Mittelwert',`Langfristiger CAPE-Mittelwert ≈ ${(avgRg10 * 10).toFixed(1)} (1881–${cur.date.slice(0,4)}), M(S&P500)RG10-Mittelwert ≈ ${avgRg10.toFixed(2)}. Die „normale" Zone liegt bei ~1,7, nicht bei 1,0.`],
+            ['Primärquelle',          `Robert Shiller, Yale University — ie_data.xls. Abdeckung: 1881-01 – ${data.yale_cutoff}.`],
+            ['Ergänzungsquelle',      hasMultpl
+              ? `multpl.com Shiller-PE-Tabelle — für Monate nach dem Yale-Cutoff (${data.yale_cutoff}). Abdeckung ${data.yale_cutoff} – ${cur.date}.`
+              : 'Keine Ergänzung — Yale-Daten decken den gesamten Zeitraum ab.'],
+            ['Trendberechnung',       '12-Monats-Veränderung in Prozent des CAPE-Werts (monatlich).'],
+            ['Interpretation',        'Die Bänder sind heuristische Orientierungspunkte, keine Kauf-/Verkaufssignale. Hohe CAPE-Werte können jahrelang anhalten.'],
           ].map(([dim, detail]) => (
             <tr>
               <td class="text-sm font-medium text-gray-700 whitespace-nowrap align-top">{dim}</td>
@@ -356,8 +364,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
 
   <!-- Fußnote -->
   <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
-    Datenquelle: Robert Shiller, Yale University — <em>Irrational Exuberance</em>-Datensatz ({data.url}).
-    Zuletzt abgerufen: {data.fetched}. Diese Seite zeigt eine Makro-Näherung zu Forschungszwecken.
+    Primärdaten: Robert Shiller, Yale University — <em>Irrational Exuberance</em>-Datensatz (1881-01 – {data.yale_cutoff}).
+    {hasMultpl && `Ergänzt mit multpl.com für Monate nach ${data.yale_cutoff}.`}
+    Zuletzt abgerufen: {data.fetched}. Reihenstandard: durchgehend monatlich (aktueller Wert und Chart verwenden dieselbe Reihe).
+    Diese Seite zeigt eine Makro-Näherung zu Forschungszwecken.
     Es handelt sich nicht um den vollständigen Reality-Gap-Indikator und nicht um Anlageberatung.
     M(S&amp;P 500)RG10 = CAPE / 10. Das materielle Eigenkapital ist in dieser Makrokonstruktion nicht enthalten.
   </p>
