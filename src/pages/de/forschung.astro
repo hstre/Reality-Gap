@@ -84,9 +84,14 @@ const indexStats = Object.entries(indexGroups)
   .sort((a, b) => b.med - a.med);
 
 // ── Sector comparison ─────────────────────────────────────────────────────────
+function normalizeSector(s: string): string {
+  if (s === 'Automotive / Technology') return 'Automotive';
+  if (s === 'Technology / Consumer Electronics') return 'Consumer Electronics';
+  return s || 'Other';
+}
 const sectorGroups: Record<string, number[]> = {};
 for (const s of valid) {
-  const sec = (s as any).sector || 'Other';
+  const sec = normalizeSector((s as any).sector);
   if (!sectorGroups[sec]) sectorGroups[sec] = [];
   sectorGroups[sec].push((s as any).rg10);
 }
@@ -574,6 +579,17 @@ const retroN = retroEntries.length;
             <p class="text-xs text-gray-400 mt-1">{card.note}</p>
           </div>
         ))}
+      </div>
+
+      <!-- ── Hinweis 2025-Daten ────────────────────────────────────────────── -->
+      <div class="flex gap-2.5 border border-amber-200 bg-amber-50/60 rounded-md px-4 py-3 mb-5 text-xs text-amber-800 leading-relaxed">
+        <span class="shrink-0 mt-0.5">⚠</span>
+        <span>
+          <strong>Hinweis zu 2025:</strong> Die Quartale Q1–Q4 2025 verwenden die <em>aktuelle</em> Marktkapitalisierung
+          statt historischer Quartalsschlusspreise. Veränderungen innerhalb 2025 spiegeln daher vor allem Verschiebungen
+          im geglätteten Gewinn G wider, keine echten Preisbewegungen. Die 2025-Trajektorie ist als fundamental-getriebenes
+          Reklassifizierungssignal zu lesen, nicht als Marktpreiszeitreihe.
+        </span>
       </div>
 
       <!-- ── SVG: Core RG vs Narrative RG Zeitverlauf ────────────────────── -->

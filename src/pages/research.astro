@@ -97,9 +97,15 @@ const indexStats = Object.entries(indexGroups)
   .sort((a, b) => b.med - a.med);
 
 // ── Sector comparison ────────────────────────────────────────────────────────
+// Normalize hybrid labels to avoid n=1 singletons in the table
+function normalizeSector(s: string): string {
+  if (s === 'Automotive / Technology') return 'Automotive';
+  if (s === 'Technology / Consumer Electronics') return 'Consumer Electronics';
+  return s || 'Other';
+}
 const sectorGroups: Record<string, number[]> = {};
 for (const s of valid) {
-  const sec = s.sector || 'Other';
+  const sec = normalizeSector(s.sector);
   if (!sectorGroups[sec]) sectorGroups[sec] = [];
   sectorGroups[sec].push(s.rg10 as number);
 }
@@ -660,6 +666,17 @@ const retroN = retroEntries.length;
             <p class="text-xs text-gray-400 mt-1">{card.note}</p>
           </div>
         ))}
+      </div>
+
+      <!-- ── 2025 data caveat ───────────────────────────────────────────── -->
+      <div class="flex gap-2.5 border border-amber-200 bg-amber-50/60 rounded-md px-4 py-3 mb-5 text-xs text-amber-800 leading-relaxed">
+        <span class="shrink-0 mt-0.5">⚠</span>
+        <span>
+          <strong>Note on 2025 data:</strong> Q1–Q4 2025 observations use the <em>current</em> market
+          capitalisation rather than end-of-quarter prices. Changes within 2025 therefore reflect
+          shifts in smoothed earnings (G) more than actual price movements. Treat the 2025 trajectory
+          as fundamental-reclassification signal, not as a market-price time series.
+        </span>
       </div>
 
       <!-- ── SVG: Core RG vs Narrative RG over time ───────────────────── -->
