@@ -1,0 +1,321 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import sp500Raw from '../../../data/macro/sp500_cape.json';
+import daxRaw   from '../../../data/macro/dax40_pe.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+interface DaxData {
+  source: string; method: string; method_note: string; cape_note: string;
+  fetched: string;
+  current: {
+    date: string; trailing_pe: number; rg10: number;
+    dax_price: number | null; ytd_52w_pct: number | null;
+    sources_used: string[];
+  };
+}
+interface Sp500Current { date: string; cape: number; rg10: number; trend: string; }
+
+const data   = daxRaw   as unknown as DaxData;
+const sp500  = (sp500Raw as any).current as Sp500Current;
+const cur    = data.current;
+const rg10   = cur.rg10;
+
+function bandFor(v: number): { label: string; color: string; bg: string; border: string; } {
+  if (v < 1.0) return { label: 'Unter langfristigem Durchschnitt — historisch selten',
+                         color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+  if (v < 1.8) return { label: 'Um langfristigen Durchschnitt — normale Zone',
+                         color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' };
+  if (v < 2.5) return { label: 'Über Durchschnitt — Vorsichtszone',
+                         color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' };
+  if (v < 3.5) return { label: 'Deutlich gestreckt — erhöhtes Risikoniveau',
+                         color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200' };
+  return              { label: 'Historisch sehr heiß — seltenes Terrain',
+                         color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200' };
+}
+const band = bandFor(rg10);
+
+const bands = [
+  { lo: 0,   hi: 1.0, rg: '< 1.0',   pe: '< 10',  label: 'Unter Durchschnitt — historisch selten',          color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { lo: 1.0, hi: 1.8, rg: '1.0–1.8', pe: '10–18', label: 'Um langfristigen Durchschnitt — normale Zone',    color: 'bg-blue-50 text-blue-700 border-blue-200'           },
+  { lo: 1.8, hi: 2.5, rg: '1.8–2.5', pe: '18–25', label: 'Etwas über Durchschnitt — Vorsicht',              color: 'bg-amber-50 text-amber-700 border-amber-200'         },
+  { lo: 2.5, hi: 3.5, rg: '2.5–3.5', pe: '25–35', label: 'Deutlich gestreckt — erhöhtes Risikoniveau',      color: 'bg-orange-50 text-orange-700 border-orange-200'      },
+  { lo: 3.5, hi: 999, rg: '≥ 3.5',   pe: '≥ 35',  label: 'Historisch sehr heiß — seltenes Terrain',         color: 'bg-red-50 text-red-700 border-red-200'               },
+];
+const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
+---
+
+<BaseLayout
+  title="Makro-RG DAX 40 — Reality Gap"
+  description="M(DAX40)RG10: marktweite Näherung des Reality-Gap-Rahmens für den DAX 40 auf Basis des Trailing-KGV."
+  lang="de"
+  canonicalPath="/de/makro/dax40"
+  altLangPath="/macro/dax40"
+  altLang="en"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <!-- ── Breadcrumb / Subnav ─────────────────────────────────────────────── -->
+  <div class="mb-2 flex items-center gap-2 text-sm text-gray-400">
+    <a href={`${base}/de/`} class="hover:text-accent no-underline">Startseite</a>
+    <span>›</span>
+    <a href={`${base}/de/makro`} class="hover:text-accent no-underline">Makro-RG</a>
+    <span>›</span>
+    <span class="text-gray-600 font-medium">DAX 40</span>
+  </div>
+
+  <!-- ── Index-Umschalter ────────────────────────────────────────────────── -->
+  <div class="flex items-center gap-2 mb-6">
+    <a href={`${base}/de/makro`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      S&amp;P 500
+    </a>
+    <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
+      DAX 40 ←
+    </span>
+  </div>
+
+  <!-- ── Überschrift ─────────────────────────────────────────────────────── -->
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    Makro-RG — DAX 40
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Marktweite Näherung des Reality-Gap-Rahmens für den deutschen DAX 40.
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Makronäherung — kein vollständiger RG</span>
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Trailing-KGV — kein CAPE</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Datenstand {cur.date} · abgerufen {data.fetched}</span>
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Materielles Eigenkapital nicht enthalten</span>
+  </div>
+
+  <!-- ── Abschnitt 1: Aktueller Wert ────────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      1. Aktueller Wert
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <!-- Hauptkennzahl -->
+      <div class={`border rounded-md p-5 ${band.bg} ${band.border}`}>
+        <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">M(DAX 40)RG10</div>
+        <div class={`text-4xl font-mono font-semibold mb-1 ${band.color}`}>{rg10.toFixed(2)}</div>
+        <div class="text-xs text-gray-500">Stand {cur.date}</div>
+        <div class={`text-xs mt-2 font-medium ${band.color}`}>{band.label}</div>
+      </div>
+
+      <!-- Trailing KGV -->
+      <div class="border border-gray-200 rounded-md p-5 bg-gray-50">
+        <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">Trailing-KGV</div>
+        <div class="text-3xl font-mono font-semibold text-gray-800 mb-1">{cur.trailing_pe.toFixed(1)}</div>
+        <div class="text-xs text-gray-500">12-Monats-Kurs-Gewinn-Verhältnis (trailing)</div>
+        <div class="text-xs text-gray-400 mt-2">Quellen: {cur.sources_used.join(' · ')}</div>
+      </div>
+
+      <!-- Formelkarte -->
+      <div class="border border-gray-200 rounded-md p-5 bg-white">
+        <div class="text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">Konstruktion</div>
+        <div class="font-mono text-sm text-gray-800 mb-3">M(DAX 40)RG10 = KGV<sub>trailing</sub> / 10</div>
+        <p class="text-xs text-gray-500">
+          Trailing-KGV wird verwendet, da kein freier automatisierter Zugang zu
+          historischen DAX-CAPE-Daten existiert.
+          Die Formel spiegelt M(S&amp;P 500)RG10 = CAPE / 10, verwendet aber
+          12-Monats-Gewinne statt des 10-Jahres-Realgewinn-Durchschnitts.
+        </p>
+      </div>
+    </div>
+
+    {cur.dax_price && (
+      <div class="text-sm text-gray-600 border-l-2 border-gray-200 pl-4">
+        DAX 40 Stand: <span class="font-mono text-gray-800">{cur.dax_price.toLocaleString('de-DE')}</span>
+        {cur.ytd_52w_pct !== null && (
+          <span class="ml-2 text-gray-500">
+            · 52-Wochen-Veränderung: <span class={cur.ytd_52w_pct >= 0 ? 'text-teal-600' : 'text-red-600'}>
+              {cur.ytd_52w_pct >= 0 ? '+' : ''}{cur.ytd_52w_pct.toFixed(1)}%
+            </span>
+          </span>
+        )}
+      </div>
+    )}
+  </section>
+
+  <!-- ── Abschnitt 2: Vergleich mit S&P 500 ────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      2. Indexvergleich
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Momentaufnahme beider Makro-RG-Werte. Hinweis: Die Gewinnnenner unterscheiden sich
+      (CAPE vs. Trailing-KGV) — der Direktvergleich ist mit Vorsicht zu interpretieren.
+    </p>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      {[
+        {
+          label: 'M(S&P 500)RG10',
+          value: sp500.rg10.toFixed(2) + sp500.trend,
+          sub: `CAPE = ${sp500.cape.toFixed(1)} · ${sp500.date}`,
+          method: 'Shiller-CAPE / 10 (10-Jahres-Realgewinne)',
+          ...bandFor(sp500.rg10),
+        },
+        {
+          label: 'M(DAX 40)RG10',
+          value: rg10.toFixed(2),
+          sub: `Trailing-KGV = ${cur.trailing_pe.toFixed(1)} · ${cur.date}`,
+          method: 'Trailing-KGV / 10 (12-Monats-Gewinne)',
+          ...bandFor(rg10),
+        },
+      ].map(c => (
+        <div class={`border rounded-md p-5 ${c.bg} ${c.border}`}>
+          <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">{c.label}</div>
+          <div class={`text-3xl font-mono font-semibold mb-1 ${c.color}`}>{c.value}</div>
+          <div class="text-xs text-gray-500">{c.sub}</div>
+          <div class="text-xs text-gray-400 mt-2 italic">{c.method}</div>
+        </div>
+      ))}
+    </div>
+
+    <div class="text-xs text-gray-400 border border-gray-100 rounded-md bg-gray-50/50 px-4 py-3">
+      Der DAX 40 weist einen niedrigeren M(RG10)-Wert auf als der S&amp;P 500 (1,80 vs. 3,94),
+      was dem historisch geringeren Bewertungsniveau des DAX entspricht — bedingt durch die
+      starke Gewichtung von Industrie- und Automobilwerten. Ein Teil des Abstands spiegelt
+      auch die unterschiedlichen Gewinnnenner: CAPE liegt in einem Gewinnaufschwung
+      typischerweise über dem Trailing-KGV.
+    </div>
+  </section>
+
+  <!-- ── Abschnitt 3: Bewertungsbänder ──────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      3. Heuristische Bewertungsbänder
+    </h2>
+    <p class="text-sm text-gray-500 mb-5">
+      Gleiche Skalierung wie die S&amp;P-500-Makroseite. Nur orientierender Rahmen —
+      keine Signale oder Schwellenwerte.
+    </p>
+
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">M(DAX 40)RG10</th>
+            <th class="text-left text-xs text-gray-500 font-medium">KGV-Äquivalent</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Heuristische Einschätzung</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bands.map((row, i) => (
+            <tr class={i === currentBandIdx ? 'bg-blue-50/40' : ''}>
+              <td class="font-mono font-semibold text-sm text-gray-800 whitespace-nowrap">
+                {row.rg}
+                {i === currentBandIdx && (
+                  <span class={`ml-2 text-xs rounded px-1.5 py-0.5 border font-normal ${row.color}`}>← aktuell</span>
+                )}
+              </td>
+              <td class="font-mono text-sm text-gray-600 whitespace-nowrap">{row.pe}</td>
+              <td><span class={`text-xs rounded px-2 py-0.5 border font-medium ${row.color}`}>{row.label}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Abschnitt 4: Verlauf nicht verfügbar ───────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      4. Historischer Verlauf — Nicht verfügbar
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Für den S&amp;P 500 stellt Robert Shiller (Yale University) eine monatliche CAPE-Zeitreihe
+      ab 1881 bereit. Eine vergleichbare frei verfügbare Zeitreihe für den DAX 40 existiert nicht.
+    </p>
+
+    <div class="border border-dashed border-gray-300 rounded-md bg-gray-50/60 px-6 py-8">
+      <p class="text-sm font-semibold text-gray-600 mb-2">Keine historische CAPE-Zeitreihe für den DAX 40 verfügbar</p>
+      <p class="text-sm text-gray-500 mb-4">
+        Alle geprüften freien Datenquellen für historische DAX-KGV- oder CAPE-Daten lieferten Fehler oder waren gesperrt:
+      </p>
+      <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-gray-400 mb-4">
+        {[
+          ['multpl.com/dax-pe', '404 — Seite existiert nicht'],
+          ['Deutsche Bundesbank API', '503 — Dienst nicht verfügbar'],
+          ['OECD MEI_FIN (Deutschland)', 'Kein KGV-Datensatz vorhanden'],
+          ['macrotrends.net', '403 — Zugriff gesperrt'],
+          ['stooq.com', 'API-Schlüssel mit Captcha erforderlich'],
+          ['StarCapital-Archiv', '403 — Zugriff gesperrt'],
+          ['JST macrohistory', '404 — Seite nicht gefunden'],
+          ['Quandl / Nasdaq Data Link', '403 — Zugriff gesperrt'],
+        ].map(([src, status]) => (
+          <div class="flex gap-2">
+            <span class="shrink-0 text-gray-300">✗</span>
+            <span><span class="font-medium text-gray-500">{src}:</span> {status}</span>
+          </div>
+        ))}
+      </div>
+      <p class="text-xs text-gray-400">
+        Sobald DAX-CAPE-Daten frei zugänglich werden, wird diese Seite mit einem vollständigen Verlaufschart aktualisiert.
+        Das Trailing-KGV der ETF-Anbieter (nur aktueller Wert) ist der einzige frei verfügbare automatisierte Datenpunkt.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Abschnitt 5: Methodik ───────────────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      5. Methodische Hinweise
+    </h2>
+
+    <div class="space-y-4">
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Trailing-KGV vs. CAPE</p>
+        <p class="text-sm text-gray-500">
+          M(DAX40)RG10 verwendet das 12-Monats-Trailing-KGV, während M(S&amp;P500)RG10 das
+          10-Jahres-CAPE (zyklusbereinigt) nutzt. Trailing-KGV ist volatiler und reagiert
+          stärker auf Einmaleffekte im Gewinn (z. B. 2020 pandemiebedingter Gewinneinbruch:
+          KGV sprunghaft gestiegen). In normalen Gewinnumgebungen sind beide Größenordnungen
+          ähnlich, können in Abschwung- oder Erholungsjahren aber deutlich divergieren.
+        </p>
+      </div>
+
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Datenquelle</p>
+        <p class="text-sm text-gray-500">
+          Trailing-KGV abgerufen via yfinance von zwei DAX-ETFs: iShares Core DAX UCITS ETF (EXS1.DE)
+          und Xtrackers DAX UCITS ETF (DBXD.DE). Beide bilden den DAX 40 Kursindex vollständig ab.
+          Werte werden kreuzgeprüft; bei Verfügbarkeit beider Werte wird der Durchschnitt verwendet.
+        </p>
+      </div>
+
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Strukturelle Unterschiede DAX vs. S&amp;P 500</p>
+        <p class="text-sm text-gray-500">
+          Der DAX 40 ist ein Performanceindex (Dividenden reinvestiert), während der S&amp;P 500
+          als Kursindex ohne Dividenden berechnet wird. Der DAX ist stark auf Industrie,
+          Automobil, Chemie und Finanzwerte gewichtet — Sektoren mit historisch niedrigeren
+          Bewertungsmultiplikatoren als die technologielastige S&amp;P-500-Komposition.
+          Ein niedrigerer M(DAX40)RG10 als M(S&amp;P500)RG10 ist strukturell zu erwarten.
+        </p>
+      </div>
+
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Was nicht enthalten ist</p>
+        <p class="text-sm text-gray-500">
+          Wie bei der S&amp;P-500-Makronäherung ist das materielle Eigenkapital nicht berücksichtigt.
+          Die vollständige RG-Formel lautet MC / (EK + N·G); die Makronäherung verwendet
+          ausschließlich den Gewinnterm. Ein Trendcode wird für den DAX 40 nicht angezeigt,
+          da keine historische Zeitreihe für den Periodenvergleich verfügbar ist.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Fußzeile ────────────────────────────────────────────────────────── -->
+  <div class="border-t border-gray-100 pt-6 text-xs text-gray-400 space-y-1">
+    <p>Quelle: {data.source}</p>
+    <p>Abgerufen: {data.fetched}. Trailing-KGV-Daten entsprechen den aktuellen ETF-Faktenblattwerten von Yahoo Finance.</p>
+    <p>Alle Daten illustrativ. Keine Anlageberatung.</p>
+  </div>
+
+</div>
+</BaseLayout>

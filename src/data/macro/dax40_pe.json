@@ -1,0 +1,18 @@
+{
+  "source":"yfinance / Yahoo Finance \u2014 iShares Core DAX UCITS ETF (EXS1.DE), Xtrackers DAX UCITS ETF (DBXD.DE)",
+  "method":"trailing_pe",
+  "method_note":"M(DAX40)RG10 = trailing 12-month P/E / 10. For comparison: M(S&P500)RG10 = Shiller CAPE / 10 (10-year real earnings average). Trailing P/E and CAPE are not directly comparable: trailing P/E is sensitive to single-year earnings swings; CAPE smooths over a full business cycle. In a normal earnings environment they tend to be of similar magnitude, but can diverge significantly in recession or recovery years.",
+  "cape_note":"No free automated source for historical DAX CAPE data exists. Checked sources include multpl.com (404), Deutsche Bundesbank API (503), OECD MEI_FIN Germany series (no P/E series available), macrotrends.net (403), stooq.com (captcha required), StarCapital archive (403). Trailing P/E from iShares Core DAX ETF (EXS1.DE) is used as the best available free proxy. Unlike CAPE, trailing P/E is sensitive to single-year earnings swings (e.g. pandemic year 2020: DAX earnings collapsed, P/E spiked).",
+  "fetched":"2026-04-11",
+  "current":{
+    "date":"2026-04",
+    "trailing_pe":18.03,
+    "rg10":1.803,
+    "dax_price":23804.0,
+    "ytd_52w_pct":13.6,
+    "sources_used":[
+      "EXS1.DE",
+      "DBXD.DE"
+    ]
+  }
+}
