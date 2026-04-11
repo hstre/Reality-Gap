@@ -472,17 +472,39 @@ const retroN = retroEntries.length;
         <p class="mt-2 text-xs text-gray-500">{tc.fragility.dataTypeNote}</p>
       </div>
 
+      <!-- Drei Marktstrukturen -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.frameworkHeading}</h3>
+      <div class="grid grid-cols-1 gap-3 mb-6" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        {tc.fragility.frameworkCases.map((c: { label: string; description: string }, i: number) => {
+          const colors = [
+            'border-gray-200 bg-gray-50/40',
+            'border-orange-200 bg-orange-50/40',
+            'border-amber-200 bg-amber-50/40',
+          ];
+          const labelColors = ['text-gray-600', 'text-orange-700', 'text-amber-700'];
+          return (
+            <div class={`border rounded-md px-4 py-3 ${colors[i]}`}>
+              <p class={`text-xs font-semibold mb-1 ${labelColors[i]}`}>{c.label}</p>
+              <p class="text-xs text-gray-600 leading-relaxed">{c.description}</p>
+            </div>
+          );
+        })}
+      </div>
+      <p class="text-xs text-gray-400 italic mb-8">{tc.fragility.frameworkNote}</p>
+
       <p class="text-xs text-gray-400 uppercase tracking-widest mb-3">{tc.fragility.signalHeading}</p>
-      <div class="grid grid-cols-2 gap-3 mb-8">
+      <div class="grid grid-cols-3 gap-3 mb-8">
         {[
-          { label: tc.fragility.peakSpreadLabel,   value: fmt(fragPeak.spread, 2),        note: fragPeak.label },
-          { label: tc.fragility.currentSpreadLabel, value: fmt(fragLatest.spread, 2),      note: fragLatest.label },
-          { label: tc.fragility.peakRatioLabel,    value: fmt(fragPeak.ratio, 1) + '×',   note: fragPeak.label },
-          { label: tc.fragility.currentRatioLabel,  value: fmt(fragLatest.ratio, 1) + '×', note: fragLatest.label },
+          { label: tc.fragility.currentCoreRgLabel,      value: fmt(fragLatest.conservativeMedian, 2), note: fragLatest.label, accent: false },
+          { label: tc.fragility.currentNarrativeRgLabel, value: fmt(fragLatest.highMedian, 2),          note: fragLatest.label, accent: false },
+          { label: tc.fragility.currentSpreadLabel,      value: fmt(fragLatest.spread, 2),              note: fragLatest.label, accent: true  },
+          { label: tc.fragility.currentRatioLabel,       value: fmt(fragLatest.ratio, 1) + '×',         note: fragLatest.label, accent: false },
+          { label: tc.fragility.peakSpreadLabel,         value: fmt(fragPeak.spread, 2),                note: fragPeak.label,   accent: false },
+          { label: tc.fragility.peakRatioLabel,          value: fmt(fragPeak.ratio, 1) + '×',           note: fragPeak.label,   accent: false },
         ].map(card => (
-          <div class="border border-gray-200 rounded-md p-4">
+          <div class={`border rounded-md p-4 ${card.accent ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200'}`}>
             <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">{card.label}</p>
-            <p class="text-2xl font-light text-gray-800" style="font-family: Georgia, serif;">{card.value}</p>
+            <p class={`text-2xl font-light ${card.accent ? 'text-orange-800' : 'text-gray-800'}`} style="font-family: Georgia, serif;">{card.value}</p>
             <p class="text-xs text-gray-400 mt-1">{card.note}</p>
           </div>
         ))}
@@ -507,7 +529,7 @@ const retroN = retroEntries.length;
               <span class="text-xs text-gray-400 w-16 shrink-0">{row.dataType === 'annual' ? tc.fragility.annualLabel : tc.fragility.quarterlyLabel}</span>
             </div>
             <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs text-gray-400 w-32 shrink-0 text-right">{tc.fragility.divergenceLegendCons.split(' ').slice(-1)[0]}</span>
+              <span class="text-xs text-gray-400 w-32 shrink-0 text-right">Core RG</span>
               <div class="flex-1 bg-gray-100 rounded-sm h-4 relative">
                 <div class="h-4 rounded-sm bg-teal-400/70"
                   style={`width: ${maxFHigh > 0 ? Math.round((row.conservativeMedian / maxFHigh) * 100) : 0}%`} />
@@ -515,7 +537,7 @@ const retroN = retroEntries.length;
               <span class="text-xs font-mono text-gray-600 w-8 shrink-0">{fmt(row.conservativeMedian)}</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-gray-400 w-32 shrink-0 text-right">{tc.fragility.divergenceLegendHigh.split(' ').slice(-1)[0]}</span>
+              <span class="text-xs text-gray-400 w-32 shrink-0 text-right">Narrative RG</span>
               <div class="flex-1 bg-gray-100 rounded-sm h-4 relative">
                 <div class={`h-4 rounded-sm ${row.spread === maxFSpread ? 'bg-orange-500/70' : 'bg-orange-400/55'}`}
                   style={`width: ${maxFHigh > 0 ? Math.round((row.highMedian / maxFHigh) * 100) : 0}%`} />
