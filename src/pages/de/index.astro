@@ -32,38 +32,23 @@ const t = de;
 
   <!-- Cards -->
   <section class="max-w-5xl mx-auto px-6 pb-16">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <a href={`${base}/de/methodik`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
-        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
-          {t.home.cards.methodology.title}
-        </h2>
-        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.methodology.description}</p>
-        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
-      </a>
-
-      <a href={`${base}/de/paper`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
-        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
-          {t.home.cards.paper.title}
-        </h2>
-        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.paper.description}</p>
-        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
-      </a>
-
-      <a href={`${base}/de/rankings`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
-        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
-          {t.home.cards.rankings.title}
-        </h2>
-        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.rankings.description}</p>
-        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
-      </a>
-
-      <a href={`${base}/de/unternehmen`} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
-        <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
-          {t.home.cards.companies.title}
-        </h2>
-        <p class="text-xs text-gray-500 leading-relaxed">{t.home.cards.companies.description}</p>
-        <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
-      </a>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[
+        { href: `${base}/de/methodik`,  card: t.home.cards.methodology },
+        { href: `${base}/de/paper`,     card: t.home.cards.paper },
+        { href: `${base}/de/rankings`,  card: t.home.cards.rankings },
+        { href: `${base}/de/unternehmen`, card: t.home.cards.companies },
+        { href: `${base}/de/forschung`, card: t.home.cards.research },
+        { href: `${base}/de/makro`,     card: t.home.cards.macro },
+      ].map(({ href, card }) => (
+        <a href={href} class="border border-gray-200 rounded-md p-5 bg-white hover:border-gray-300 hover:shadow-sm transition-all no-underline group block">
+          <h2 class="text-sm font-semibold text-gray-800 group-hover:text-accent transition-colors mb-2">
+            {card.title}
+          </h2>
+          <p class="text-xs text-gray-500 leading-relaxed">{card.description}</p>
+          <p class="text-xs text-accent mt-4 opacity-0 group-hover:opacity-100 transition-opacity">{t.home.cta} →</p>
+        </a>
+      ))}
     </div>
   </section>
 </BaseLayout>

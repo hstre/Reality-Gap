@@ -49,6 +49,14 @@ export const en = {
         title: 'Companies',
         description: 'Individual RG profiles for each company in the dataset.',
       },
+      research: {
+        title: 'Research',
+        description: 'Fragility analysis: Core RG vs. Narrative RG, spread, and market structure.',
+      },
+      macro: {
+        title: 'Macro RG',
+        description: 'Market-level RG approximation via Shiller CAPE (S&P 500) and trailing P/E (DAX 40).',
+      },
     },
     cta: 'Explore',
   },
