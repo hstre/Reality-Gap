@@ -184,7 +184,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
 
     <div class="text-xs text-gray-400 border border-gray-100 rounded-md bg-gray-50/50 px-4 py-3">
-      The DAX 40 trades at a lower M(RG10) than the S&amp;P 500 (1.80 vs. 3.94), consistent
+      The DAX 40 trades at a lower M(RG10) than the S&amp;P 500 ({rg10.toFixed(2)} vs. {sp500.rg10.toFixed(2)}), consistent
       with the DAX's historically lower valuation due to its heavy industrial and automotive
       weighting. However, part of the gap reflects the different earnings denominators:
       CAPE typically exceeds trailing P/E in an earnings-recovery environment.
@@ -261,9 +261,17 @@ function fmt2(v: number): string { return v.toFixed(2); }
           </div>
         ))}
       </div>
-      <p class="text-xs text-gray-400">
+      <p class="text-xs text-gray-400 mb-3">
         If DAX CAPE data becomes freely accessible in the future, this page will be updated with a full historical chart.
         The trailing P/E from ETF providers (current only) is the only free automated data point available.
+      </p>
+      <p class="text-xs text-gray-400">
+        <span class="font-medium text-gray-500">Note for researchers:</span> Siblis Research
+        (siblisresearch.com) publishes historical CAPE data for 35+ countries including
+        Germany / DAX Index going back 40+ years ($48/month subscription). If building a
+        proper M(DAX)RG10 historical series, this is the recommended source: download the
+        CAPE column for Germany, divide by 10, label as M(DAX)RG10, and mark the DAX 30→40
+        composition break at September 2021.
       </p>
     </div>
   </section>
@@ -297,6 +305,18 @@ function fmt2(v: number): string { return v.toFixed(2); }
           chemicals, and financials — sectors with historically lower P/E multiples than the
           technology-heavy S&P 500. A lower M(DAX40)RG10 than M(S&P500)RG10 is structurally
           expected, independent of valuation levels.
+        </p>
+      </div>
+
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">DAX 30 → DAX 40 composition break (September 2021)</p>
+        <p class="text-sm text-gray-500">
+          In September 2021, Deutsche Börse expanded the flagship German index from 30 to 40
+          constituents, adding 10 new companies primarily from mid-cap industries. Any future
+          historical series covering pre- and post-2021 data should mark this structural break:
+          the DAX 40 P/E and earnings profile is not directly comparable to the DAX 30 series
+          prior to September 2021. Current ETF data (EXS1.DE, DBXD.DE) reflects the DAX 40
+          composition.
         </p>
       </div>
 
