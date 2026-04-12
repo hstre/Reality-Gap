@@ -1,4 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="4" fill="#3b6e9e"/>
-  <text x="6" y="23" font-family="Georgia, serif" font-size="18" font-weight="normal" fill="white">RG</text>
+  <!-- Dark background -->
+  <rect width="32" height="32" rx="5" fill="#1e2d3d"/>
+
+  <!-- R (scaled to fit 32×32, mark occupies ~left half) -->
+  <!-- Stem -->
+  <rect x="2" y="3" width="2.5" height="16" fill="white"/>
+  <!-- Bowl outer -->
+  <path fill-rule="evenodd" fill="white" d="
+    M 4.5,3 H 9.5 Q 14,3 14,8 Q 14,13 9.5,13 H 4.5 Z
+    M 5.5,4.5 H 9.2 Q 12,4.5 12,8 Q 12,11.5 9.2,11.5 H 5.5 Z
+  "/>
+  <!-- Leg -->
+  <line x1="8" y1="13.5" x2="14" y2="19" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- G (center 22,10  outer r≈8  inner r≈5.5) -->
+  <path fill="white" d="
+    M 26.3,3.8 A 8,8 0 1 1 26.3,16.2 L 24.5,14.6 A 5.5,5.5 0 1 0 24.5,5.4 Z
+  "/>
+  <!-- G arm -->
+  <rect x="21.5" y="8.8" width="5" height="2.8" fill="white"/>
+
 </svg>

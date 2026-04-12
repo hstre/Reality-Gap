@@ -46,13 +46,31 @@ const altLangLabel = isDE ? 'EN' : 'DE';
 
 <header class="border-b border-gray-200 bg-white">
   <div class="max-w-5xl mx-auto px-6 flex items-center justify-between h-14">
-    <!-- Wordmark -->
+    <!-- Logo mark -->
     <a
       href={isDE ? `${base}/de/` : `${base}/`}
-      class="text-base font-semibold tracking-tight text-gray-900 hover:text-accent no-underline"
-      style="font-family: Georgia, serif; letter-spacing: -0.01em;"
+      class="text-gray-900 hover:opacity-80 transition-opacity no-underline flex items-center"
+      aria-label="Reality Gap — Home"
     >
-      Reality Gap
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 115"
+           class="h-8 w-auto" fill="none" aria-hidden="true">
+        <!-- R stem -->
+        <rect x="0" y="0" width="15" height="112" fill="currentColor"/>
+        <!-- R bowl (even-odd → transparent interior) -->
+        <path fill-rule="evenodd" fill="currentColor" d="
+          M 15,0 H 54 Q 91,0 91,30 Q 91,60 54,60 H 15 Z
+          M 21,10 H 51 Q 75,10 75,30 Q 75,50 51,50 H 21 Z
+        "/>
+        <!-- R leg -->
+        <line x1="50" y1="62" x2="95" y2="112"
+              stroke="currentColor" stroke-width="16" stroke-linecap="round"/>
+        <!-- G ring (CW outer + CCW inner → nonzero fill = transparent hollow) -->
+        <path fill="currentColor" d="
+          M 191,14 A 50,50 0 1 1 191,98 L 183,86 A 35,35 0 1 0 183,26 Z
+        "/>
+        <!-- G arm -->
+        <rect x="162" y="47" width="53" height="18" fill="currentColor"/>
+      </svg>
     </a>
 
     <!-- Desktop nav -->

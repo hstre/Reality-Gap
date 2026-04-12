@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 175" fill="none">
+
+  <!-- ── R ── -->
+  <!-- Stem -->
+  <rect x="0" y="0" width="15" height="112" fill="#1e2d3d"/>
+
+  <!-- Bowl: outer D minus inner D (even-odd = transparent interior) -->
+  <path fill-rule="evenodd" fill="#1e2d3d" d="
+    M 15,0 H 54 Q 91,0 91,30 Q 91,60 54,60 H 15 Z
+    M 21,10 H 51 Q 75,10 75,30 Q 75,50 51,50 H 21 Z
+  "/>
+
+  <!-- Leg -->
+  <line x1="50" y1="62" x2="95" y2="112"
+        stroke="#1e2d3d" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- ── G ── (center 165,56  outer r≈50  inner r≈35) -->
+  <!-- Ring: outer CW large-arc → inner CCW large-arc (nonzero fill = transparent hollow) -->
+  <path fill="#1e2d3d" d="
+    M 191,14
+    A 50,50 0 1 1 191,98
+    L 183,86
+    A 35,35 0 1 0 183,26
+    Z
+  "/>
+
+  <!-- Arm (horizontal bar at mid-height, bridging the opening) -->
+  <rect x="162" y="47" width="53" height="18" fill="#1e2d3d"/>
+
+  <!-- ── REALITY GAP ── -->
+  <text x="107" y="156"
+        font-family="'Helvetica Neue',Helvetica,Arial,sans-serif"
+        font-size="15.5" font-weight="600" letter-spacing="7.5"
+        fill="#1e2d3d" text-anchor="middle">REALITY GAP</text>
+
+</svg>
