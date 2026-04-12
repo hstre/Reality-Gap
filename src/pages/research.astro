@@ -1076,6 +1076,48 @@ const retroN = retroEntries.length;
         </div>
       )}
 
+      <!-- ── Transition Matrix findings ────────────────────────────────── -->
+      <div class="space-y-2.5 mb-8">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG positions are sticky</p>
+          <p class="text-sm text-gray-500">
+            {transStabilityPct}% of the {tN}-company panel remained in the same quartile group between
+            Q4 2023 and Q4 2025. Valuation structure, as captured by RG, tends to persist — a property
+            that simple price-based multiples reset with every price move.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">No direct Core ↔ Narrative crossings</p>
+          <p class="text-sm text-gray-500">
+            Every company that changed extreme — from cheap to expensive or vice versa — passed through
+            the middle quartiles first. Zero companies jumped directly between Core and Narrative.
+            This suggests RG extreme positions are not easily or quickly reversed.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Core is more stable than Narrative</p>
+          <p class="text-sm text-gray-500">
+            {tN > 0 && transMatrix[0] && transMatrix[2] ? (() => {
+              const coreTotal = (transMatrix[0][0]??0)+(transMatrix[0][1]??0)+(transMatrix[0][2]??0);
+              const narrTotal = (transMatrix[2][0]??0)+(transMatrix[2][1]??0)+(transMatrix[2][2]??0);
+              const corePct = coreTotal > 0 ? Math.round((transMatrix[0][0]??0)/coreTotal*100) : 0;
+              const narrPct = narrTotal > 0 ? Math.round((transMatrix[2][2]??0)/narrTotal*100) : 0;
+              return `${corePct}% of Core companies stayed Core; only ${narrPct}% of Narrative companies stayed Narrative.`;
+            })() : ''}
+            {' '}Narrative positions erode faster — consistent with the idea that high-RG valuations
+            carry more reversion pressure than low-RG ones.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The middle acts as a one-way buffer</p>
+          <p class="text-sm text-gray-500">
+            Movement between extremes runs through the middle, making the middle group a structural
+            transition zone rather than a stable resting place. This is distinct from P/G, where
+            re-ranking can occur with a single earnings revision.
+          </p>
+        </div>
+      </div>
+
       <!-- ── Interpretation ────────────────────────────────────────────── -->
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.interpretation.heading}</h3>
       <div class="space-y-3 mb-5">

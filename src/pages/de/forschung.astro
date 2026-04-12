@@ -972,6 +972,48 @@ const retroN = retroEntries.length;
         </div>
       )}
 
+      <!-- ── Befunde der Übergangsmatrix ────────────────────────────────── -->
+      <div class="space-y-2.5 mb-8">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG-Positionen sind träge</p>
+          <p class="text-sm text-gray-500">
+            {transStabilityPct}% der {tN} Unternehmen blieben zwischen Q4 2023 und Q4 2025 in derselben
+            Quartilsgruppe. Die Bewertungsstruktur, wie RG sie abbildet, neigt zur Persistenz — eine
+            Eigenschaft, die einfache preisbasierte Multiples mit jeder Kursänderung zurücksetzen.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Kein direkter Core ↔ Narrative-Sprung</p>
+          <p class="text-sm text-gray-500">
+            Jedes Unternehmen, das zwischen den Extremen wechselte, durchlief zunächst die mittleren
+            Quartile. Kein Unternehmen sprang direkt von Core nach Narrative oder umgekehrt.
+            Extreme RG-Positionen sind offenbar nicht schnell oder einfach reversibel.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Core ist stabiler als Narrative</p>
+          <p class="text-sm text-gray-500">
+            {tN > 0 && transMatrix[0] && transMatrix[2] ? (() => {
+              const coreTotal = (transMatrix[0][0]??0)+(transMatrix[0][1]??0)+(transMatrix[0][2]??0);
+              const narrTotal = (transMatrix[2][0]??0)+(transMatrix[2][1]??0)+(transMatrix[2][2]??0);
+              const corePct = coreTotal > 0 ? Math.round((transMatrix[0][0]??0)/coreTotal*100) : 0;
+              const narrPct = narrTotal > 0 ? Math.round((transMatrix[2][2]??0)/narrTotal*100) : 0;
+              return `${corePct}% der Core-Unternehmen blieben Core; nur ${narrPct}% der Narrative-Unternehmen blieben Narrative.`;
+            })() : ''}
+            {' '}Narrative-Positionen erodieren schneller — konsistent mit der Überlegung, dass hohe
+            RG-Bewertungen stärkerem Regressionsdruck unterliegen als niedrige.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Die Mitte wirkt als Einbahnpuffer</p>
+          <p class="text-sm text-gray-500">
+            Bewegungen zwischen den Extremen verlaufen über die Mitte — die mittlere Gruppe ist
+            strukturell eine Übergangszone, kein stabiler Ruhezustand. Das unterscheidet RG
+            von P/G, bei dem eine einzelne Gewinnrevision sofortige Neuordnungen bewirken kann.
+          </p>
+        </div>
+      </div>
+
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.interpretation.heading}</h3>
       <div class="space-y-3 mb-5">
         {tc.fragility.interpretation.items.map((item: { title: string; body: string }) => (
