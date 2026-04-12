@@ -560,6 +560,120 @@ const illustrativeCases = [
   { company: 'UnitedHealth',   rg10: 2.27, pg: 2.42, mte: null, ret:  -43, caseType: 'ambiguous'  as const },
 ];
 const retroN = retroEntries.length;
+
+// ── Geographische Fragmentierung ──────────────────────────────────────────────
+function getRegion(country: string): 'US' | 'DE' | 'JP' | null {
+  if (country === 'US') return 'US';
+  if (country === 'DE') return 'DE';
+  if (country === 'JP') return 'JP';
+  return null;
+}
+
+const GEO_PERIODS = ['2023_q4','2024_q4','2025_q1','2025_q2','2025_q3','2025_q4'];
+const GEO_LABELS_MAP: Record<string,string> = {
+  '2023_q4':'Q4 2023','2024_q4':'Q4 2024',
+  '2025_q1':'Q1 2025','2025_q2':'Q2 2025','2025_q3':'Q3 2025','2025_q4':'Q4 2025',
+};
+
+interface GeoRow { pk:string; label:string; n:number; med:number; coreMedian:number; narrMedian:number; spread:number; }
+const geoSeries: Record<'US'|'DE'|'JP', GeoRow[]> = { US:[], DE:[], JP:[] };
+
+for (const pk of GEO_PERIODS) {
+  const rv: Record<'US'|'DE'|'JP', number[]> = { US:[], DE:[], JP:[] };
+  for (const d of allCompanies) {
+    const reg = getRegion((d as any).country ?? '');
+    if (!reg) continue;
+    for (const o of (d as any).observations as any[]) {
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) rv[reg].push(o.rg10 as number);
+    }
+  }
+  for (const reg of (['US','DE','JP'] as const)) {
+    const vals = [...rv[reg]].sort((a,b) => a - b);
+    const n = vals.length;
+    if (n < 4) continue;
+    const t = Math.max(1, Math.floor(n / 4));
+    geoSeries[reg].push({
+      pk, label: GEO_LABELS_MAP[pk]!, n,
+      med: median(vals),
+      coreMedian: median(vals.slice(0, t)),
+      narrMedian: median(vals.slice(n - t)),
+      spread: median(vals.slice(n - t)) - median(vals.slice(0, t)),
+    });
+  }
+}
+
+const geoSnap = {
+  US: geoSeries.US.find(r => r.pk === '2025_q4'),
+  DE: geoSeries.DE.find(r => r.pk === '2025_q4'),
+  JP: geoSeries.JP.find(r => r.pk === '2025_q4'),
+};
+
+const GEO_N = GEO_PERIODS.length;
+const GEO_Y_MAX = 4.0;
+function geoChartX(i: number): number { return GEO_N > 1 ? SVG_PL + (i / (GEO_N - 1)) * SVG_IW : SVG_PL + SVG_IW / 2; }
+function geoChartY(v: number): number { return SVG_PT + (1 - v / GEO_Y_MAX) * SVG_IH; }
+
+function geoPath(reg: 'US'|'DE'|'JP'): string {
+  let path = '';
+  for (let i = 0; i < GEO_PERIODS.length; i++) {
+    const pk = GEO_PERIODS[i]!;
+    const row = geoSeries[reg].find(r => r.pk === pk);
+    if (!row) continue;
+    path += (path === '' ? `M ${geoChartX(i).toFixed(1)} ${geoChartY(row.med).toFixed(1)}`
+                        : ` L ${geoChartX(i).toFixed(1)} ${geoChartY(row.med).toFixed(1)}`);
+  }
+  return path;
+}
+const geoUSPath = geoPath('US');
+const geoDEPath = geoPath('DE');
+const geoJPPath = geoPath('JP');
+const geoYTicks = [0, 1, 2, 3, 4];
+const geoMaxNarr = Math.max(
+  geoSnap.US?.narrMedian ?? 0,
+  geoSnap.DE?.narrMedian ?? 0,
+  geoSnap.JP?.narrMedian ?? 0,
+);
+
+// ── Super-Narrative-Cluster (oberes Dezil) ────────────────────────────────────
+const superThresholds: Record<string, number> = {};
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of (d as any).observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  superThresholds[pk] = quantile([...vals].sort((a,b) => a - b), 0.90);
+}
+const superValidPeriods = OPEN_PERIODS.filter(pk => superThresholds[pk] != null);
+
+interface SuperRow {
+  company: string; sector: string; country: string;
+  appearances: number;
+  rg: Partial<Record<string, number>>;
+}
+
+const superAll: SuperRow[] = [];
+for (const d of allCompanies) {
+  let appearances = 0;
+  const rg: Partial<Record<string, number>> = {};
+  for (const o of (d as any).observations as any[]) {
+    const pk = o.periodKey as string;
+    if (!OPEN_PERIODS.includes(pk)) continue;
+    if (o.rg10 == null || o.nearBoundary) continue;
+    rg[pk] = o.rg10 as number;
+    const th = superThresholds[pk];
+    if (th != null && (o.rg10 as number) >= th) appearances++;
+  }
+  if (appearances >= 2) superAll.push({
+    company: (d as any).company as string,
+    sector: normalizeSector((d as any).sector ?? ''),
+    country: (d as any).country ?? '',
+    appearances, rg,
+  });
+}
+superAll.sort((a,b) => b.appearances - a.appearances);
+const superCore = superAll.filter(r => r.appearances >= 5);
+const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
 ---
 
 <BaseLayout
@@ -1527,6 +1641,232 @@ const retroN = retroEntries.length;
             Wie bei allen 2025-Beobachtungen: Es wird die aktuelle Marktkapitalisierung verwendet, keine
             historischen Quartalsschlusspreise. Unternehmen mit höheren geglätteten Gewinnen in 2025
             zeigen mechanisch einen niedrigeren RG — Konvergenz ohne Kurskorrektur.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5e. Geographische Fragmentierung -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Geographische Fragmentierung</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Ist RG-Fragilität ein globales Phänomen — oder primär ein amerikanisches? Anhand des Herkunftslandes
+        werden drei Regionen verglichen: US (S&amp;P 500), DE (DAX 40) und JP (Nikkei/TOPIX-Stichprobe).
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Offenes Panel — je Periode vorhandene Unternehmen. JP-Abdeckung begrenzt auf Quartale mit
+        ausreichender Quartalsdatenqualität (n ≥ 4).
+      </p>
+
+      <!-- SVG: regionale Median-Verläufe -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">Median-RG10 nach Region</h3>
+      <div class="overflow-x-auto mb-6">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full max-w-2xl" aria-hidden="true">
+          {geoYTicks.map(v => (
+            <g>
+              <line x1={SVG_PL} y1={geoChartY(v)} x2={SVG_W - SVG_PR} y2={geoChartY(v)}
+                stroke={v === 0 ? '#d1d5db' : '#f3f4f6'} stroke-width="1" />
+              <text x={SVG_PL - 4} y={geoChartY(v) + 4} text-anchor="end"
+                font-size="9.5" fill="#9ca3af">{v}</text>
+            </g>
+          ))}
+          {GEO_PERIODS.map((pk, i) => (
+            <text x={geoChartX(i)} y={SVG_H - SVG_PB + 16}
+              text-anchor="middle" font-size="9" fill="#9ca3af">
+              {GEO_LABELS_MAP[pk]}
+            </text>
+          ))}
+          <line x1={SVG_PL} y1={geoChartY(1)} x2={SVG_W - SVG_PR} y2={geoChartY(1)}
+            stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,3" />
+          <text x={SVG_W - SVG_PR + 2} y={geoChartY(1) + 3} font-size="8" fill="#d1d5db">1</text>
+          {geoUSPath && <path d={geoUSPath} fill="none" stroke="rgb(59,130,246)" stroke-width="2.2" stroke-linejoin="round" />}
+          {geoDEPath && <path d={geoDEPath} fill="none" stroke="rgb(20,184,166)" stroke-width="2.2" stroke-linejoin="round" />}
+          {geoJPPath && <path d={geoJPPath} fill="none" stroke="rgb(245,158,11)" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5,3" />}
+          {geoSeries.US.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(59,130,246)" /> : null;
+          })}
+          {geoSeries.DE.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(20,184,166)" /> : null;
+          })}
+          {geoSeries.JP.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(245,158,11)" /> : null;
+          })}
+          <circle cx={SVG_PL + 4} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(59,130,246)" />
+          <text x={SVG_PL + 12} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">US</text>
+          <circle cx={SVG_PL + 38} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(20,184,166)" />
+          <text x={SVG_PL + 46} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">DE</text>
+          <circle cx={SVG_PL + 72} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(245,158,11)" />
+          <text x={SVG_PL + 80} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">JP (lückenhaft)</text>
+        </svg>
+      </div>
+
+      <!-- Q4 2025 Momentaufnahme -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Q4 2025 Momentaufnahme: Core vs. Narrativ je Region</h3>
+      <div class="space-y-3 mb-6">
+        {([
+          { label: 'US', snap: geoSnap.US, textColor: 'text-blue-700' },
+          { label: 'DE', snap: geoSnap.DE, textColor: 'text-teal-700' },
+          { label: 'JP', snap: geoSnap.JP, textColor: 'text-amber-700' },
+        ] as const).filter(row => row.snap).map(row => (
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-gray-600 w-6 shrink-0">{row.label}</span>
+            <div class="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style={`max-width: 320px`}>
+              <div class="absolute left-0 top-0 h-full rounded"
+                style={`width:${((row.snap!.narrMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(251,146,60,0.35)`}></div>
+              <div class="absolute left-0 top-0 h-full rounded"
+                style={`width:${((row.snap!.coreMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(20,184,166,0.5)`}></div>
+              <div class="absolute top-0 h-full w-0.5 bg-gray-500"
+                style={`left:${((row.snap!.med / geoMaxNarr) * 100).toFixed(1)}%`}></div>
+            </div>
+            <div class="text-xs text-gray-500 shrink-0 space-x-2">
+              <span>Median <span class={`font-semibold ${row.textColor}`}>{fmt(row.snap!.med)}</span></span>
+              <span class="text-gray-400">|</span>
+              <span>Spreizung <span class="font-semibold text-gray-700">{fmt(row.snap!.spread)}</span></span>
+              <span class="text-gray-300">n={row.snap!.n}</span>
+            </div>
+          </div>
+        ))}
+        <p class="text-xs text-gray-400 mt-1">Balken: Türkis = Core-Quartil-Median, Orange = Narrativ-Quartil-Median. Senkrechte Linie = Gesamtmedian.</p>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-blue-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG-Fragilität ist primär ein amerikanisches Phänomen</p>
+          <p class="text-sm text-gray-500">
+            Der US-Median ({fmt(geoSnap.US?.med)}) liegt ca. {geoSnap.DE ? (geoSnap.US!.med / geoSnap.DE.med).toFixed(1) : '?'}× über dem
+            deutschen Median ({fmt(geoSnap.DE?.med)}) und {geoSnap.JP ? (geoSnap.US!.med / geoSnap.JP.med).toFixed(1) : '?'}× über dem
+            japanischen Median ({fmt(geoSnap.JP?.med)}). Die Narrativprämie ist strukturell in der US-Marktbewertung verankert —
+            ohne vergleichbares Pendant in europäischen oder japanischen Indizes.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Alle Regionen zeigen interne Fragilität — in unterschiedlicher Stärke</p>
+          <p class="text-sm text-gray-500">
+            Auch im konservativen deutschen Sample liegt der Narrativ-Quartil-Median ({fmt(geoSnap.DE?.narrMedian)})
+            beim {geoSnap.DE ? (geoSnap.DE.narrMedian / geoSnap.DE.coreMedian).toFixed(1) : '?'}‑Fachen
+            des Core-Quartil-Medians ({fmt(geoSnap.DE?.coreMedian)}).
+            In den USA beträgt dieses Verhältnis {geoSnap.US ? (geoSnap.US.narrMedian / geoSnap.US.coreMedian).toFixed(1) : '?'}.
+            Die geographische Zugehörigkeit komprimiert das Niveau, beseitigt die interne Polarisierung aber nicht.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">US-Spreizung hat sich seit den Hochs 2023–2024 verengt</p>
+          <p class="text-sm text-gray-500">
+            Die US-Core-Narrativ-Spreizung erreichte ihren Höhepunkt im GJ 2024 und ist seitdem rückläufig.
+            Deutsche und japanische Spreizungen blieben stabiler. Die Annäherung ist konsistent mit dem
+            allgemeinen Fragilitätstrend, bringt das US-Niveau jedoch nicht in den deutschen oder japanischen Bereich.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5f. Super-Narrative-Cluster -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Super-Narrativ-Cluster</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Das obere Dezil (Top 10 % nach RG10 je Periode) wird für jedes Quartal unabhängig bestimmt.
+        Sind es immer dieselben Unternehmen — oder rotiert die Zusammensetzung?
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        {superValidPeriods.length} Perioden analysiert ({superValidPeriods.map(pk => OPEN_LABELS[pk]).join(', ')}).
+        Ein Unternehmen gilt als „Dauerläufer", wenn es in mindestens 5 von {superValidPeriods.length} Perioden im oberen Dezil vertreten ist.
+      </p>
+
+      {superCore.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">
+            Dauerläufer — oberes Dezil in ≥5 / {superValidPeriods.length} Perioden
+          </h3>
+          <div class="border border-gray-200 rounded-md overflow-hidden text-xs mb-2">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left px-3 py-2 font-semibold text-gray-600">Unternehmen</th>
+                  <th class="text-left px-3 py-2 font-semibold text-gray-600">Sektor</th>
+                  <th class="text-center px-3 py-2 font-semibold text-gray-600">Land</th>
+                  <th class="text-center px-2 py-2 font-semibold text-gray-600">Perioden im<br/>Top 10 %</th>
+                  {OPEN_PERIODS.map(pk => (
+                    <th class="text-center px-2 py-2 font-semibold text-gray-400">{OPEN_LABELS[pk]}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {superCore.map((r, idx) => (
+                  <tr class={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td class="px-3 py-1.5 font-medium text-gray-800">{r.company}</td>
+                    <td class="px-3 py-1.5 text-gray-500">{r.sector}</td>
+                    <td class="px-3 py-1.5 text-center text-gray-500">{r.country}</td>
+                    <td class="px-3 py-1.5 text-center">
+                      <span class="inline-block bg-orange-100 text-orange-700 font-bold rounded px-1.5">
+                        {r.appearances} / {superValidPeriods.length}
+                      </span>
+                    </td>
+                    {OPEN_PERIODS.map(pk => {
+                      const val = r.rg[pk];
+                      const th  = superThresholds[pk];
+                      const inTop = val != null && th != null && val >= th;
+                      return (
+                        <td class={`px-2 py-1.5 text-center font-mono ${inTop ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-400'}`}>
+                          {val != null ? fmt(val) : '—'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-gray-400">Orange Hervorhebung = Periode, in der das Unternehmen im oberen Dezil des jeweiligen Quartals war.</p>
+        </div>
+      )}
+
+      {superFreq.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Wiederkehrende Einträge — oberes Dezil in 3–4 Perioden</h3>
+          <div class="flex flex-wrap gap-2">
+            {superFreq.map(r => (
+              <span class="text-xs border border-orange-200 bg-orange-50 text-orange-700 rounded px-2 py-0.5">
+                {r.company} ({r.appearances}/{superValidPeriods.length})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Das Super-Narrativ-Tier ist strukturell stabil</p>
+          <p class="text-sm text-gray-500">
+            {superCore.length > 0
+              ? `${superCore.map(r => r.company).join(', ')} besetzen das obere Dezil in ${superCore[0]!.appearances} von ${superValidPeriods.length} Perioden.`
+              : ''} Dies ist keine Marktphasenrotation:
+            dieselben Unternehmen tragen unabhängig vom gemessenen Quartal konstant die höchste Narrativprämie.
+            Die Fragilitätsspreizung ist damit kein statistisches Artefakt zufälliger Ausreißer, sondern
+            spiegelt ein stabiles strukturelles Tier wider.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Alle Dauerläufer sind US-Unternehmen</p>
+          <p class="text-sm text-gray-500">
+            Alle Unternehmen im Dauerläufer-Cluster ({superCore.map(r => r.company).join(', ')}) sind
+            in den USA domiziliert. Kein deutsches oder japanisches Unternehmen erscheint über mehrere
+            Perioden im oberen Dezil. Dies verstärkt den Befund der geographischen Fragmentierung:
+            extreme Narrativbewertung ist nicht nur häufiger in den USA — sie konzentriert sich auf eine
+            kleine, persistente Untergruppe amerikanischer Unternehmen.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Implikation für die Spreizungsmetrik</p>
+          <p class="text-sm text-gray-500">
+            Da das Narrativ-Quartil von denselben Unternehmen Periode für Periode verankert wird, misst
+            die Spreizung eine persistente strukturelle Lücke — kein Rauschen. Eine Kompression der
+            Spreizung würde entweder einen deutlichen RG-Rückgang bei den Dauerläufern erfordern
+            (durch Kurskorrektur oder Gewinnwachstum) oder deren Ablösung durch Unternehmen außerhalb
+            des aktuellen Clusters.
           </p>
         </div>
       </div>
