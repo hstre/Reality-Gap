@@ -364,6 +364,41 @@ const coreToNarrative = transDetails.filter(c => c.from === 0 && c.to === 2)
 const narrativeToCore = transDetails.filter(c => c.from === 2 && c.to === 0)
   .sort((a, b) => a.change - b.change);
 
+// ── Sector internal fragility (current snapshot) ─────────────────────────────
+// For each sector: how far apart are the cheap and expensive halves right now?
+interface SectorFragRow {
+  sector: string; n: number;
+  coreMedian: number; narrativeMedian: number; spread: number;
+}
+const sectorFragMap: Record<string, number[]> = {};
+for (const s of valid) {
+  const sec = normalizeSector(s.sector);
+  if (!sectorFragMap[sec]) sectorFragMap[sec] = [];
+  sectorFragMap[sec].push(s.rg10 as number);
+}
+const sectorFragRows: SectorFragRow[] = Object.entries(sectorFragMap)
+  .filter(([, vals]) => vals.length >= 4)
+  .map(([sector, vals]) => {
+    const sorted = [...vals].sort((a, b) => a - b);
+    const n = sorted.length;
+    let coreVals: number[], narrVals: number[];
+    if (n >= 8) {
+      const q1v = quantile(sorted, 0.25), q3v = quantile(sorted, 0.75);
+      coreVals = sorted.filter(v => v <= q1v);
+      narrVals = sorted.filter(v => v >= q3v);
+    } else {
+      const half = Math.floor(n / 2);
+      coreVals = sorted.slice(0, half);
+      narrVals = sorted.slice(n - half);
+    }
+    const coreMedian   = median(coreVals);
+    const narrMedian   = median(narrVals);
+    return { sector, n, coreMedian, narrativeMedian: narrMedian, spread: narrMedian - coreMedian };
+  })
+  .sort((a, b) => b.spread - a.spread);
+const maxSectorNarr   = Math.max(...sectorFragRows.map(r => r.narrativeMedian));
+const maxSectorSpread = Math.max(...sectorFragRows.map(r => r.spread));
+
 // ── Retrospective metric comparison ─────────────────────────────────────────
 // Historical anchor: 2023_q4 preferred, fallback 2023_q3/q2/q1
 const RETRO_ANCHORS = ['2023_q4', '2023_q3', '2023_q2', '2023_q1'];
@@ -1133,6 +1168,74 @@ const retroN = retroEntries.length;
       <p class="text-xs text-gray-400 border border-gray-100 rounded-md bg-gray-50/50 px-4 py-3">
         {tc.fragility.limitationNote}
       </p>
+    </section>
+
+    <!-- ── 5b. Sector Internal Fragility ────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.sectorFrag?.heading ?? 'Sector Internal Fragility'}</h2>
+      <p class="text-sm text-gray-500 mb-1">{tc.sectorFrag?.subheading ?? 'How far apart are the cheap and expensive halves within each sector — current snapshot.'}</p>
+      <p class="text-xs text-gray-400 mb-6">{tc.sectorFrag?.note ?? 'Sectors with ≥ 4 companies. n ≥ 8: quartile split; n < 8: median split. Sorted by spread descending.'}</p>
+
+      <div class="space-y-3">
+        {sectorFragRows.map(row => (
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-gray-700">{row.sector}</span>
+              <span class="text-xs text-gray-400">n={row.n}</span>
+            </div>
+            <!-- Range bar: full bar = Narrative, inset = Core -->
+            <div class="relative h-6 bg-gray-100 rounded-sm overflow-hidden">
+              <!-- Narrative bar (orange, background) -->
+              <div
+                class="absolute inset-y-0 left-0 bg-orange-400/50 rounded-sm"
+                style={`width:${maxSectorNarr > 0 ? (row.narrativeMedian / maxSectorNarr * 100).toFixed(1) : 0}%`}
+              />
+              <!-- Core bar (teal, foreground overlay) -->
+              <div
+                class="absolute inset-y-0 left-0 bg-teal-400/70 rounded-sm"
+                style={`width:${maxSectorNarr > 0 ? (row.coreMedian / maxSectorNarr * 100).toFixed(1) : 0}%`}
+              />
+            </div>
+            <!-- Values -->
+            <div class="flex items-center gap-3 mt-1 text-[11px]">
+              <span class="text-teal-700 font-mono">Core {row.coreMedian.toFixed(2)}</span>
+              <span class="text-gray-300">·</span>
+              <span class="text-orange-700 font-mono">Narrative {row.narrativeMedian.toFixed(2)}</span>
+              <span class="text-gray-300">·</span>
+              <span class={`font-mono font-semibold ${row.spread === maxSectorSpread ? 'text-orange-700' : 'text-gray-600'}`}>
+                Spread {row.spread.toFixed(2)}{row.spread === maxSectorSpread ? ' ↑' : ''}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="mt-6 border-l-2 border-gray-200 pl-4 space-y-2.5">
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Automotive — the most internally split sector</p>
+          <p class="text-sm text-gray-500">
+            Traditional automakers (low RG, earnings-anchored) sit in the same sector as high-narrative EV
+            companies. The within-sector spread of {sectorFragRows.find(r => r.sector === 'Automotive')?.spread.toFixed(2) ?? '—'}
+            is the widest in the panel, making Automotive more internally divergent than even Technology.
+          </p>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Semiconductors: growth premium concentrated in the top half</p>
+          <p class="text-sm text-gray-500">
+            The sector spans from mature foundry-model companies (TSMC-type, lower RG) to pure-play AI
+            infrastructure names trading at high multiples of smoothed earnings. Spread of
+            {sectorFragRows.find(r => r.sector === 'Semiconductors')?.spread.toFixed(2) ?? '—'}.
+          </p>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Technology: smaller spread than expected</p>
+          <p class="text-sm text-gray-500">
+            With the broadest company count, Technology shows a moderate spread of
+            {sectorFragRows.find(r => r.sector === 'Technology')?.spread.toFixed(2) ?? '—'} —
+            suggesting the label "Technology" covers a more homogeneous RG band than Automotive or Semiconductors.
+          </p>
+        </div>
+      </div>
     </section>
 
     <!-- ── 6. RG vs Simpler Metrics ─────────────────────────────────────── -->
