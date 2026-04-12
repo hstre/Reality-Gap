@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../components/layout/BaseLayout.astro';
 import { en } from '../i18n/en';
+import sp500MacroRaw from '../data/macro/sp500_cape.json';
+import dax40MacroRaw from '../data/macro/dax40_pe.json';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const t = en;
@@ -814,6 +816,67 @@ const decompOther        = decompRows.filter(r => r.cat === 'earnings_drag');
 const decompN = decompRows.length;
 const specPct = decompN > 0 ? Math.round(decompSpeculative.length / decompN * 100) : 0;
 const elPct   = decompN > 0 ? Math.round(decompEarningsLed.length  / decompN * 100) : 0;
+
+// ── Macro-Micro Bridge ────────────────────────────────────────────────────────
+const sp500Macro = sp500MacroRaw as any;
+const dax40Macro = dax40MacroRaw as any;
+
+const macroSP  = sp500Macro.current as { date: string; cape: number; rg10: number; trend: string };
+const macroDAX = dax40Macro.current as { date: string; trailing_pe: number; rg10: number };
+const spLRAvg  = sp500Macro.long_run_avg_rg10 as number;  // 1.773
+const spLRMax  = sp500Macro.long_run_max_rg10 as number;  // 4.42 (Dec 1999)
+
+// Bottom-up regional stats from company data (Q4 2025 snapshot)
+const buUS: number[] = [], buDE: number[] = [], buJP: number[] = [];
+for (const d of allCompanies) {
+  const country = (d as any).country ?? '';
+  const arr = country === 'US' ? buUS : country === 'DE' ? buDE : country === 'JP' ? buJP : null;
+  if (!arr) continue;
+  for (const o of (d as any).observations as any[]) {
+    if (o.periodKey === '2025_q4' && o.rg10 != null && !o.nearBoundary) arr.push(o.rg10 as number);
+  }
+}
+const buUSMed  = median([...buUS].sort((a,b)=>a-b));
+const buUSMean = buUS.reduce((a,b)=>a+b,0) / (buUS.length || 1);
+const buDEMed  = median([...buDE].sort((a,b)=>a-b));
+const buJPMed  = median([...buJP].sort((a,b)=>a-b));
+
+// Historical SP500 macro series — annual snapshots for SVG chart (2000–current)
+interface MacroPoint { date: string; rg10: number; }
+const spSeries = (sp500Macro.series as MacroPoint[]) ?? [];
+// Pick one data point per year (January, or earliest available for that year)
+const annualSP: MacroPoint[] = [];
+for (let yr = 2000; yr <= 2026; yr++) {
+  const prefix = `${yr}-`;
+  const pts = spSeries.filter(p => p.date.startsWith(prefix)).sort((a,b) => a.date.localeCompare(b.date));
+  if (pts[0]) annualSP.push(pts[0]);
+}
+// Add current if not already covered
+const lastAnnual = annualSP[annualSP.length - 1];
+if (lastAnnual && !lastAnnual.date.startsWith('2026')) annualSP.push(macroSP as MacroPoint);
+
+// SVG for macro time series
+const MAC_W = 620, MAC_H = 200;
+const MAC_PL = 40, MAC_PR = 15, MAC_PT = 16, MAC_PB = 40;
+const MAC_IW = MAC_W - MAC_PL - MAC_PR;
+const MAC_IH = MAC_H - MAC_PT - MAC_PB;
+const macN = annualSP.length;
+const MAC_Y_MAX = 5.0;
+function macX(i: number): number { return macN > 1 ? MAC_PL + (i / (macN - 1)) * MAC_IW : MAC_PL + MAC_IW / 2; }
+function macY(v: number): number { return MAC_PT + (1 - Math.min(v, MAC_Y_MAX) / MAC_Y_MAX) * MAC_IH; }
+
+const macPolyPts = annualSP.map((p, i) => `${macX(i).toFixed(1)},${macY(p.rg10).toFixed(1)}`).join(' ');
+// Fill area under the line
+const macFillPts = [
+  `${macX(0).toFixed(1)},${(MAC_PT + MAC_IH).toFixed(1)}`,
+  ...annualSP.map((p, i) => `${macX(i).toFixed(1)},${macY(p.rg10).toFixed(1)}`),
+  `${macX(macN - 1).toFixed(1)},${(MAC_PT + MAC_IH).toFixed(1)}`,
+].join(' ');
+const macYTicks = [1, 2, 3, 4, 5];
+// X labels: every 5 years
+const macXLabels = annualSP
+  .map((p, i) => ({ i, yr: parseInt(p.date.slice(0, 4)) }))
+  .filter(({ yr }) => yr % 5 === 0 || yr === 2026);
 ---
 
 <BaseLayout
@@ -2217,6 +2280,171 @@ const elPct   = decompN > 0 ? Math.round(decompEarningsLed.length  / decompN * 1
             declined. The market has not priced out any narrative premium through a correction in the
             2023–2025 window. If mean-reversion occurs, it will require either continued earnings
             growth (the earnings-led path) or a repricing event not yet visible in the data.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5h. Macro-Micro Bridge ──────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Macro vs. Micro: Index Level vs. Company Level</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        The CAPE-based macro RG (market-cap weighted, index level) and the bottom-up company median
+        (equal-weighted) tell different stories about the same market. Both are useful — but the gap
+        between them reveals where fragility is concentrated.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Macro RG source: Shiller CAPE data (S&P 500) and trailing P/E (DAX 40). Bottom-up: company-level
+        medians from this dataset, Q4 2025 snapshot.
+      </p>
+
+      <!-- Comparison table -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {([
+          {
+            label: 'S&P 500',
+            macro: macroSP.rg10,
+            buMed: buUSMed,
+            buMean: buUSMean,
+            macroLabel: 'CAPE / 10',
+            flag: '🇺🇸',
+          },
+          {
+            label: 'DAX 40',
+            macro: macroDAX.rg10,
+            buMed: buDEMed,
+            buMean: null,
+            macroLabel: 'P/E trailing / 10',
+            flag: '🇩🇪',
+          },
+        ] as const).map(row => {
+          const gap = row.macro - row.buMed;
+          return (
+            <div class="border border-gray-200 rounded-md px-4 py-3">
+              <p class="text-xs text-gray-400 uppercase tracking-wide mb-2">{row.label}</p>
+              <div class="flex justify-between items-baseline mb-1">
+                <span class="text-xs text-gray-500">Macro RG ({row.macroLabel})</span>
+                <span class="font-mono font-semibold text-gray-800">{fmt(row.macro)}</span>
+              </div>
+              <div class="flex justify-between items-baseline mb-1">
+                <span class="text-xs text-gray-500">Bottom-up median</span>
+                <span class="font-mono text-gray-600">{fmt(row.buMed)}</span>
+              </div>
+              {row.buMean != null && (
+                <div class="flex justify-between items-baseline mb-1">
+                  <span class="text-xs text-gray-500">Bottom-up mean</span>
+                  <span class="font-mono text-gray-500">{fmt(row.buMean)}</span>
+                </div>
+              )}
+              <div class="border-t border-gray-100 pt-2 mt-2 flex justify-between items-baseline">
+                <span class="text-xs text-gray-400">Macro − median gap</span>
+                <span class={`font-mono font-semibold text-sm ${gap > 1 ? 'text-orange-600' : 'text-gray-600'}`}>
+                  +{fmt(gap)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+        <div class="border border-gray-200 rounded-md px-4 py-3">
+          <p class="text-xs text-gray-400 uppercase tracking-wide mb-2">S&P 500 Historical Context</p>
+          <div class="flex justify-between items-baseline mb-1">
+            <span class="text-xs text-gray-500">Long-run avg (since 1881)</span>
+            <span class="font-mono text-gray-600">{fmt(spLRAvg)}</span>
+          </div>
+          <div class="flex justify-between items-baseline mb-1">
+            <span class="text-xs text-gray-500">All-time high (Dec 1999)</span>
+            <span class="font-mono text-gray-600">{fmt(spLRMax)}</span>
+          </div>
+          <div class="flex justify-between items-baseline mb-1">
+            <span class="text-xs text-gray-500">Current vs LR avg</span>
+            <span class="font-mono font-semibold text-orange-600">{(macroSP.rg10 / spLRAvg).toFixed(2)}×</span>
+          </div>
+          <div class="flex justify-between items-baseline">
+            <span class="text-xs text-gray-500">Current vs 1999 peak</span>
+            <span class="font-mono text-gray-600">{(macroSP.rg10 / spLRMax * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SVG: SP500 macro RG time series 2000–present -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">S&P 500 Macro RG10 — Annual (2000–present)</h3>
+      <div class="overflow-x-auto mb-6">
+        <svg viewBox={`0 0 ${MAC_W} ${MAC_H}`} class="w-full max-w-2xl" aria-hidden="true">
+          <!-- Fill area -->
+          <polygon points={macFillPts} fill="rgba(249,115,22,0.08)" />
+          <!-- Gridlines + Y labels -->
+          {macYTicks.map(v => (
+            <g>
+              <line x1={MAC_PL} y1={macY(v)} x2={MAC_W - MAC_PR} y2={macY(v)}
+                stroke={v === 0 ? '#d1d5db' : '#f3f4f6'} stroke-width="1" />
+              <text x={MAC_PL - 4} y={macY(v) + 4} text-anchor="end"
+                font-size="9.5" fill="#9ca3af">{v}</text>
+            </g>
+          ))}
+          <!-- Long-run average line -->
+          <line x1={MAC_PL} y1={macY(spLRAvg)} x2={MAC_W - MAC_PR} y2={macY(spLRAvg)}
+            stroke="#6b7280" stroke-width="1" stroke-dasharray="4,3" />
+          <text x={MAC_W - MAC_PR + 2} y={macY(spLRAvg) + 3}
+            font-size="8" fill="#6b7280">avg</text>
+          <!-- All-time peak reference -->
+          <line x1={MAC_PL} y1={macY(spLRMax)} x2={MAC_W - MAC_PR} y2={macY(spLRMax)}
+            stroke="rgb(239,68,68)" stroke-width="1" stroke-dasharray="3,4" opacity="0.5" />
+          <text x={MAC_W - MAC_PR + 2} y={macY(spLRMax) + 3}
+            font-size="8" fill="rgb(239,68,68)" opacity="0.7">1999</text>
+          <!-- RG = 1 line -->
+          <line x1={MAC_PL} y1={macY(1)} x2={MAC_W - MAC_PR} y2={macY(1)}
+            stroke="#d1d5db" stroke-width="1" stroke-dasharray="3,4" />
+          <!-- Main polyline -->
+          <polyline points={macPolyPts} fill="none" stroke="rgb(249,115,22)" stroke-width="2.2" stroke-linejoin="round" />
+          <!-- X-axis year labels -->
+          {macXLabels.map(({ i, yr }) => (
+            <text x={macX(i)} y={MAC_PT + MAC_IH + 14}
+              text-anchor="middle" font-size="9" fill="#9ca3af">{yr}</text>
+          ))}
+          <!-- Current value dot -->
+          <circle cx={macX(macN - 1)} cy={macY(annualSP[macN-1]!.rg10)} r="3.5" fill="rgb(249,115,22)" />
+          <text x={macX(macN - 1) - 4} y={macY(annualSP[macN-1]!.rg10) - 6}
+            text-anchor="end" font-size="9" font-weight="bold" fill="rgb(249,115,22)">
+            {fmt(annualSP[macN-1]!.rg10)}
+          </text>
+        </svg>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">
+            Macro–micro gap reveals where fragility concentrates
+          </p>
+          <p class="text-sm text-gray-500">
+            The S&P 500 macro RG ({fmt(macroSP.rg10)}) sits {fmt(macroSP.rg10 - buUSMed)} points above the
+            equal-weighted company median ({fmt(buUSMed)}). The difference reflects market-cap weighting:
+            Tesla, Broadcom, AMD — the permanent super-narrative fixtures — are also among the largest
+            index constituents. A passive index investor's effective RG exposure is substantially higher
+            than the median company in the index implies.
+          </p>
+        </div>
+        <div class="border-l-2 border-red-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">
+            Approaching the 1999 peak — with a different composition
+          </p>
+          <p class="text-sm text-gray-500">
+            At {fmt(macroSP.rg10)}, the S&P 500 macro RG stands at {(macroSP.rg10 / spLRMax * 100).toFixed(0)}%
+            of its December 1999 peak of {fmt(spLRMax)}, and {(macroSP.rg10 / spLRAvg).toFixed(1)}× the
+            144-year long-run average of {fmt(spLRAvg)}. In 1999 the concentration was in broad-market
+            technology. Today the extreme valuations are even more concentrated: the same four companies
+            recur in the top decile across all measured periods.
+          </p>
+        </div>
+        <div class="border-l-2 border-teal-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">
+            Geographic hierarchy holds at both levels
+          </p>
+          <p class="text-sm text-gray-500">
+            Macro: S&P 500 {fmt(macroSP.rg10)} vs DAX 40 {fmt(macroDAX.rg10)} — ratio {(macroSP.rg10 / macroDAX.rg10).toFixed(1)}×.
+            Bottom-up: US median {fmt(buUSMed)} vs DE median {fmt(buDEMed)} — ratio {(buUSMed / buDEMed).toFixed(1)}×.
+            The different methodologies produce different absolute levels but the same structural ordering.
+            US equities carry meaningfully higher valuation multiples at every level of analysis.
           </p>
         </div>
       </div>
