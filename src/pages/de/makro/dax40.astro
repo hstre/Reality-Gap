@@ -176,7 +176,7 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
     </div>
 
     <div class="text-xs text-gray-400 border border-gray-100 rounded-md bg-gray-50/50 px-4 py-3">
-      Der DAX 40 weist einen niedrigeren M(RG10)-Wert auf als der S&amp;P 500 (1,80 vs. 3,94),
+      Der DAX 40 weist einen niedrigeren M(RG10)-Wert auf als der S&amp;P 500 ({rg10.toFixed(2).replace('.', ',')} vs. {sp500.rg10.toFixed(2).replace('.', ',')}),
       was dem historisch geringeren Bewertungsniveau des DAX entspricht — bedingt durch die
       starke Gewichtung von Industrie- und Automobilwerten. Ein Teil des Abstands spiegelt
       auch die unterschiedlichen Gewinnnenner: CAPE liegt in einem Gewinnaufschwung
@@ -253,9 +253,16 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
           </div>
         ))}
       </div>
-      <p class="text-xs text-gray-400">
+      <p class="text-xs text-gray-400 mb-3">
         Sobald DAX-CAPE-Daten frei zugänglich werden, wird diese Seite mit einem vollständigen Verlaufschart aktualisiert.
         Das Trailing-KGV der ETF-Anbieter (nur aktueller Wert) ist der einzige frei verfügbare automatisierte Datenpunkt.
+      </p>
+      <p class="text-xs text-gray-400">
+        <span class="font-medium text-gray-500">Hinweis für Forscher:</span> Siblis Research
+        (siblisresearch.com) veröffentlicht historische CAPE-Daten für über 35 Länder inkl.
+        Deutschland / DAX Index über 40 Jahre zurück (48 USD/Monat). Für eine vollständige
+        M(DAX)RG10-Zeitreihe: CAPE-Spalte für Deutschland herunterladen, durch 10 dividieren,
+        als M(DAX)RG10 kennzeichnen und den DAX-30→40-Komponentenbruch im September 2021 markieren.
       </p>
     </div>
   </section>
@@ -295,6 +302,17 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
           Automobil, Chemie und Finanzwerte gewichtet — Sektoren mit historisch niedrigeren
           Bewertungsmultiplikatoren als die technologielastige S&amp;P-500-Komposition.
           Ein niedrigerer M(DAX40)RG10 als M(S&amp;P500)RG10 ist strukturell zu erwarten.
+        </p>
+      </div>
+
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">DAX 30 → DAX 40 Zusammensetzungsbruch (September 2021)</p>
+        <p class="text-sm text-gray-500">
+          Im September 2021 erweiterte die Deutsche Börse den Leitindex von 30 auf 40 Unternehmen,
+          vorwiegend aus mittelgroßen Branchen. Jede künftige historische Zeitreihe, die Daten vor
+          und nach 2021 umfasst, sollte diesen Strukturbruch markieren: KGV und Gewinnprofil des
+          DAX 40 sind nicht direkt mit der DAX-30-Reihe vor September 2021 vergleichbar.
+          Die aktuellen ETF-Daten (EXS1.DE, DBXD.DE) spiegeln die DAX-40-Zusammensetzung wider.
         </p>
       </div>
 

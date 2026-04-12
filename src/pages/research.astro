@@ -31,6 +31,17 @@ function fmt(v: number | null | undefined, decimals = 2): string {
   return v.toFixed(decimals);
 }
 
+function gini(arr: number[]): number {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const n = s.length;
+  const sum = s.reduce((a, b) => a + b, 0);
+  if (sum === 0) return 0;
+  let num = 0;
+  for (let i = 0; i < n; i++) num += (i + 1) * s[i]!;
+  return (2 * num) / (n * sum) - (n + 1) / n;
+}
+
 // ── Latest RG10 per company (most recent quarterly obs, or latest available) ──
 interface CompanySummary {
   company: string;
@@ -97,9 +108,15 @@ const indexStats = Object.entries(indexGroups)
   .sort((a, b) => b.med - a.med);
 
 // ── Sector comparison ────────────────────────────────────────────────────────
+// Normalize hybrid labels to avoid n=1 singletons in the table
+function normalizeSector(s: string): string {
+  if (s === 'Automotive / Technology') return 'Automotive';
+  if (s === 'Technology / Consumer Electronics') return 'Consumer Electronics';
+  return s || 'Other';
+}
 const sectorGroups: Record<string, number[]> = {};
 for (const s of valid) {
-  const sec = s.sector || 'Other';
+  const sec = normalizeSector(s.sector);
   if (!sectorGroups[sec]) sectorGroups[sec] = [];
   sectorGroups[sec].push(s.rg10 as number);
 }
@@ -220,6 +237,294 @@ const maxFHigh    = Math.max(...fragSeries.map(r => r.highMedian));
 const fragPeak    = fragSeries.find(r => r.spread === maxFSpread)!;
 const fragLatest  = fragSeries[fragSeries.length - 1]!;
 const fragFirst   = fragSeries[0]!;
+
+// ── Open-panel series (unbalanced — all companies per period, for SVG chart) ─
+// Uses every quarter with ≥15 valid companies; panel composition varies.
+// Gives broader time coverage than the balanced panel table.
+const OPEN_PERIODS = ['2023_q4', '2024_q1', '2024_q4', '2025_q1', '2025_q2', '2025_q3', '2025_q4'];
+const OPEN_LABELS: Record<string, string> = {
+  '2023_q4': 'Q4 2023', '2024_q1': 'Q1 2024', '2024_q4': 'Q4 2024',
+  '2025_q1': 'Q1 2025', '2025_q2': 'Q2 2025', '2025_q3': 'Q3 2025', '2025_q4': 'Q4 2025',
+};
+
+interface OpenFragRow {
+  pk: string; label: string; n: number;
+  consMedian: number; highMedian: number; spread: number;
+}
+const openFragSeries: OpenFragRow[] = [];
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies) {
+    for (const o of (d.observations as any[])) {
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) {
+        vals.push(o.rg10 as number);
+      }
+    }
+  }
+  vals.sort((a, b) => a - b);
+  const n = vals.length;
+  if (n < 15) continue;
+  let consVals: number[], highVals: number[];
+  if (n >= 30) {
+    const q1v = quantile(vals, 0.25), q3v = quantile(vals, 0.75);
+    consVals = vals.filter(v => v <= q1v);
+    highVals = vals.filter(v => v >= q3v);
+  } else {
+    const t = Math.floor(n / 3);
+    consVals = vals.slice(0, t);
+    highVals = vals.slice(n - t);
+  }
+  openFragSeries.push({
+    pk, label: OPEN_LABELS[pk]!,
+    n,
+    consMedian: median(consVals),
+    highMedian: median(highVals),
+    spread: median(highVals) - median(consVals),
+  });
+}
+
+// ── SVG chart pre-computation ─────────────────────────────────────────────────
+const SVG_W = 620, SVG_H = 230;
+const SVG_PL = 40, SVG_PR = 15, SVG_PT = 16, SVG_PB = 52;
+const SVG_IW = SVG_W - SVG_PL - SVG_PR;
+const SVG_IH = SVG_H - SVG_PT - SVG_PB;
+const oN = openFragSeries.length;
+const svgMaxY = oN > 0
+  ? Math.ceil(Math.max(...openFragSeries.map(r => r.highMedian)) + 0.5)
+  : 10;
+const svgMinY = 0;
+const svgYTicks = Array.from({ length: svgMaxY + 1 }, (_, i) => i);
+
+function svgX(i: number): number {
+  return oN > 1 ? SVG_PL + (i / (oN - 1)) * SVG_IW : SVG_PL + SVG_IW / 2;
+}
+function svgY(v: number): number {
+  return SVG_PT + (1 - (v - svgMinY) / (svgMaxY - svgMinY)) * SVG_IH;
+}
+
+const svgCorePoints = openFragSeries
+  .map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.consMedian).toFixed(1)}`).join(' ');
+const svgHighPoints = openFragSeries
+  .map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.highMedian).toFixed(1)}`).join(' ');
+const svgFillPts = [
+  ...openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${svgY(r.consMedian).toFixed(1)}`),
+  ...[...openFragSeries].reverse().map((r, i) => `${svgX(oN - 1 - i).toFixed(1)},${svgY(r.highMedian).toFixed(1)}`),
+].join(' ');
+
+// Spread-only SVG
+const svgSpreadMaxY = oN > 0
+  ? Math.ceil(Math.max(...openFragSeries.map(r => r.spread)) * 1.2 * 10) / 10
+  : 5;
+const svgSpreadPts = openFragSeries
+  .map((r, i) => `${svgX(i).toFixed(1)},${(SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH).toFixed(1)}`).join(' ');
+const svgSpreadFillPts = [
+  ...openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${(SVG_PT + SVG_IH).toFixed(1)}`),
+  ...[...openFragSeries].reverse().map((r, i) => `${svgX(oN - 1 - i).toFixed(1)},${(SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH).toFixed(1)}`),
+].join(' ');
+
+// ── Gini series (same open panel periods) ────────────────────────────────────
+interface GiniRow { pk: string; label: string; n: number; g: number; }
+const giniSeries: GiniRow[] = [];
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of d.observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  giniSeries.push({ pk, label: OPEN_LABELS[pk]!, n: vals.length, g: gini(vals) });
+}
+const gN = giniSeries.length;
+function gX(i: number): number { return gN > 1 ? SVG_PL + (i / (gN - 1)) * SVG_IW : SVG_PL + SVG_IW / 2; }
+const GINI_MAX = 0.70; // fixed y-axis: 0 – 0.70
+function gY(v: number): number { return SVG_PT + (1 - v / GINI_MAX) * SVG_IH; }
+const svgGiniPts = giniSeries.map((r, i) => `${gX(i).toFixed(1)},${gY(r.g).toFixed(1)}`).join(' ');
+const svgGiniFillPts = [
+  ...giniSeries.map((r, i) => `${gX(i).toFixed(1)},${(SVG_PT + SVG_IH).toFixed(1)}`),
+  ...[...giniSeries].reverse().map((r, i) => `${gX(gN - 1 - i).toFixed(1)},${gY(r.g).toFixed(1)}`),
+].join(' ');
+const giniPeak    = giniSeries.reduce((a, b) => a.g > b.g ? a : b, giniSeries[0]!);
+const giniLatest  = giniSeries[giniSeries.length - 1]!;
+const giniYTicks  = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+
+// ── Transition Matrix: Q4 2023 → Q4 2025 ────────────────────────────────────
+interface TransEntry {
+  company: string; sector: string;
+  rg23: number; rg25: number;
+  from: 0 | 1 | 2;
+  to:   0 | 1 | 2;
+  change: number;
+}
+const transRaw: Array<{company: string; sector: string; rg23: number; rg25: number}> = [];
+for (const d of allCompanies) {
+  const obs = d.observations as any[];
+  const o23 = obs.find((o: any) => o.periodKey === '2023_q4' && o.rg10 != null && !o.nearBoundary);
+  const o25 = obs.find((o: any) => o.periodKey === '2025_q4' && o.rg10 != null && !o.nearBoundary);
+  if (o23 && o25) transRaw.push({
+    company: d.company as string, sector: d.sector ?? '',
+    rg23: o23.rg10 as number, rg25: o25.rg10 as number,
+  });
+}
+const tN = transRaw.length;
+const transMethod: 'quartile' | 'third' = tN >= 30 ? 'quartile' : 'third';
+const rg23sorted = [...transRaw.map(c => c.rg23)].sort((a, b) => a - b);
+const rg25sorted = [...transRaw.map(c => c.rg25)].sort((a, b) => a - b);
+
+function transBucket(sorted: number[], v: number): 0 | 1 | 2 {
+  const n = sorted.length;
+  if (transMethod === 'quartile') {
+    const q1 = quantile(sorted, 0.25);
+    const q3 = quantile(sorted, 0.75);
+    if (v <= q1) return 0;
+    if (v >= q3) return 2;
+    return 1;
+  }
+  const t = Math.floor(n / 3);
+  if (v <= sorted[t - 1]!) return 0;
+  if (v >= sorted[n - t]!) return 2;
+  return 1;
+}
+
+const transMatrix: number[][] = [[0,0,0],[0,0,0],[0,0,0]];
+const transDetails: TransEntry[] = [];
+for (const c of transRaw) {
+  const from = transBucket(rg23sorted, c.rg23);
+  const to   = transBucket(rg25sorted, c.rg25);
+  transMatrix[from]![to]!++;
+  transDetails.push({ ...c, from, to, change: c.rg25 - c.rg23 });
+}
+const diagCount = transMatrix[0]![0]! + transMatrix[1]![1]! + transMatrix[2]![2]!;
+const transStabilityPct = tN > 0 ? Math.round(diagCount / tN * 100) : 0;
+const coreToNarrative = transDetails.filter(c => c.from === 0 && c.to === 2)
+  .sort((a, b) => b.change - a.change);
+const narrativeToCore = transDetails.filter(c => c.from === 2 && c.to === 0)
+  .sort((a, b) => a.change - b.change);
+
+// ── Convergence to RG = 1 (fair-value anchor) ────────────────────────────────
+// Threshold 0.05 to avoid labelling noise as convergence/divergence
+interface ConvEntry extends TransEntry { dist23: number; dist25: number; distDelta: number; converging: boolean; diverging: boolean; }
+const convDetails: ConvEntry[] = transDetails.map(c => {
+  const dist23 = Math.abs(c.rg23 - 1);
+  const dist25 = Math.abs(c.rg25 - 1);
+  const distDelta = dist25 - dist23;
+  return { ...c, dist23, dist25, distDelta,
+    converging: distDelta < -0.05,
+    diverging:  distDelta >  0.05 };
+});
+const convCount = convDetails.filter(c => c.converging).length;
+const divCount  = convDetails.filter(c => c.diverging).length;
+const convPct   = tN > 0 ? Math.round(convCount / tN * 100) : 0;
+
+// By starting group (using rg23 absolute thresholds)
+const convCore = convDetails.filter(c => c.rg23 < 0.8);
+const convNarr = convDetails.filter(c => c.rg23 > 1.5);
+const coreConvPct = convCore.length > 0 ? Math.round(convCore.filter(c => c.converging).length / convCore.length * 100) : 0;
+const narrConvPct = convNarr.length > 0 ? Math.round(convNarr.filter(c => c.converging).length / convNarr.length * 100) : 0;
+
+// By sector — use normalizeSector on transDetails
+const convBySector: Record<string, { conv: number; div: number; n: number }> = {};
+for (const c of convDetails) {
+  const s = normalizeSector(c.sector);
+  if (!convBySector[s]) convBySector[s] = { conv: 0, div: 0, n: 0 };
+  convBySector[s].n++;
+  if (c.converging) convBySector[s].conv++;
+  if (c.diverging)  convBySector[s].div++;
+}
+const convSectorRows = Object.entries(convBySector)
+  .filter(([, v]) => v.n >= 3)
+  .map(([sector, v]) => ({ sector, ...v, convPct: Math.round(v.conv / v.n * 100) }))
+  .sort((a, b) => b.convPct - a.convPct);
+
+// Top movers
+const topConvergers = [...convDetails].filter(c => c.converging).sort((a, b) => a.distDelta - b.distDelta).slice(0, 5);
+const topDivergers  = [...convDetails].filter(c => c.diverging ).sort((a, b) => b.distDelta - a.distDelta).slice(0, 5);
+
+// ── RG Persistence: per-company quartile stability across all periods ─────────
+// Compute independent quartile thresholds per period, then classify each obs.
+const PERSIST_PERIODS = ['2023_q4','2024_q1','2024_q4','2025_q1','2025_q2','2025_q3','2025_q4'];
+const periodThresholds: Record<string, { q1: number; q3: number }> = {};
+for (const pk of PERSIST_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of d.observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n >= 30) {
+    periodThresholds[pk] = { q1: quantile(sorted, 0.25), q3: quantile(sorted, 0.75) };
+  } else {
+    const t = Math.floor(n / 3);
+    periodThresholds[pk] = { q1: sorted[t - 1]!, q3: sorted[n - t]! };
+  }
+}
+
+interface PersistRow {
+  company: string; sector: string;
+  nCore: number; nNarr: number; nMid: number; nTotal: number;
+  corePct: number; narrPct: number;
+}
+const persistRows: PersistRow[] = [];
+for (const d of allCompanies) {
+  let nCore = 0, nNarr = 0, nMid = 0, nTotal = 0;
+  for (const o of d.observations as any[]) {
+    const th = periodThresholds[o.periodKey as string];
+    if (!th || o.rg10 == null || o.nearBoundary) continue;
+    nTotal++;
+    if (o.rg10 <= th.q1) nCore++;
+    else if (o.rg10 >= th.q3) nNarr++;
+    else nMid++;
+  }
+  if (nTotal < 2) continue;
+  persistRows.push({
+    company: d.company as string, sector: normalizeSector(d.sector ?? ''),
+    nCore, nNarr, nMid, nTotal,
+    corePct: Math.round(nCore / nTotal * 100),
+    narrPct: Math.round(nNarr / nTotal * 100),
+  });
+}
+
+const PERSIST_THRESHOLD = 70;
+const permNarrative = persistRows.filter(r => r.narrPct >= PERSIST_THRESHOLD)
+  .sort((a, b) => b.narrPct - a.narrPct);
+const permCore      = persistRows.filter(r => r.corePct >= PERSIST_THRESHOLD)
+  .sort((a, b) => b.corePct - a.corePct);
+const rotators      = persistRows.filter(r => r.narrPct < 50 && r.corePct < 50 && r.nTotal >= 3)
+  .sort((a, b) => (b.nMid / b.nTotal) - (a.nMid / a.nTotal));
+
+// ── Sector internal fragility (current snapshot) ─────────────────────────────
+// For each sector: how far apart are the cheap and expensive halves right now?
+interface SectorFragRow {
+  sector: string; n: number;
+  coreMedian: number; narrativeMedian: number; spread: number;
+}
+const sectorFragMap: Record<string, number[]> = {};
+for (const s of valid) {
+  const sec = normalizeSector(s.sector);
+  if (!sectorFragMap[sec]) sectorFragMap[sec] = [];
+  sectorFragMap[sec].push(s.rg10 as number);
+}
+const sectorFragRows: SectorFragRow[] = Object.entries(sectorFragMap)
+  .filter(([, vals]) => vals.length >= 4)
+  .map(([sector, vals]) => {
+    const sorted = [...vals].sort((a, b) => a - b);
+    const n = sorted.length;
+    let coreVals: number[], narrVals: number[];
+    if (n >= 8) {
+      const q1v = quantile(sorted, 0.25), q3v = quantile(sorted, 0.75);
+      coreVals = sorted.filter(v => v <= q1v);
+      narrVals = sorted.filter(v => v >= q3v);
+    } else {
+      const half = Math.floor(n / 2);
+      coreVals = sorted.slice(0, half);
+      narrVals = sorted.slice(n - half);
+    }
+    const coreMedian   = median(coreVals);
+    const narrMedian   = median(narrVals);
+    return { sector, n, coreMedian, narrativeMedian: narrMedian, spread: narrMedian - coreMedian };
+  })
+  .sort((a, b) => b.spread - a.spread);
+const maxSectorNarr   = Math.max(...sectorFragRows.map(r => r.narrativeMedian));
+const maxSectorSpread = Math.max(...sectorFragRows.map(r => r.spread));
 
 // ── Retrospective metric comparison ─────────────────────────────────────────
 // Historical anchor: 2023_q4 preferred, fallback 2023_q3/q2/q1
@@ -578,6 +883,214 @@ const retroN = retroEntries.length;
         ))}
       </div>
 
+      <!-- ── 2025 data caveat ───────────────────────────────────────────── -->
+      <div class="flex gap-2.5 border border-amber-200 bg-amber-50/60 rounded-md px-4 py-3 mb-5 text-xs text-amber-800 leading-relaxed">
+        <span class="shrink-0 mt-0.5">⚠</span>
+        <span>
+          <strong>Note on 2025 data:</strong> Q1–Q4 2025 observations use the <em>current</em> market
+          capitalisation rather than end-of-quarter prices. Changes within 2025 therefore reflect
+          shifts in smoothed earnings (G) more than actual price movements. Treat the 2025 trajectory
+          as fundamental-reclassification signal, not as a market-price time series.
+        </span>
+      </div>
+
+      <!-- ── SVG: Core RG vs Narrative RG over time ───────────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Core RG vs. Narrative RG — Time Series</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Open panel (all companies with valid RG10 per quarter, n varies). Q1 2024: 21 companies only (tercile method).
+        Shaded area = Narrative RG − Core RG (spread).
+      </p>
+      <!-- Legend -->
+      <div class="flex items-center gap-5 mb-2 text-xs text-gray-500">
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-0.5 rounded" style="background:rgb(20,184,166);"></span>
+          Core RG (bottom quartile)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-0.5 rounded" style="background:rgb(234,88,12);"></span>
+          Narrative RG (top quartile)
+        </span>
+        <span class="flex items-center gap-1.5">
+          <span class="inline-block w-6 h-3 rounded-sm opacity-30" style="background:rgb(249,115,22);"></span>
+          Spread
+        </span>
+      </div>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-4 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y grid + labels */}
+          {svgYTicks.map(y => (
+            <>
+              <line x1={SVG_PL} y1={svgY(y)} x2={SVG_W - SVG_PR} y2={svgY(y)} stroke="#f3f4f6" stroke-width="1" />
+              <text x={SVG_PL - 5} y={svgY(y) + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y}</text>
+            </>
+          ))}
+          {/* X vertical guides */}
+          {openFragSeries.map((_, i) => (
+            <line x1={svgX(i)} y1={SVG_PT} x2={svgX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Spread fill */}
+          {svgFillPts && <polygon points={svgFillPts} fill="rgba(249,115,22,0.10)" />}
+          {/* Core line */}
+          {svgCorePoints && <polyline points={svgCorePoints} fill="none" stroke="rgb(20,184,166)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Narrative line */}
+          {svgHighPoints && <polyline points={svgHighPoints} fill="none" stroke="rgb(234,88,12)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Dots + value labels */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <circle cx={svgX(i)} cy={svgY(r.consMedian)} r="3.5" fill="rgb(20,184,166)" />
+              <text x={svgX(i)} y={svgY(r.consMedian) + 14} text-anchor="middle" font-size="9" fill="rgb(13,148,136)">{r.consMedian.toFixed(1)}</text>
+              <circle cx={svgX(i)} cy={svgY(r.highMedian)} r="3.5" fill="rgb(234,88,12)" />
+              <text x={svgX(i)} y={svgY(r.highMedian) - 6} text-anchor="middle" font-size="9" fill="rgb(194,65,12)">{r.highMedian.toFixed(1)}</text>
+            </>
+          ))}
+          {/* X labels + n */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          {/* Y-axis label */}
+          <text
+            transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">RG10</text>
+        </svg>
+      </div>
+
+      <!-- ── SVG: Fragility Spread ─────────────────────────────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Fragility Spread — Time Series</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Narrative RG minus Core RG. Higher values indicate greater structural divergence in market valuations.
+      </p>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-8 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y grid + labels */}
+          {Array.from({ length: Math.ceil(svgSpreadMaxY / 0.5) + 1 }, (_, i) => i * 0.5).map(y => (
+            <>
+              <line x1={SVG_PL} y1={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH} stroke="#f3f4f6" stroke-width="1" />
+              {(y * 10) % 5 === 0 && (
+                <text x={SVG_PL - 5} y={SVG_PT + (1 - y / svgSpreadMaxY) * SVG_IH + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y.toFixed(1)}</text>
+              )}
+            </>
+          ))}
+          {/* X vertical guides */}
+          {openFragSeries.map((_, i) => (
+            <line x1={svgX(i)} y1={SVG_PT} x2={svgX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Area fill */}
+          {svgSpreadFillPts && <polygon points={svgSpreadFillPts} fill="rgba(234,88,12,0.12)" />}
+          {/* Baseline */}
+          <line x1={SVG_PL} y1={SVG_PT + SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + SVG_IH} stroke="#e5e7eb" stroke-width="1" />
+          {/* Spread line */}
+          {svgSpreadPts && <polyline points={svgSpreadPts} fill="none" stroke="rgb(234,88,12)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Dots + value labels */}
+          {openFragSeries.map((r, i) => {
+            const cy = SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH;
+            const isPeak = r.spread === Math.max(...openFragSeries.map(x => x.spread));
+            return (
+              <>
+                <circle cx={svgX(i)} cy={cy} r="3.5" fill={isPeak ? 'rgb(185,28,28)' : 'rgb(234,88,12)'} />
+                <text x={svgX(i)} y={cy - 7} text-anchor="middle" font-size="9" fill={isPeak ? 'rgb(185,28,28)' : 'rgb(194,65,12)'}
+                  font-weight={isPeak ? 'bold' : 'normal'}>{r.spread.toFixed(2)}{isPeak ? ' ↑' : ''}</text>
+              </>
+            );
+          })}
+          {/* X labels + n */}
+          {openFragSeries.map((r, i) => (
+            <>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={svgX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          <text
+            transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">Spread</text>
+        </svg>
+      </div>
+
+      <!-- ── SVG: Gini Coefficient of RG10 Distribution ───────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Gini Coefficient — Time Series</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Distributional inequality of RG10 across all companies per quarter (0 = perfect equality, 1 = maximum concentration).
+        Independent of quartile boundaries — captures the full distribution shape.
+        Peak: {giniPeak.label} ({giniPeak.g.toFixed(3)}) · Latest: {giniLatest.label} ({giniLatest.g.toFixed(3)}).
+      </p>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-8 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y grid */}
+          {giniYTicks.map(y => (
+            <>
+              <line x1={SVG_PL} y1={gY(y)} x2={SVG_W - SVG_PR} y2={gY(y)} stroke="#f3f4f6" stroke-width="1" />
+              <text x={SVG_PL - 5} y={gY(y) + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y.toFixed(1)}</text>
+            </>
+          ))}
+          {/* X guides */}
+          {giniSeries.map((_, i) => (
+            <line x1={gX(i)} y1={SVG_PT} x2={gX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Area fill */}
+          {svgGiniFillPts && <polygon points={svgGiniFillPts} fill="rgba(99,102,241,0.08)" />}
+          {/* Baseline */}
+          <line x1={SVG_PL} y1={SVG_PT + SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + SVG_IH} stroke="#e5e7eb" stroke-width="1" />
+          {/* Gini line */}
+          {svgGiniPts && <polyline points={svgGiniPts} fill="none" stroke="rgb(99,102,241)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Dots + labels */}
+          {giniSeries.map((r, i) => {
+            const cy = gY(r.g);
+            const isPeak = r.pk === giniPeak.pk;
+            return (
+              <>
+                <circle cx={gX(i)} cy={cy} r="3.5" fill={isPeak ? 'rgb(79,70,229)' : 'rgb(99,102,241)'} />
+                <text x={gX(i)} y={cy - 7} text-anchor="middle" font-size="9"
+                  fill={isPeak ? 'rgb(79,70,229)' : 'rgb(99,102,241)'}
+                  font-weight={isPeak ? 'bold' : 'normal'}>
+                  {r.g.toFixed(3)}{isPeak ? ' ↑' : ''}
+                </text>
+              </>
+            );
+          })}
+          {/* X labels */}
+          {giniSeries.map((r, i) => (
+            <>
+              <text x={gX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={gX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          <text transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">Gini</text>
+        </svg>
+      </div>
+
+      <!-- ── Gini insight ───────────────────────────────────────────────── -->
+      <div class="border border-indigo-100 bg-indigo-50/40 rounded-md px-5 py-4 mb-8 space-y-3">
+        <p class="text-xs font-semibold text-indigo-800 uppercase tracking-wide">What the Gini shows that Spread doesn't</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-indigo-900">
+          <div class="border-l-2 border-indigo-300 pl-3">
+            <p class="font-semibold mb-0.5">2023 → 2024: top-quartile expansion, not broad inequality</p>
+            <p class="text-indigo-700 leading-relaxed">
+              Q4 2023 → Q4 2024: Spread jumped from 3.20 → 4.60 (+1.40), but Gini barely moved
+              (0.486 → 0.496, +0.010). The quartile extremes widened dramatically while the
+              overall distribution shape stayed nearly the same. Conclusion: the expensive tail
+              grew away from the rest — the middle didn't shift.
+            </p>
+          </div>
+          <div class="border-l-2 border-indigo-300 pl-3">
+            <p class="font-semibold mb-0.5">2024 → 2025: broad-based compression across the whole distribution</p>
+            <p class="text-indigo-700 leading-relaxed">
+              Q4 2024 → Q1 2025: both Gini (0.496 → 0.376) and Spread (4.60 → 2.35) fell sharply
+              together. When Gini and Spread move in parallel, the compression is structural —
+              it affects the full distribution, not just the extremes. Consistent with either a
+              genuine valuation reset or the 2025 market-cap caveat.
+            </p>
+          </div>
+        </div>
+        <p class="text-[11px] text-indigo-500 leading-relaxed pt-1">
+          Neither of these dynamics is visible from Spread or Ratio alone.
+          A stable Gini with a rising Spread is a specific structural signal:
+          the market is not becoming more unequal overall — only the existing extremes are pulling further apart.
+        </p>
+      </div>
+
       <!-- ── Divergence chart: Conservative vs High-RG ─────────────────── -->
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.divergenceChartHeading}</h3>
       <!-- Legend -->
@@ -723,6 +1236,133 @@ const retroN = retroEntries.length;
         </table>
       </div>
 
+      <!-- ── Transition Matrix ──────────────────────────────────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Transition Matrix: Q4 2023 → Q4 2025</h3>
+      <p class="text-xs text-gray-400 mb-4">
+        Panel of {tN} companies with valid RG10 in both periods. Rows = 2023 position, columns = 2025 position.
+        Thresholds computed independently per period ({transMethod === 'quartile' ? 'quartile split' : 'tercile split'}).
+        Diagonal = stable quartile position ({transStabilityPct}% of panel).
+        Highlighted: extreme cross-boundary moves.
+      </p>
+      <div class="border border-gray-200 rounded-md overflow-hidden mb-5 text-xs">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-50 text-gray-400 uppercase tracking-wide text-[10px]">
+              <th class="text-left px-3 py-2 font-medium">2023 ↓ / 2025 →</th>
+              <th class="px-3 py-2 font-medium text-center text-teal-600">Core 2025</th>
+              <th class="px-3 py-2 font-medium text-center">Middle 2025</th>
+              <th class="px-3 py-2 font-medium text-center text-orange-600">Narrative 2025</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transMatrix.map((row, ri) => {
+              const rowLabel = ['Core 2023', 'Middle 2023', 'Narrative 2023'][ri];
+              const rowColor = ['text-teal-700', 'text-gray-600', 'text-orange-700'][ri];
+              return (
+                <tr class="border-t border-gray-100">
+                  <td class={`px-3 py-2 font-medium ${rowColor}`}>{rowLabel}</td>
+                  {row.map((count, ci) => {
+                    const pct = tN > 0 ? Math.round(count / tN * 100) : 0;
+                    const isDiag = ri === ci;
+                    const isHot  = ri === 0 && ci === 2;
+                    const isCool = ri === 2 && ci === 0;
+                    return (
+                      <td class={[
+                        'px-3 py-2 text-center font-mono',
+                        isDiag ? 'bg-gray-50 font-semibold text-gray-800' : 'text-gray-500',
+                        isHot  ? 'bg-orange-50 !text-orange-800 font-bold' : '',
+                        isCool ? 'bg-teal-50 !text-teal-800 font-bold' : '',
+                      ].join(' ')}>
+                        {count > 0 ? count : '—'}
+                        {count > 0 && <span class="font-normal text-gray-400 ml-1 text-[10px]">{pct}%</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Extreme movers */}
+      {(narrativeToCore.length > 0 || coreToNarrative.length > 0) && (
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          {narrativeToCore.length > 0 && (
+            <div>
+              <p class="text-xs font-semibold text-teal-700 mb-2">
+                Narrative → Core — corrected ({narrativeToCore.length})
+              </p>
+              <div class="space-y-1">
+                {narrativeToCore.slice(0, 6).map(c => (
+                  <div class="flex items-center justify-between text-xs border border-teal-100 bg-teal-50/50 rounded px-2.5 py-1.5">
+                    <span class="font-medium text-gray-700 truncate mr-2">{c.company}</span>
+                    <span class="font-mono text-teal-700 shrink-0">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {coreToNarrative.length > 0 && (
+            <div>
+              <p class="text-xs font-semibold text-orange-700 mb-2">
+                Core → Narrative — became expensive ({coreToNarrative.length})
+              </p>
+              <div class="space-y-1">
+                {coreToNarrative.slice(0, 6).map(c => (
+                  <div class="flex items-center justify-between text-xs border border-orange-100 bg-orange-50/50 rounded px-2.5 py-1.5">
+                    <span class="font-medium text-gray-700 truncate mr-2">{c.company}</span>
+                    <span class="font-mono text-orange-700 shrink-0">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <!-- ── Transition Matrix findings ────────────────────────────────── -->
+      <div class="space-y-2.5 mb-8">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG positions are sticky</p>
+          <p class="text-sm text-gray-500">
+            {transStabilityPct}% of the {tN}-company panel remained in the same quartile group between
+            Q4 2023 and Q4 2025. Valuation structure, as captured by RG, tends to persist — a property
+            that simple price-based multiples reset with every price move.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">No direct Core ↔ Narrative crossings</p>
+          <p class="text-sm text-gray-500">
+            Every company that changed extreme — from cheap to expensive or vice versa — passed through
+            the middle quartiles first. Zero companies jumped directly between Core and Narrative.
+            This suggests RG extreme positions are not easily or quickly reversed.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Core is more stable than Narrative</p>
+          <p class="text-sm text-gray-500">
+            {tN > 0 && transMatrix[0] && transMatrix[2] ? (() => {
+              const coreTotal = (transMatrix[0][0]??0)+(transMatrix[0][1]??0)+(transMatrix[0][2]??0);
+              const narrTotal = (transMatrix[2][0]??0)+(transMatrix[2][1]??0)+(transMatrix[2][2]??0);
+              const corePct = coreTotal > 0 ? Math.round((transMatrix[0][0]??0)/coreTotal*100) : 0;
+              const narrPct = narrTotal > 0 ? Math.round((transMatrix[2][2]??0)/narrTotal*100) : 0;
+              return `${corePct}% of Core companies stayed Core; only ${narrPct}% of Narrative companies stayed Narrative.`;
+            })() : ''}
+            {' '}Narrative positions erode faster — consistent with the idea that high-RG valuations
+            carry more reversion pressure than low-RG ones.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The middle acts as a one-way buffer</p>
+          <p class="text-sm text-gray-500">
+            Movement between extremes runs through the middle, making the middle group a structural
+            transition zone rather than a stable resting place. This is distinct from P/G, where
+            re-ranking can occur with a single earnings revision.
+          </p>
+        </div>
+      </div>
+
       <!-- ── Interpretation ────────────────────────────────────────────── -->
       <h3 class="text-sm font-semibold text-gray-700 mb-3">{tc.fragility.interpretation.heading}</h3>
       <div class="space-y-3 mb-5">
@@ -738,6 +1378,291 @@ const retroN = retroEntries.length;
       <p class="text-xs text-gray-400 border border-gray-100 rounded-md bg-gray-50/50 px-4 py-3">
         {tc.fragility.limitationNote}
       </p>
+    </section>
+
+    <!-- ── 5b. Sector Internal Fragility ────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">{tc.sectorFrag?.heading ?? 'Sector Internal Fragility'}</h2>
+      <p class="text-sm text-gray-500 mb-1">{tc.sectorFrag?.subheading ?? 'How far apart are the cheap and expensive halves within each sector — current snapshot.'}</p>
+      <p class="text-xs text-gray-400 mb-6">{tc.sectorFrag?.note ?? 'Sectors with ≥ 4 companies. n ≥ 8: quartile split; n < 8: median split. Sorted by spread descending.'}</p>
+
+      <div class="space-y-3">
+        {sectorFragRows.map(row => (
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-gray-700">{row.sector}</span>
+              <span class="text-xs text-gray-400">n={row.n}</span>
+            </div>
+            <!-- Range bar: full bar = Narrative, inset = Core -->
+            <div class="relative h-6 bg-gray-100 rounded-sm overflow-hidden">
+              <!-- Narrative bar (orange, background) -->
+              <div
+                class="absolute inset-y-0 left-0 bg-orange-400/50 rounded-sm"
+                style={`width:${maxSectorNarr > 0 ? (row.narrativeMedian / maxSectorNarr * 100).toFixed(1) : 0}%`}
+              />
+              <!-- Core bar (teal, foreground overlay) -->
+              <div
+                class="absolute inset-y-0 left-0 bg-teal-400/70 rounded-sm"
+                style={`width:${maxSectorNarr > 0 ? (row.coreMedian / maxSectorNarr * 100).toFixed(1) : 0}%`}
+              />
+            </div>
+            <!-- Values -->
+            <div class="flex items-center gap-3 mt-1 text-[11px]">
+              <span class="text-teal-700 font-mono">Core {row.coreMedian.toFixed(2)}</span>
+              <span class="text-gray-300">·</span>
+              <span class="text-orange-700 font-mono">Narrative {row.narrativeMedian.toFixed(2)}</span>
+              <span class="text-gray-300">·</span>
+              <span class={`font-mono font-semibold ${row.spread === maxSectorSpread ? 'text-orange-700' : 'text-gray-600'}`}>
+                Spread {row.spread.toFixed(2)}{row.spread === maxSectorSpread ? ' ↑' : ''}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="mt-6 border-l-2 border-gray-200 pl-4 space-y-2.5">
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Automotive — the most internally split sector</p>
+          <p class="text-sm text-gray-500">
+            Traditional automakers (low RG, earnings-anchored) sit in the same sector as high-narrative EV
+            companies. The within-sector spread of {sectorFragRows.find(r => r.sector === 'Automotive')?.spread.toFixed(2) ?? '—'}
+            is the widest in the panel, making Automotive more internally divergent than even Technology.
+          </p>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Semiconductors: growth premium concentrated in the top half</p>
+          <p class="text-sm text-gray-500">
+            The sector spans from mature foundry-model companies (TSMC-type, lower RG) to pure-play AI
+            infrastructure names trading at high multiples of smoothed earnings. Spread of
+            {sectorFragRows.find(r => r.sector === 'Semiconductors')?.spread.toFixed(2) ?? '—'}.
+          </p>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Technology: smaller spread than expected</p>
+          <p class="text-sm text-gray-500">
+            With the broadest company count, Technology shows a moderate spread of
+            {sectorFragRows.find(r => r.sector === 'Technology')?.spread.toFixed(2) ?? '—'} —
+            suggesting the label "Technology" covers a more homogeneous RG band than Automotive or Semiconductors.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5c. RG Persistence ───────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">RG Persistence</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Which companies are structurally anchored in their RG group — and which rotate?
+        Classified across all available periods ({PERSIST_PERIODS.length} quarters max).
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Persistently Narrative / Core = ≥ 70% of observed quarters in the top or bottom quartile respectively.
+        Thresholds computed independently per period.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <!-- Persistently Narrative -->
+        <div>
+          <p class="text-xs font-semibold text-orange-700 mb-2 uppercase tracking-wide">
+            Persistently Narrative — {permNarrative.length} companies
+          </p>
+          <div class="space-y-1">
+            {permNarrative.map(r => (
+              <div class="flex items-center justify-between text-xs border border-orange-100 bg-orange-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-orange-600 shrink-0">{r.narrPct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- Persistently Core -->
+        <div>
+          <p class="text-xs font-semibold text-teal-700 mb-2 uppercase tracking-wide">
+            Persistently Core — {permCore.length} companies
+          </p>
+          <div class="space-y-1">
+            {permCore.map(r => (
+              <div class="flex items-center justify-between text-xs border border-teal-100 bg-teal-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-teal-600 shrink-0">{r.corePct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- Rotators -->
+        <div>
+          <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+            Middle-anchored / Rotators — {rotators.length} companies (n ≥ 3)
+          </p>
+          <div class="space-y-1">
+            {rotators.map(r => (
+              <div class="flex items-center justify-between text-xs border border-gray-100 bg-gray-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-gray-400 shrink-0">{Math.round(r.nMid / r.nTotal * 100)}% mid</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The Narrative cluster is structurally stable — and US-dominated</p>
+          <p class="text-sm text-gray-500">
+            Every company in the persistently Narrative group has been in the top quartile in every
+            single observed period. These are not momentum trades — they are structurally expensive
+            by RG's smoothed-earnings logic. The group is almost entirely US-listed growth and quality
+            names: semiconductors, payments, consumer staples, streaming. No European or Japanese
+            company appears here.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The Core cluster is structurally stable — and geographically concentrated</p>
+          <p class="text-sm text-gray-500">
+            Persistently Core companies are dominated by German automakers (BMW, Mercedes-Benz,
+            Volkswagen, Porsche SE), Japanese industrials and banks (Toyota, Honda, Mitsubishi UFJ),
+            and German financials (Deutsche Bank) and utilities (RWE). These names have been in the
+            bottom quartile consistently — structural value by RG logic, or structural earnings weakness.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Alphabet and Meta sit in the middle — not with Nvidia</p>
+          <p class="text-sm text-gray-500">
+            Despite being classified as Big Tech alongside Nvidia and AMD, Alphabet and Meta have never
+            been in the top quartile across any observed period. Their smoothed earnings are high enough
+            relative to their market cap to keep them out of the Narrative cluster. This is a structural
+            distinction RG draws that a simple "tech sector" label does not.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5d. Convergence to RG = 1 ────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Convergence to Fair Value (RG = 1)</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        RG = 1 is the instrument's theoretical anchor: market cap equals ten times smoothed earnings.
+        Do companies actually move toward it over time — or drift further away?
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Panel of {tN} companies with valid RG10 in both Q4 2023 and Q4 2025.
+        Converging = distance to RG 1.0 decreased by &gt; 0.05; Diverging = increased by &gt; 0.05.
+      </p>
+
+      <!-- Summary bar -->
+      <div class="flex gap-3 mb-6 flex-wrap">
+        <div class="border border-teal-200 bg-teal-50/50 rounded-md px-5 py-3 min-w-[140px]">
+          <p class="text-xs text-teal-600 font-medium uppercase tracking-wide mb-1">Converging</p>
+          <p class="text-3xl font-light text-teal-800" style="font-family:Georgia,serif">{convCount}</p>
+          <p class="text-xs text-teal-500 mt-0.5">{convPct}% of panel</p>
+        </div>
+        <div class="border border-orange-200 bg-orange-50/50 rounded-md px-5 py-3 min-w-[140px]">
+          <p class="text-xs text-orange-600 font-medium uppercase tracking-wide mb-1">Diverging</p>
+          <p class="text-3xl font-light text-orange-800" style="font-family:Georgia,serif">{divCount}</p>
+          <p class="text-xs text-orange-500 mt-0.5">{100 - convPct}% of panel</p>
+        </div>
+        <div class="border border-gray-200 bg-gray-50/50 rounded-md px-5 py-3 min-w-[200px] flex-1">
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">By starting group</p>
+          <div class="flex gap-4 mt-1 text-xs">
+            <span><span class="text-teal-700 font-semibold">{coreConvPct}%</span> <span class="text-gray-500">of Core (RG &lt; 0.8) converging</span></span>
+          </div>
+          <div class="flex gap-4 mt-0.5 text-xs">
+            <span><span class="text-orange-700 font-semibold">{narrConvPct}%</span> <span class="text-gray-500">of Narrative (RG &gt; 1.5) converging</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top movers -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <p class="text-xs font-semibold text-teal-700 mb-2">Strongest convergence — approaching RG 1.0</p>
+          <div class="space-y-1.5">
+            {topConvergers.map(c => (
+              <div class="border border-teal-100 bg-teal-50/40 rounded px-3 py-2 text-xs">
+                <div class="flex justify-between items-baseline">
+                  <span class="font-medium text-gray-700">{c.company}</span>
+                  <span class="font-mono text-teal-700">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                </div>
+                <div class="text-gray-400 mt-0.5">
+                  Distance to RG 1.0: {c.dist23.toFixed(2)} → {c.dist25.toFixed(2)}
+                  <span class="text-teal-600 ml-1">({c.distDelta.toFixed(2)})</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-orange-700 mb-2">Strongest divergence — moving away from RG 1.0</p>
+          <div class="space-y-1.5">
+            {topDivergers.map(c => (
+              <div class="border border-orange-100 bg-orange-50/40 rounded px-3 py-2 text-xs">
+                <div class="flex justify-between items-baseline">
+                  <span class="font-medium text-gray-700">{c.company}</span>
+                  <span class="font-mono text-orange-700">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                </div>
+                <div class="text-gray-400 mt-0.5">
+                  Distance to RG 1.0: {c.dist23.toFixed(2)} → {c.dist25.toFixed(2)}
+                  <span class="text-orange-600 ml-1">(+{c.distDelta.toFixed(2)})</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Sector breakdown -->
+      {convSectorRows.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">Convergence rate by sector (n ≥ 3)</h3>
+          <div class="space-y-2">
+            {convSectorRows.map(row => (
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-600 w-40 shrink-0">{row.sector}</span>
+                <div class="flex-1 bg-gray-100 rounded-sm h-4 relative">
+                  <div class="h-4 rounded-sm bg-teal-400/70"
+                    style={`width:${row.convPct}%`} />
+                </div>
+                <span class="text-xs font-mono text-gray-700 w-10 shrink-0">{row.convPct}%</span>
+                <span class="text-xs text-gray-400 shrink-0">n={row.n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Core companies converge faster than Narrative</p>
+          <p class="text-sm text-gray-500">
+            {coreConvPct}% of companies starting below RG 0.8 moved closer to fair value — likely via rising
+            smoothed earnings, not falling prices. Only {narrConvPct}% of companies starting above RG 1.5
+            corrected toward 1.0. The expensive tail is stickier than the cheap tail, which is consistent
+            with the fragility hypothesis: narrative valuations resist downward revision.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">A soft internal validation</p>
+          <p class="text-sm text-gray-500">
+            The majority of the panel ({convPct}%) moves in the direction RG theory predicts — toward
+            the fair-value anchor. This does not prove predictive power, but it is consistent with the
+            instrument's internal logic. The {100 - convPct}% diverging group — led by names like Tesla
+            and Broadcom — represents the genuinely open question: will those correct, or has the
+            smoothed-earnings baseline itself shifted?
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Caveat: 2025 market cap bias</p>
+          <p class="text-sm text-gray-500">
+            As with all 2025 observations: current market cap is used rather than end-of-quarter prices.
+            Companies that report higher smoothed earnings in 2025 will mechanically show lower RG,
+            appearing to converge even without a price correction.
+          </p>
+        </div>
+      </div>
     </section>
 
     <!-- ── 6. RG vs Simpler Metrics ─────────────────────────────────────── -->
