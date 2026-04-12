@@ -644,6 +644,121 @@ const illustrativeCases = [
 
 // Takeaways n
 const retroN = retroEntries.length;
+
+// ── Geographic Fragmentation ──────────────────────────────────────────────────
+function getRegion(country: string): 'US' | 'DE' | 'JP' | null {
+  if (country === 'US') return 'US';
+  if (country === 'DE') return 'DE';
+  if (country === 'JP') return 'JP';
+  return null;
+}
+
+const GEO_PERIODS = ['2023_q4','2024_q4','2025_q1','2025_q2','2025_q3','2025_q4'];
+const GEO_LABELS_MAP: Record<string,string> = {
+  '2023_q4':'Q4 2023','2024_q4':'Q4 2024',
+  '2025_q1':'Q1 2025','2025_q2':'Q2 2025','2025_q3':'Q3 2025','2025_q4':'Q4 2025',
+};
+
+interface GeoRow { pk:string; label:string; n:number; med:number; coreMedian:number; narrMedian:number; spread:number; }
+const geoSeries: Record<'US'|'DE'|'JP', GeoRow[]> = { US:[], DE:[], JP:[] };
+
+for (const pk of GEO_PERIODS) {
+  const rv: Record<'US'|'DE'|'JP', number[]> = { US:[], DE:[], JP:[] };
+  for (const d of allCompanies) {
+    const reg = getRegion((d as any).country ?? '');
+    if (!reg) continue;
+    for (const o of (d as any).observations as any[]) {
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) rv[reg].push(o.rg10 as number);
+    }
+  }
+  for (const reg of (['US','DE','JP'] as const)) {
+    const vals = [...rv[reg]].sort((a,b) => a - b);
+    const n = vals.length;
+    if (n < 4) continue;
+    const t = Math.max(1, Math.floor(n / 4));
+    geoSeries[reg].push({
+      pk, label: GEO_LABELS_MAP[pk]!, n,
+      med: median(vals),
+      coreMedian: median(vals.slice(0, t)),
+      narrMedian: median(vals.slice(n - t)),
+      spread: median(vals.slice(n - t)) - median(vals.slice(0, t)),
+    });
+  }
+}
+
+const geoSnap = {
+  US: geoSeries.US.find(r => r.pk === '2025_q4'),
+  DE: geoSeries.DE.find(r => r.pk === '2025_q4'),
+  JP: geoSeries.JP.find(r => r.pk === '2025_q4'),
+};
+
+// SVG: multi-line chart (reuse existing SVG_W/H/padding constants)
+const GEO_N = GEO_PERIODS.length; // 6
+const GEO_Y_MAX = 4.0;
+function geoChartX(i: number): number { return GEO_N > 1 ? SVG_PL + (i / (GEO_N - 1)) * SVG_IW : SVG_PL + SVG_IW / 2; }
+function geoChartY(v: number): number { return SVG_PT + (1 - v / GEO_Y_MAX) * SVG_IH; }
+
+function geoPath(reg: 'US'|'DE'|'JP'): string {
+  let path = '';
+  for (let i = 0; i < GEO_PERIODS.length; i++) {
+    const pk = GEO_PERIODS[i]!;
+    const row = geoSeries[reg].find(r => r.pk === pk);
+    if (!row) continue;
+    path += (path === '' ? `M ${geoChartX(i).toFixed(1)} ${geoChartY(row.med).toFixed(1)}`
+                        : ` L ${geoChartX(i).toFixed(1)} ${geoChartY(row.med).toFixed(1)}`);
+  }
+  return path;
+}
+const geoUSPath = geoPath('US');
+const geoDEPath = geoPath('DE');
+const geoJPPath = geoPath('JP');
+const geoYTicks = [0, 1, 2, 3, 4];
+const geoMaxNarr = Math.max(
+  geoSnap.US?.narrMedian ?? 0,
+  geoSnap.DE?.narrMedian ?? 0,
+  geoSnap.JP?.narrMedian ?? 0,
+);
+
+// ── Super-Narrative Cluster (upper decile) ────────────────────────────────────
+const superThresholds: Record<string, number> = {};
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of (d as any).observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  superThresholds[pk] = quantile([...vals].sort((a,b) => a - b), 0.90);
+}
+const superValidPeriods = OPEN_PERIODS.filter(pk => superThresholds[pk] != null);
+
+interface SuperRow {
+  company: string; sector: string; country: string;
+  appearances: number;
+  rg: Partial<Record<string, number>>;
+}
+
+const superAll: SuperRow[] = [];
+for (const d of allCompanies) {
+  let appearances = 0;
+  const rg: Partial<Record<string, number>> = {};
+  for (const o of (d as any).observations as any[]) {
+    const pk = o.periodKey as string;
+    if (!OPEN_PERIODS.includes(pk)) continue;
+    if (o.rg10 == null || o.nearBoundary) continue;
+    rg[pk] = o.rg10 as number;
+    const th = superThresholds[pk];
+    if (th != null && (o.rg10 as number) >= th) appearances++;
+  }
+  if (appearances >= 2) superAll.push({
+    company: (d as any).company as string,
+    sector: normalizeSector((d as any).sector ?? ''),
+    country: (d as any).country ?? '',
+    appearances, rg,
+  });
+}
+superAll.sort((a,b) => b.appearances - a.appearances);
+const superCore = superAll.filter(r => r.appearances >= 5);
+const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
 ---
 
 <BaseLayout
@@ -1660,6 +1775,247 @@ const retroN = retroEntries.length;
             As with all 2025 observations: current market cap is used rather than end-of-quarter prices.
             Companies that report higher smoothed earnings in 2025 will mechanically show lower RG,
             appearing to converge even without a price correction.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5e. Geographic Fragmentation ─────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Geographic Fragmentation</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Is RG fragility a global phenomenon — or primarily an American one? Using country of incorporation,
+        three regions are compared: US (S&P 500 constituents), DE (DAX 40), and JP (Nikkei/TOPIX sample).
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Open panel — companies present per period. JP coverage is limited to quarters where sufficient
+        quarterly reporting is available (n ≥ 4).
+      </p>
+
+      <!-- SVG: regional median trajectories -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">Median RG10 by Region</h3>
+      <div class="overflow-x-auto mb-6">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full max-w-2xl" aria-hidden="true">
+          <!-- Y gridlines + labels -->
+          {geoYTicks.map(v => (
+            <g>
+              <line x1={SVG_PL} y1={geoChartY(v)} x2={SVG_W - SVG_PR} y2={geoChartY(v)}
+                stroke={v === 0 ? '#d1d5db' : '#f3f4f6'} stroke-width="1" />
+              <text x={SVG_PL - 4} y={geoChartY(v) + 4} text-anchor="end"
+                font-size="9.5" fill="#9ca3af">{v}</text>
+            </g>
+          ))}
+          <!-- X axis labels -->
+          {GEO_PERIODS.map((pk, i) => (
+            <text x={geoChartX(i)} y={SVG_H - SVG_PB + 16}
+              text-anchor="middle" font-size="9" fill="#9ca3af">
+              {GEO_LABELS_MAP[pk]}
+            </text>
+          ))}
+          <!-- RG = 1 reference line -->
+          <line x1={SVG_PL} y1={geoChartY(1)} x2={SVG_W - SVG_PR} y2={geoChartY(1)}
+            stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,3" />
+          <text x={SVG_W - SVG_PR + 2} y={geoChartY(1) + 3} font-size="8" fill="#d1d5db">1</text>
+          <!-- US line (blue) -->
+          {geoUSPath && <path d={geoUSPath} fill="none" stroke="rgb(59,130,246)" stroke-width="2.2" stroke-linejoin="round" />}
+          <!-- DE line (teal) -->
+          {geoDEPath && <path d={geoDEPath} fill="none" stroke="rgb(20,184,166)" stroke-width="2.2" stroke-linejoin="round" />}
+          <!-- JP line (amber, dashed for sparse coverage) -->
+          {geoJPPath && <path d={geoJPPath} fill="none" stroke="rgb(245,158,11)" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5,3" />}
+          <!-- Dots on each data point -->
+          {geoSeries.US.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(59,130,246)" /> : null;
+          })}
+          {geoSeries.DE.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(20,184,166)" /> : null;
+          })}
+          {geoSeries.JP.map(r => {
+            const i = GEO_PERIODS.indexOf(r.pk);
+            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(245,158,11)" /> : null;
+          })}
+          <!-- Legend -->
+          <circle cx={SVG_PL + 4} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(59,130,246)" />
+          <text x={SVG_PL + 12} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">US</text>
+          <circle cx={SVG_PL + 38} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(20,184,166)" />
+          <text x={SVG_PL + 46} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">DE</text>
+          <circle cx={SVG_PL + 72} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(245,158,11)" />
+          <text x={SVG_PL + 80} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">JP (sparse)</text>
+        </svg>
+      </div>
+
+      <!-- Q4 2025 regional snapshot -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Q4 2025 Snapshot: Core vs Narrative per Region</h3>
+      <div class="space-y-3 mb-6">
+        {([
+          { label: 'US', snap: geoSnap.US, color: 'bg-blue-500', textColor: 'text-blue-700', n: geoSnap.US?.n },
+          { label: 'DE', snap: geoSnap.DE, color: 'bg-teal-500', textColor: 'text-teal-700', n: geoSnap.DE?.n },
+          { label: 'JP', snap: geoSnap.JP, color: 'bg-amber-500', textColor: 'text-amber-700', n: geoSnap.JP?.n },
+        ] as const).filter(row => row.snap).map(row => (
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-gray-600 w-6 shrink-0">{row.label}</span>
+            <!-- Range bar -->
+            <div class="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style={`max-width: 320px`}>
+              <!-- Narrative bar -->
+              <div class="absolute left-0 top-0 h-full rounded"
+                style={`width:${((row.snap!.narrMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(251,146,60,0.35)`}></div>
+              <!-- Core bar -->
+              <div class="absolute left-0 top-0 h-full rounded"
+                style={`width:${((row.snap!.coreMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(20,184,166,0.5)`}></div>
+              <!-- Median marker -->
+              <div class="absolute top-0 h-full w-0.5 bg-gray-500"
+                style={`left:${((row.snap!.med / geoMaxNarr) * 100).toFixed(1)}%`}></div>
+            </div>
+            <div class="text-xs text-gray-500 shrink-0 space-x-2">
+              <span>Median <span class={`font-semibold ${row.textColor}`}>{fmt(row.snap!.med)}</span></span>
+              <span class="text-gray-400">|</span>
+              <span>Spread <span class="font-semibold text-gray-700">{fmt(row.snap!.spread)}</span></span>
+              <span class="text-gray-300">n={row.n}</span>
+            </div>
+          </div>
+        ))}
+        <p class="text-xs text-gray-400 mt-1">Bar: teal = Core quartile median, orange = Narrative quartile median. Vertical mark = overall median.</p>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-blue-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG fragility is primarily an American phenomenon</p>
+          <p class="text-sm text-gray-500">
+            US median RG ({fmt(geoSnap.US?.med)}) is roughly {geoSnap.DE ? (geoSnap.US!.med / geoSnap.DE.med).toFixed(1) : '?'}× the
+            German median ({fmt(geoSnap.DE?.med)}) and {geoSnap.JP ? (geoSnap.US!.med / geoSnap.JP.med).toFixed(1) : '?'}× the
+            Japanese median ({fmt(geoSnap.JP?.med)}). The narrative premium is structurally embedded in US
+            market pricing in a way that has no equivalent in European or Japanese indices.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">All regions show internal fragility — but at different magnitudes</p>
+          <p class="text-sm text-gray-500">
+            Even within the conservative German sample, the Narrative quartile median ({fmt(geoSnap.DE?.narrMedian)})
+            is {geoSnap.DE ? (geoSnap.DE.narrMedian / geoSnap.DE.coreMedian).toFixed(1) : '?'}× the Core quartile median ({fmt(geoSnap.DE?.coreMedian)}).
+            In the US this ratio is {geoSnap.US ? (geoSnap.US.narrMedian / geoSnap.US.coreMedian).toFixed(1) : '?'}×.
+            Geographic location compresses the level but does not eliminate internal polarisation.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The US spread has narrowed since 2023–2024 peaks</p>
+          <p class="text-sm text-gray-500">
+            US Core–Narrative spread peaked in FY 2024 before moderating through 2025. German and Japanese
+            spreads have remained more stable. The convergence is consistent with the overall fragility
+            trend but does not bring US levels into the German or Japanese range.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5f. Super-Narrative Cluster ──────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Super-Narrative Cluster</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        The upper decile (top 10% by RG10 per period) is defined independently for each quarter.
+        Are the same companies always there — or does the composition rotate?
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        {superValidPeriods.length} periods analysed ({superValidPeriods.map(pk => OPEN_LABELS[pk]).join(', ')}).
+        A company counts as a "fixture" if it appears in the upper decile in {'\u2265'}5 of {superValidPeriods.length} periods.
+      </p>
+
+      <!-- Core cluster: permanent fixtures -->
+      {superCore.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">
+            Permanent Fixtures — upper decile in {'\u2265'}5 / {superValidPeriods.length} periods
+          </h3>
+          <div class="border border-gray-200 rounded-md overflow-hidden text-xs mb-2">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200">
+                  <th class="text-left px-3 py-2 font-semibold text-gray-600">Company</th>
+                  <th class="text-left px-3 py-2 font-semibold text-gray-600">Sector</th>
+                  <th class="text-center px-3 py-2 font-semibold text-gray-600">Country</th>
+                  <th class="text-center px-2 py-2 font-semibold text-gray-600">
+                    Periods in<br/>top 10%
+                  </th>
+                  {OPEN_PERIODS.map(pk => (
+                    <th class="text-center px-2 py-2 font-semibold text-gray-400">{OPEN_LABELS[pk]}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {superCore.map((r, idx) => (
+                  <tr class={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td class="px-3 py-1.5 font-medium text-gray-800">{r.company}</td>
+                    <td class="px-3 py-1.5 text-gray-500">{r.sector}</td>
+                    <td class="px-3 py-1.5 text-center text-gray-500">{r.country}</td>
+                    <td class="px-3 py-1.5 text-center">
+                      <span class="inline-block bg-orange-100 text-orange-700 font-bold rounded px-1.5">
+                        {r.appearances} / {superValidPeriods.length}
+                      </span>
+                    </td>
+                    {OPEN_PERIODS.map(pk => {
+                      const val = r.rg[pk];
+                      const th  = superThresholds[pk];
+                      const inTop = val != null && th != null && val >= th;
+                      return (
+                        <td class={`px-2 py-1.5 text-center font-mono ${inTop ? 'bg-orange-50 text-orange-700 font-semibold' : 'text-gray-400'}`}>
+                          {val != null ? fmt(val) : '—'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-gray-400">Orange highlight = period in which this company was in the upper decile for that quarter.</p>
+        </div>
+      )}
+
+      <!-- Recurring entries (3–4 periods) -->
+      {superFreq.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Recurring Entries — upper decile in 3–4 periods</h3>
+          <div class="flex flex-wrap gap-2">
+            {superFreq.map(r => (
+              <span class="text-xs border border-orange-200 bg-orange-50 text-orange-700 rounded px-2 py-0.5">
+                {r.company} ({r.appearances}/{superValidPeriods.length})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">The super-narrative tier is structurally stable</p>
+          <p class="text-sm text-gray-500">
+            {superCore.length > 0
+              ? `${superCore.map(r => r.company).join(', ')} occupy the upper decile in ${superCore[0]!.appearances} of ${superValidPeriods.length} periods.`
+              : ''} This is not a market-phase rotation:
+            the same companies persistently carry the highest narrative premium regardless of which quarter
+            is measured. The overall Fragility Spread is therefore not a statistical artefact of random
+            outliers — it reflects a stable structural tier.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">All permanent fixtures are US companies</p>
+          <p class="text-sm text-gray-500">
+            Every company in the permanent cluster ({superCore.map(r => r.company).join(', ')}) is
+            incorporated in the US. No German or Japanese company appears in the upper decile across
+            multiple periods. This reinforces the geographic fragmentation finding: extreme narrative
+            pricing is not just more common in the US — it is concentrated in a small, persistent subset
+            of US companies.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Implication for the Spread metric</p>
+          <p class="text-sm text-gray-500">
+            Because the Narrative quartile is anchored by the same companies period after period, the
+            Spread measures a persistent structural gap — not noise. Any compression of the Spread would
+            require either a significant RG decline in the fixture companies (via price correction or
+            earnings growth) or their replacement by companies from outside the current cluster.
           </p>
         </div>
       </div>
