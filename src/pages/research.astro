@@ -648,10 +648,14 @@ const illustrativeCases = [
 const retroN = retroEntries.length;
 
 // ── Geographic Fragmentation ──────────────────────────────────────────────────
-function getRegion(country: string): 'US' | 'DE' | 'JP' | null {
+type GeoRegion = 'US'|'DE'|'JP'|'GB'|'FR'|'CH';
+function getRegion(country: string): GeoRegion | null {
   if (country === 'US') return 'US';
   if (country === 'DE') return 'DE';
   if (country === 'JP') return 'JP';
+  if (country === 'GB') return 'GB';
+  if (country === 'FR') return 'FR';
+  if (country === 'CH') return 'CH';
   return null;
 }
 
@@ -662,10 +666,10 @@ const GEO_LABELS_MAP: Record<string,string> = {
 };
 
 interface GeoRow { pk:string; label:string; n:number; med:number; coreMedian:number; narrMedian:number; spread:number; }
-const geoSeries: Record<'US'|'DE'|'JP', GeoRow[]> = { US:[], DE:[], JP:[] };
+const geoSeries: Record<GeoRegion, GeoRow[]> = { US:[], DE:[], JP:[], GB:[], FR:[], CH:[] };
 
 for (const pk of GEO_PERIODS) {
-  const rv: Record<'US'|'DE'|'JP', number[]> = { US:[], DE:[], JP:[] };
+  const rv: Record<GeoRegion, number[]> = { US:[], DE:[], JP:[], GB:[], FR:[], CH:[] };
   for (const d of allCompanies) {
     const reg = getRegion((d as any).country ?? '');
     if (!reg) continue;
@@ -673,7 +677,7 @@ for (const pk of GEO_PERIODS) {
       if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) rv[reg].push(o.rg10 as number);
     }
   }
-  for (const reg of (['US','DE','JP'] as const)) {
+  for (const reg of (['US','DE','JP','GB','FR','CH'] as const)) {
     const vals = [...rv[reg]].sort((a,b) => a - b);
     const n = vals.length;
     if (n < 4) continue;
@@ -688,19 +692,26 @@ for (const pk of GEO_PERIODS) {
   }
 }
 
+// Use the most-recent period with sufficient data per region as its snapshot
+function latestSnap(reg: GeoRegion): GeoRow | undefined {
+  return [...geoSeries[reg]].sort((a,b) => b.pk.localeCompare(a.pk))[0];
+}
 const geoSnap = {
-  US: geoSeries.US.find(r => r.pk === '2025_q4'),
-  DE: geoSeries.DE.find(r => r.pk === '2025_q4'),
-  JP: geoSeries.JP.find(r => r.pk === '2025_q4'),
+  US: geoSeries.US.find(r => r.pk === '2025_q4') ?? latestSnap('US'),
+  DE: geoSeries.DE.find(r => r.pk === '2025_q4') ?? latestSnap('DE'),
+  JP: geoSeries.JP.find(r => r.pk === '2025_q4') ?? latestSnap('JP'),
+  GB: geoSeries.GB.find(r => r.pk === '2025_q4') ?? latestSnap('GB'),
+  FR: geoSeries.FR.find(r => r.pk === '2025_q4') ?? latestSnap('FR'),
+  CH: geoSeries.CH.find(r => r.pk === '2025_q4') ?? latestSnap('CH'),
 };
 
 // SVG: multi-line chart (reuse existing SVG_W/H/padding constants)
 const GEO_N = GEO_PERIODS.length; // 6
-const GEO_Y_MAX = 4.0;
+const GEO_Y_MAX = 5.0;
 function geoChartX(i: number): number { return GEO_N > 1 ? SVG_PL + (i / (GEO_N - 1)) * SVG_IW : SVG_PL + SVG_IW / 2; }
 function geoChartY(v: number): number { return SVG_PT + (1 - v / GEO_Y_MAX) * SVG_IH; }
 
-function geoPath(reg: 'US'|'DE'|'JP'): string {
+function geoPath(reg: GeoRegion): string {
   let path = '';
   for (let i = 0; i < GEO_PERIODS.length; i++) {
     const pk = GEO_PERIODS[i]!;
@@ -714,11 +725,17 @@ function geoPath(reg: 'US'|'DE'|'JP'): string {
 const geoUSPath = geoPath('US');
 const geoDEPath = geoPath('DE');
 const geoJPPath = geoPath('JP');
-const geoYTicks = [0, 1, 2, 3, 4];
+const geoGBPath = geoPath('GB');
+const geoFRPath = geoPath('FR');
+const geoCHPath = geoPath('CH');
+const geoYTicks = [0, 1, 2, 3, 4, 5];
 const geoMaxNarr = Math.max(
   geoSnap.US?.narrMedian ?? 0,
   geoSnap.DE?.narrMedian ?? 0,
   geoSnap.JP?.narrMedian ?? 0,
+  geoSnap.GB?.narrMedian ?? 0,
+  geoSnap.FR?.narrMedian ?? 0,
+  geoSnap.CH?.narrMedian ?? 0,
 );
 
 // ── Super-Narrative Cluster (upper decile) ────────────────────────────────────
@@ -1902,12 +1919,12 @@ const macXLabels = annualSP
     <section class="mb-12">
       <h2 class="text-xl font-semibold text-gray-800 mb-1">Geographic Fragmentation</h2>
       <p class="text-sm text-gray-500 mb-1">
-        Is RG fragility a global phenomenon — or primarily an American one? Using country of incorporation,
-        three regions are compared: US (S&P 500 constituents), DE (DAX 40), and JP (Nikkei/TOPIX sample).
+        Is RG fragility a global phenomenon — or primarily an American one? Six regions are compared across
+        S&amp;P 500 (US), DAX 40 (DE), FTSE 100 sample (GB), CAC 40 sample (FR), SMI (CH), and Nikkei/TOPIX sample (JP).
       </p>
       <p class="text-xs text-gray-400 mb-6">
-        Open panel — companies present per period. JP coverage is limited to quarters where sufficient
-        quarterly reporting is available (n ≥ 4).
+        Open panel — companies present per period. European annual reporters contribute to the period of their
+        fiscal year-end; quarterly reporters appear in all six periods. Minimum n = 4 per region per period.
       </p>
 
       <!-- SVG: regional median trajectories -->
@@ -1938,50 +1955,55 @@ const macXLabels = annualSP
           {geoUSPath && <path d={geoUSPath} fill="none" stroke="rgb(59,130,246)" stroke-width="2.2" stroke-linejoin="round" />}
           <!-- DE line (teal) -->
           {geoDEPath && <path d={geoDEPath} fill="none" stroke="rgb(20,184,166)" stroke-width="2.2" stroke-linejoin="round" />}
+          <!-- GB line (green) -->
+          {geoGBPath && <path d={geoGBPath} fill="none" stroke="rgb(34,197,94)" stroke-width="2" stroke-linejoin="round" />}
+          <!-- FR line (rose) -->
+          {geoFRPath && <path d={geoFRPath} fill="none" stroke="rgb(244,63,94)" stroke-width="2" stroke-linejoin="round" />}
+          <!-- CH line (purple) -->
+          {geoCHPath && <path d={geoCHPath} fill="none" stroke="rgb(168,85,247)" stroke-width="2" stroke-linejoin="round" />}
           <!-- JP line (amber, dashed for sparse coverage) -->
           {geoJPPath && <path d={geoJPPath} fill="none" stroke="rgb(245,158,11)" stroke-width="2" stroke-linejoin="round" stroke-dasharray="5,3" />}
           <!-- Dots on each data point -->
-          {geoSeries.US.map(r => {
-            const i = GEO_PERIODS.indexOf(r.pk);
-            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(59,130,246)" /> : null;
-          })}
-          {geoSeries.DE.map(r => {
-            const i = GEO_PERIODS.indexOf(r.pk);
-            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(20,184,166)" /> : null;
-          })}
-          {geoSeries.JP.map(r => {
-            const i = GEO_PERIODS.indexOf(r.pk);
-            return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="3" fill="rgb(245,158,11)" /> : null;
-          })}
-          <!-- Legend -->
-          <circle cx={SVG_PL + 4} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(59,130,246)" />
-          <text x={SVG_PL + 12} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">US</text>
-          <circle cx={SVG_PL + 38} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(20,184,166)" />
-          <text x={SVG_PL + 46} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">DE</text>
-          <circle cx={SVG_PL + 72} cy={SVG_H - SVG_PB + 32} r="4" fill="rgb(245,158,11)" />
-          <text x={SVG_PL + 80} y={SVG_H - SVG_PB + 36} font-size="9.5" fill="#6b7280">JP (sparse)</text>
+          {geoSeries.US.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(59,130,246)" /> : null; })}
+          {geoSeries.DE.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(20,184,166)" /> : null; })}
+          {geoSeries.GB.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(34,197,94)" /> : null; })}
+          {geoSeries.FR.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(244,63,94)" /> : null; })}
+          {geoSeries.CH.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(168,85,247)" /> : null; })}
+          {geoSeries.JP.map(r => { const i = GEO_PERIODS.indexOf(r.pk); return i >= 0 ? <circle cx={geoChartX(i)} cy={geoChartY(r.med)} r="2.5" fill="rgb(245,158,11)" /> : null; })}
+          <!-- Legend row 1 -->
+          <circle cx={SVG_PL + 4}   cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(59,130,246)" />
+          <text x={SVG_PL + 11}  y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">US</text>
+          <circle cx={SVG_PL + 34}  cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(20,184,166)" />
+          <text x={SVG_PL + 41}  y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">DE</text>
+          <circle cx={SVG_PL + 64}  cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(34,197,94)" />
+          <text x={SVG_PL + 71}  y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">GB</text>
+          <circle cx={SVG_PL + 94}  cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(244,63,94)" />
+          <text x={SVG_PL + 101} y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">FR</text>
+          <circle cx={SVG_PL + 124} cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(168,85,247)" />
+          <text x={SVG_PL + 131} y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">CH</text>
+          <circle cx={SVG_PL + 154} cy={SVG_H - SVG_PB + 32} r="3.5" fill="rgb(245,158,11)" />
+          <text x={SVG_PL + 161} y={SVG_H - SVG_PB + 36} font-size="9" fill="#6b7280">JP (sparse)</text>
         </svg>
       </div>
 
-      <!-- Q4 2025 regional snapshot -->
-      <h3 class="text-sm font-semibold text-gray-700 mb-3">Q4 2025 Snapshot: Core vs Narrative per Region</h3>
+      <!-- Latest snapshot per region -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Latest Snapshot: Core vs Narrative per Region</h3>
       <div class="space-y-3 mb-6">
         {([
-          { label: 'US', snap: geoSnap.US, color: 'bg-blue-500', textColor: 'text-blue-700', n: geoSnap.US?.n },
-          { label: 'DE', snap: geoSnap.DE, color: 'bg-teal-500', textColor: 'text-teal-700', n: geoSnap.DE?.n },
-          { label: 'JP', snap: geoSnap.JP, color: 'bg-amber-500', textColor: 'text-amber-700', n: geoSnap.JP?.n },
+          { label: 'US', snap: geoSnap.US, textColor: 'text-blue-700' },
+          { label: 'DE', snap: geoSnap.DE, textColor: 'text-teal-700' },
+          { label: 'GB', snap: geoSnap.GB, textColor: 'text-green-700' },
+          { label: 'FR', snap: geoSnap.FR, textColor: 'text-rose-700' },
+          { label: 'CH', snap: geoSnap.CH, textColor: 'text-purple-700' },
+          { label: 'JP', snap: geoSnap.JP, textColor: 'text-amber-700' },
         ] as const).filter(row => row.snap).map(row => (
           <div class="flex items-center gap-3">
             <span class="text-xs font-bold text-gray-600 w-6 shrink-0">{row.label}</span>
-            <!-- Range bar -->
-            <div class="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style={`max-width: 320px`}>
-              <!-- Narrative bar -->
+            <div class="flex-1 relative h-5 bg-gray-100 rounded overflow-hidden" style="max-width:320px">
               <div class="absolute left-0 top-0 h-full rounded"
                 style={`width:${((row.snap!.narrMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(251,146,60,0.35)`}></div>
-              <!-- Core bar -->
               <div class="absolute left-0 top-0 h-full rounded"
                 style={`width:${((row.snap!.coreMedian / geoMaxNarr) * 100).toFixed(1)}%; background:rgba(20,184,166,0.5)`}></div>
-              <!-- Median marker -->
               <div class="absolute top-0 h-full w-0.5 bg-gray-500"
                 style={`left:${((row.snap!.med / geoMaxNarr) * 100).toFixed(1)}%`}></div>
             </div>
@@ -1989,39 +2011,42 @@ const macXLabels = annualSP
               <span>Median <span class={`font-semibold ${row.textColor}`}>{fmt(row.snap!.med)}</span></span>
               <span class="text-gray-400">|</span>
               <span>Spread <span class="font-semibold text-gray-700">{fmt(row.snap!.spread)}</span></span>
-              <span class="text-gray-300">n={row.n}</span>
+              <span class="text-gray-300">n={row.snap!.n}</span>
             </div>
           </div>
         ))}
-        <p class="text-xs text-gray-400 mt-1">Bar: teal = Core quartile median, orange = Narrative quartile median. Vertical mark = overall median.</p>
+        <p class="text-xs text-gray-400 mt-1">Teal = Core quartile median · Orange = Narrative quartile median · Vertical mark = overall median.</p>
       </div>
 
       <!-- Interpretation -->
       <div class="space-y-2.5">
         <div class="border-l-2 border-blue-300 pl-4">
-          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG fragility is primarily an American phenomenon</p>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">US exceptionalism confirmed — but France and Switzerland challenge it</p>
           <p class="text-sm text-gray-500">
-            US median RG ({fmt(geoSnap.US?.med)}) is roughly {geoSnap.DE ? (geoSnap.US!.med / geoSnap.DE.med).toFixed(1) : '?'}× the
-            German median ({fmt(geoSnap.DE?.med)}) and {geoSnap.JP ? (geoSnap.US!.med / geoSnap.JP.med).toFixed(1) : '?'}× the
-            Japanese median ({fmt(geoSnap.JP?.med)}). The narrative premium is structurally embedded in US
-            market pricing in a way that has no equivalent in European or Japanese indices.
+            The US median RG ({fmt(geoSnap.US?.med)}) remains the highest among all six regions.
+            Yet France ({fmt(geoSnap.FR?.med)}) and Switzerland ({fmt(geoSnap.CH?.med)}) both exceed
+            Germany ({fmt(geoSnap.DE?.med)}) and Japan ({fmt(geoSnap.JP?.med)}), driven by luxury-goods
+            and life-sciences heavyweights with structurally high narrative premiums. High RG is not an exclusively
+            American phenomenon — it tracks sector composition as much as country.
           </p>
         </div>
         <div class="border-l-2 border-gray-300 pl-4">
-          <p class="text-sm font-semibold text-gray-700 mb-0.5">All regions show internal fragility — but at different magnitudes</p>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Germany and the UK are the most conservatively valued large-cap markets</p>
           <p class="text-sm text-gray-500">
-            Even within the conservative German sample, the Narrative quartile median ({fmt(geoSnap.DE?.narrMedian)})
-            is {geoSnap.DE ? (geoSnap.DE.narrMedian / geoSnap.DE.coreMedian).toFixed(1) : '?'}× the Core quartile median ({fmt(geoSnap.DE?.coreMedian)}).
-            In the US this ratio is {geoSnap.US ? (geoSnap.US.narrMedian / geoSnap.US.coreMedian).toFixed(1) : '?'}×.
-            Geographic location compresses the level but does not eliminate internal polarisation.
+            DE ({fmt(geoSnap.DE?.med)}) and GB ({fmt(geoSnap.GB?.med)}) show the lowest medians, consistent
+            with value-heavy banking, energy, and industrials sectors dominating their indices. Both markets
+            nonetheless show meaningful internal spread between Core and Narrative quartiles
+            (DE spread: {fmt(geoSnap.DE?.spread)}, GB spread: {fmt(geoSnap.GB?.spread)}),
+            confirming that polarisation exists across all markets.
           </p>
         </div>
         <div class="border-l-2 border-gray-300 pl-4">
-          <p class="text-sm font-semibold text-gray-700 mb-0.5">The US spread has narrowed since 2023–2024 peaks</p>
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">RG fragility clusters by sector, not just by flag</p>
           <p class="text-sm text-gray-500">
-            US Core–Narrative spread peaked in FY 2024 before moderating through 2025. German and Japanese
-            spreads have remained more stable. The convergence is consistent with the overall fragility
-            trend but does not bring US levels into the German or Japanese range.
+            Narrative-cluster companies (luxury, pharma, tech) elevate the FR and CH medians above those
+            of the more diversified UK and German indices. This suggests that the geographic hierarchy is
+            a secondary effect: the primary driver is whether a market is dominated by asset-light, story-driven
+            sectors or by capital-intensive, cash-flow-anchored businesses.
           </p>
         </div>
       </div>

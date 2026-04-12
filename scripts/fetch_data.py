@@ -161,17 +161,62 @@ DAX_MEMBERS: list[tuple] = [
     ("SRT.DE",  "Sartorius",           "Healthcare",              "DAX 40", "DE", "EUR"),
 ]
 
-# Samsung Electronics is not part of the three covered indices but was
-# included in the initial dataset. Fetched separately as KOSPI company.
-KOSPI_MEMBERS: list[tuple] = [
-    ("005930.KS", "Samsung", "Technology / Consumer Electronics", "KOSPI", "KR", "KRW"),
+FTSE_MEMBERS: list[tuple] = [
+    ("AZN.L",  "AstraZeneca",    "Healthcare",              "FTSE 100", "GB", "GBP"),
+    ("SHEL.L", "Shell",          "Energy",                  "FTSE 100", "GB", "GBP"),
+    ("HSBA.L", "HSBC",           "Financials",              "FTSE 100", "GB", "GBP"),
+    ("ULVR.L", "Unilever",       "Consumer Staples",        "FTSE 100", "GB", "GBP"),
+    ("BP.L",   "BP",             "Energy",                  "FTSE 100", "GB", "GBP"),
+    ("GSK.L",  "GSK",            "Healthcare",              "FTSE 100", "GB", "GBP"),
+    ("RIO.L",  "Rio Tinto",      "Materials",               "FTSE 100", "GB", "GBP"),
+    ("DGE.L",  "Diageo",         "Consumer Staples",        "FTSE 100", "GB", "GBP"),
+    ("BA.L",   "BAE Systems",    "Industrials",             "FTSE 100", "GB", "GBP"),
+    ("RR.L",   "Rolls-Royce",    "Industrials",             "FTSE 100", "GB", "GBP"),
+    ("REL.L",  "RELX",           "Technology",              "FTSE 100", "GB", "GBP"),
+    ("LLOY.L", "Lloyds Banking", "Financials",              "FTSE 100", "GB", "GBP"),
+    ("BARC.L", "Barclays",       "Financials",              "FTSE 100", "GB", "GBP"),
+    ("NG.L",   "National Grid",  "Utilities",               "FTSE 100", "GB", "GBP"),
+    ("CPG.L",  "Compass Group",  "Consumer Discretionary",  "FTSE 100", "GB", "GBP"),
+]
+
+CAC_MEMBERS: list[tuple] = [
+    ("MC.PA",  "LVMH",              "Consumer Discretionary", "CAC 40", "FR", "EUR"),
+    ("TTE.PA", "TotalEnergies",     "Energy",                 "CAC 40", "FR", "EUR"),
+    ("OR.PA",  "L'Oreal",           "Consumer Staples",       "CAC 40", "FR", "EUR"),
+    ("SAN.PA", "Sanofi",            "Healthcare",             "CAC 40", "FR", "EUR"),
+    ("AI.PA",  "Air Liquide",       "Materials",              "CAC 40", "FR", "EUR"),
+    ("RMS.PA", "Hermes",            "Consumer Discretionary", "CAC 40", "FR", "EUR"),
+    ("BNP.PA", "BNP Paribas",       "Financials",             "CAC 40", "FR", "EUR"),
+    ("SU.PA",  "Schneider Electric","Industrials",            "CAC 40", "FR", "EUR"),
+    ("SAF.PA", "Safran",            "Industrials",            "CAC 40", "FR", "EUR"),
+    ("DSY.PA", "Dassault Systemes", "Technology",             "CAC 40", "FR", "EUR"),
+    ("CS.PA",  "AXA",               "Financials",             "CAC 40", "FR", "EUR"),
+    ("RI.PA",  "Pernod Ricard",     "Consumer Staples",       "CAC 40", "FR", "EUR"),
+    ("DG.PA",  "Vinci",             "Industrials",            "CAC 40", "FR", "EUR"),
+    ("KER.PA", "Kering",            "Consumer Discretionary", "CAC 40", "FR", "EUR"),
+    ("CAP.PA", "Capgemini",         "Technology",             "CAC 40", "FR", "EUR"),
+]
+
+SMI_MEMBERS: list[tuple] = [
+    ("NESN.SW", "Nestle",          "Consumer Staples",       "SMI", "CH", "CHF"),
+    ("NOVN.SW", "Novartis",        "Healthcare",             "SMI", "CH", "CHF"),
+    ("ROG.SW",  "Roche",           "Healthcare",             "SMI", "CH", "CHF"),
+    ("ABBN.SW", "ABB",             "Industrials",            "SMI", "CH", "CHF"),
+    ("ZURN.SW", "Zurich Insurance","Financials",             "SMI", "CH", "CHF"),
+    ("SREN.SW", "Swiss Re",        "Financials",             "SMI", "CH", "CHF"),
+    ("CFR.SW",  "Richemont",       "Consumer Discretionary", "SMI", "CH", "CHF"),
+    ("LONN.SW", "Lonza",           "Healthcare",             "SMI", "CH", "CHF"),
+    ("PGHN.SW", "Partners Group",  "Financials",             "SMI", "CH", "CHF"),
+    ("SIKA.SW", "Sika",            "Materials",              "SMI", "CH", "CHF"),
 ]
 
 INDEX_MAP = {
-    "SP500":  SP500_MEMBERS,
-    "N225":   NIKKEI_MEMBERS,
-    "DAX":    DAX_MEMBERS,
-    "KOSPI":  KOSPI_MEMBERS,
+    "SP500": SP500_MEMBERS,
+    "N225":  NIKKEI_MEMBERS,
+    "DAX":   DAX_MEMBERS,
+    "FTSE":  FTSE_MEMBERS,
+    "CAC":   CAC_MEMBERS,
+    "SMI":   SMI_MEMBERS,
 }
 
 NI_LABELS = [
@@ -562,7 +607,6 @@ def fetch_company(ticker: str, display_name: str, sector: str,
         if not mc or mc <= 0:
             print("SKIP (no market cap)")
             return None
-        market_cap_b = to_billions(float(mc))
         shares = float(info.get("sharesOutstanding") or 0)
 
         # --- Price history (for historical market cap) -------------------------
@@ -571,17 +615,65 @@ def fetch_company(ticker: str, display_name: str, sector: str,
         except Exception:
             price_hist = pd.DataFrame()
 
+        # --- Currency normalisation ------------------------------------------
+        # yfinance returns prices (and price_hist) in the trading currency, but
+        # financial statements in financialCurrency (often USD for non-US stocks).
+        # We convert price_hist and mc so that price × shares gives a value in the
+        # same currency as the income/balance-sheet data (financialCurrency).
+        price_currency_raw = info.get("currency", "USD")
+        financial_currency  = info.get("financialCurrency", price_currency_raw)
+
+        # Step 1 – GBp (pence) → GBP (pounds)
+        # For LSE stocks (.L), price_hist is ALWAYS in GBp (pence) regardless of
+        # what info.get('currency') reports — yfinance inconsistently returns
+        # 'GBp', 'GBP', or even 'USD' for different .L tickers while history()
+        # always returns raw pence prices. Always divide price_hist by 100.
+        price_currency = price_currency_raw
+        is_lse = ticker.upper().endswith(".L")
+        if price_currency_raw == "GBp" or is_lse:
+            price_currency = "GBP"
+            if not price_hist.empty and "Close" in price_hist.columns:
+                price_hist = price_hist.copy()
+                price_hist["Close"] = price_hist["Close"] / 100.0
+            # info.marketCap for .L tickers is usually in GBP already (yfinance
+            # converts pence → pounds for the snapshot value). Leave mc as-is;
+            # it is only used as a fallback when price_hist has no data.
+
+        # Step 2 – Convert normalized price currency → financialCurrency
+        # (e.g. GBP → USD for London-listed stocks that report in USD)
+        if price_currency != financial_currency:
+            fx_pair = f"{price_currency}{financial_currency}=X"
+            try:
+                fx_df = yf.Ticker(fx_pair).history(period="15y", interval="1mo")
+                if not fx_df.empty and "Close" in fx_df.columns:
+                    current_fx = float(fx_df["Close"].iloc[-1])
+                    # Convert current market cap
+                    mc = float(mc) * current_fx
+                    # Convert price_hist using historical FX at each date
+                    if not price_hist.empty:
+                        price_hist = price_hist.copy()
+                        fx_vals = [price_at_date(fx_df, ts) or current_fx
+                                   for ts in price_hist.index]
+                        price_hist["Close"] = (
+                            price_hist["Close"].values * fx_vals
+                        )
+            except Exception as _fx_exc:
+                pass  # leave mc and price_hist in non-converted state
+
+        market_cap_b = to_billions(float(mc))
+
         # --- Quarterly income -------------------------------------------------
         try:
             q_stmt = stock.quarterly_income_stmt
         except Exception:
             q_stmt = pd.DataFrame()
 
-        if q_stmt is None or q_stmt.empty:
-            print("SKIP (no quarterly income)")
-            return None
-
-        ni_label = next((l for l in NI_LABELS if l in q_stmt.index), None)
+        # Many non-US companies report semi-annually or annually; allow fallback.
+        q_stmt_available = q_stmt is not None and not q_stmt.empty
+        ni_label = (
+            next((l for l in NI_LABELS if l in q_stmt.index), None)
+            if q_stmt_available else None
+        )
 
         # --- Annual income (supplement + historical chart) --------------------
         a_series_sorted: Optional[pd.Series] = None
@@ -691,11 +783,25 @@ def fetch_company(ticker: str, display_name: str, sector: str,
             fb10 = fundamental_base(G, tangible_eq_b, 10)
             fb12 = fundamental_base(G, tangible_eq_b, 12)
 
-            rg8  = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=8)
-            rg10 = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=10)
-            rg12 = calc_rg(market_cap_b, G, tangible_eq_b, multiplier=12)
+            # Use historical end-of-quarter closing price × current shares
+            # (historical shares not available; current shares are an approximation)
+            q_hist_price = price_at_date(price_hist, date) if not price_hist.empty else None
+            if q_hist_price and shares > 0:
+                q_mc_b = to_billions(q_hist_price * shares)
+                hist_price_used = True
+            else:
+                q_mc_b = market_cap_b  # fallback: current market cap
+                hist_price_used = False
+
+            rg8  = calc_rg(q_mc_b, G, tangible_eq_b, multiplier=8)
+            rg10 = calc_rg(q_mc_b, G, tangible_eq_b, multiplier=10)
+            rg12 = calc_rg(q_mc_b, G, tangible_eq_b, multiplier=12)
 
             note = "Computed via yfinance."
+            if hist_price_used:
+                note += " Historical end-of-quarter closing price × current shares outstanding."
+            else:
+                note += " Current market cap used (historical price unavailable)."
             if used_annual:
                 note += " Older quarters estimated from annual NI / 4."
             if use_cpi:
@@ -719,7 +825,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
                 "rg10":                 rg10,
                 "rg12":                 rg12,
                 "trend":                None,
-                "marketCap":            round(market_cap_b, 1),
+                "marketCap":            round(q_mc_b, 1),
                 "tangibleEquity":       round(tangible_eq_b, 1),
                 "smoothedEarnings":     G,
                 "fundamentalBaseRG8":   round(fb8, 2) if fb8 is not None else None,
@@ -799,7 +905,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch RG data via yfinance")
-    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "KOSPI", "ALL"], default="ALL")
+    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "FTSE", "CAC", "SMI", "ALL"], default="ALL")
     parser.add_argument("--limit",  type=int, default=0)
     parser.add_argument("--ticker", default="")
     parser.add_argument("--delay",  type=float, default=1.0)
