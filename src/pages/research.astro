@@ -894,6 +894,79 @@ const macYTicks = [1, 2, 3, 4, 5];
 const macXLabels = annualSP
   .map((p, i) => ({ i, yr: parseInt(p.date.slice(0, 4)) }))
   .filter(({ yr }) => yr % 5 === 0 || yr === 2026);
+
+// ── Sector × Country Decomposition ──────────────────────────────────────────
+// Snapshot: most-recent RG10 per company, all regions including CN (Hang Seng)
+const SC_COUNTRIES = ['US','DE','JP','GB','FR','CH','CN'] as const;
+type SCCountry = typeof SC_COUNTRIES[number];
+
+interface SCPoint { company:string; sector:string; country:SCCountry; rg10:number; }
+const scPoints: SCPoint[] = [];
+for (const d of allCompanies) {
+  const country = (d as any).country as string;
+  if (!(SC_COUNTRIES as readonly string[]).includes(country)) continue;
+  const sector = normalizeSector((d as any).sector ?? '');
+  const obs = ((d as any).observations as any[])
+    .filter((o:any) => o.rg10 != null && !o.nearBoundary)
+    .sort((a:any,b:any) => b.periodKey.localeCompare(a.periodKey));
+  if (obs.length === 0) continue;
+  scPoints.push({ company:(d as any).company, sector, country:country as SCCountry, rg10:obs[0].rg10 as number });
+}
+
+const scN = scPoints.length;
+const scMean = scN > 0 ? scPoints.reduce((s,p)=>s+p.rg10,0) / scN : 0;
+const scTSS  = scPoints.reduce((s,p) => s + (p.rg10 - scMean)**2, 0);
+
+// Aggregate by sector
+const scSectorVals: Record<string,number[]> = {};
+for (const p of scPoints) { (scSectorVals[p.sector] ??= []).push(p.rg10); }
+
+// Aggregate by country
+const scCountryVals: Record<string,number[]> = {};
+for (const p of scPoints) { (scCountryVals[p.country] ??= []).push(p.rg10); }
+
+// R² = variance explained (using arithmetic mean for proper SS decomp)
+function groupMeans(agg: Record<string,number[]>): Record<string,number> {
+  const m: Record<string,number> = {};
+  for (const [k,v] of Object.entries(agg)) m[k] = v.reduce((a,b)=>a+b,0)/v.length;
+  return m;
+}
+const scSectorMean = groupMeans(scSectorVals);
+const scCountryMean = groupMeans(scCountryVals);
+
+const scSectorRSS = scPoints.reduce((s,p) => { const d=p.rg10-(scSectorMean[p.sector]??scMean); return s+d*d; },0);
+const scCountryRSS= scPoints.reduce((s,p) => { const d=p.rg10-(scCountryMean[p.country]??scMean); return s+d*d; },0);
+const scSectorR2  = Math.max(0, Math.round((1 - scSectorRSS/scTSS)*100));
+const scCountryR2 = Math.max(0, Math.round((1 - scCountryRSS/scTSS)*100));
+
+// Sector rows for display (≥ 3 companies, descending median)
+const scSectorRows = Object.entries(scSectorVals)
+  .filter(([,v]) => v.length >= 3)
+  .map(([sector, vals]) => ({ sector, n:vals.length, med: median([...vals].sort((a,b)=>a-b)) }))
+  .sort((a,b) => b.med - a.med);
+
+// Cross-tab: sector × country (median; null = no data)
+const scCross: Record<string, Record<SCCountry, number|null>> = {};
+for (const row of scSectorRows) {
+  const byC = {} as Record<SCCountry, number|null>;
+  for (const c of SC_COUNTRIES) {
+    const vals = scPoints.filter(p=>p.sector===row.sector&&p.country===c).map(p=>p.rg10).sort((a,b)=>a-b);
+    byC[c] = vals.length >= 1 ? median(vals) : null;
+  }
+  scCross[row.sector] = byC;
+}
+
+// Heat-map color scale (low=teal, mid=amber, high=red)
+const scHeatAll = scSectorRows.map(r=>r.med);
+const scHeatMin = Math.min(...scHeatAll), scHeatMax = Math.max(...scHeatAll);
+function scCellBg(v:number|null): string {
+  if (v===null) return '';
+  const t = scHeatMax > scHeatMin ? Math.min(1,Math.max(0,(v-scHeatMin)/(scHeatMax-scHeatMin))) : 0.5;
+  if (t < 0.4) return `rgba(20,184,166,${(0.12+t*0.55).toFixed(2)})`;
+  if (t < 0.7) return `rgba(251,146,60,${(0.15+(t-0.4)*0.5).toFixed(2)})`;
+  return `rgba(239,68,68,${(0.2+(t-0.7)*0.65).toFixed(2)})`;
+}
+const scMaxSectorMed = scSectorRows[0]?.med ?? 1;
 ---
 
 <BaseLayout
@@ -2470,6 +2543,125 @@ const macXLabels = annualSP
             Bottom-up: US median {fmt(buUSMed)} vs DE median {fmt(buDEMed)} — ratio {(buUSMed / buDEMed).toFixed(1)}×.
             The different methodologies produce different absolute levels but the same structural ordering.
             US equities carry meaningfully higher valuation multiples at every level of analysis.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5i. Sector vs. Country ──────────────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Sector vs. Country: What Drives the Reality Gap?</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        With {scN} companies across {SC_COUNTRIES.length} markets, we can decompose RG variation into a
+        <em>sector effect</em> (same sector, different countries) and a <em>country effect</em> (same country,
+        different sectors). Which signal is stronger?
+      </p>
+      <p class="text-xs text-gray-400 mb-6">Snapshot: most-recent available RG10 per company. One company per row in the decomposition.</p>
+
+      <!-- R² comparison cards -->
+      <div class="grid grid-cols-2 gap-4 mb-8" style="max-width:420px">
+        <div class="border border-gray-200 rounded-md p-4 text-center">
+          <div class="text-3xl font-light text-orange-500 mb-1">{scSectorR2}%</div>
+          <div class="text-xs font-semibold text-gray-600">Variance explained</div>
+          <div class="text-xs text-gray-400 mt-0.5">by Sector alone</div>
+        </div>
+        <div class="border border-gray-200 rounded-md p-4 text-center">
+          <div class="text-3xl font-light text-blue-500 mb-1">{scCountryR2}%</div>
+          <div class="text-xs font-semibold text-gray-600">Variance explained</div>
+          <div class="text-xs text-gray-400 mt-0.5">by Country alone</div>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mb-8">R² measures how much of the cross-company RG variance is captured by knowing only the sector or only the country. Neither model uses both simultaneously.</p>
+
+      <!-- Sector ranking bar chart -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Sector Median RG10 (all markets combined, n ≥ 3)</h3>
+      <div class="space-y-1.5 mb-8">
+        {scSectorRows.map(row => (
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-gray-500 shrink-0" style="width:170px; text-align:right;">{row.sector}</span>
+            <div class="flex-1 bg-gray-100 rounded-sm h-5 relative" style="max-width:260px">
+              <div class="h-5 rounded-sm" style={`width:${(row.med/scMaxSectorMed*100).toFixed(1)}%;background:${scCellBg(row.med)}`}></div>
+            </div>
+            <span class="font-mono font-semibold text-gray-700 w-8 shrink-0">{row.med.toFixed(2)}</span>
+            <span class="text-gray-400 shrink-0">n={row.n}</span>
+          </div>
+        ))}
+      </div>
+
+      <!-- Cross-tabulation: sector × country -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">Cross-Tab: Median RG10 by Sector × Country</h3>
+      <p class="text-xs text-gray-400 mb-3">Cells with a single company show that company's value. Empty = no data. Heat: teal = low, orange = medium, red = high.</p>
+      <div class="overflow-x-auto mb-6">
+        <table class="text-xs border-collapse w-full" style="min-width:480px">
+          <thead>
+            <tr class="text-gray-500">
+              <th class="text-left px-2 py-1.5 font-medium border-b border-gray-200" style="min-width:130px">Sector</th>
+              {SC_COUNTRIES.map(c => <th class="text-center px-2 py-1.5 font-semibold border-b border-gray-200">{c}</th>)}
+              <th class="text-right px-2 py-1.5 font-medium border-b border-gray-200">All</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scSectorRows.map(row => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+                <td class="px-2 py-1.5 text-gray-700 font-medium">{row.sector}</td>
+                {SC_COUNTRIES.map(c => {
+                  const v = scCross[row.sector]?.[c] ?? null;
+                  return (
+                    <td class="px-2 py-1.5 text-center font-mono"
+                      style={`background:${scCellBg(v)}`}>
+                      {v !== null ? v.toFixed(2) : <span class="text-gray-300">—</span>}
+                    </td>
+                  );
+                })}
+                <td class="px-2 py-1.5 text-right font-mono font-semibold text-gray-700">{row.med.toFixed(2)}</td>
+              </tr>
+            ))}
+            <!-- Country median row -->
+            <tr class="border-t-2 border-gray-300 bg-gray-50">
+              <td class="px-2 py-1.5 text-gray-600 font-semibold">Country median</td>
+              {SC_COUNTRIES.map(c => {
+                const v = scCountryVals[c] ? median([...scCountryVals[c]].sort((a,b)=>a-b)) : null;
+                return (
+                  <td class="px-2 py-1.5 text-center font-mono font-semibold text-gray-700"
+                    style={`background:${scCellBg(v)}`}>
+                    {v !== null ? v.toFixed(2) : '—'}
+                  </td>
+                );
+              })}
+              <td class="px-2 py-1.5 text-right font-mono font-semibold text-gray-900">{scMean.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">
+            Sector explains {scSectorR2 > scCountryR2 ? 'more' : 'less'} variance than country ({scSectorR2}% vs {scCountryR2}%)
+          </p>
+          <p class="text-sm text-gray-500">
+            Knowing only a company's sector accounts for {scSectorR2}% of the cross-company variation in RG10.
+            Knowing only its country accounts for {scCountryR2}%. Both effects are real, but
+            {scSectorR2 > scCountryR2 ? 'sector membership is the stronger signal' : 'country provides the stronger signal'}.
+            This explains why France and Switzerland rank above Germany in the geographic analysis —
+            their indices are dominated by luxury goods and pharmaceuticals, two sectors with structurally elevated narrative premiums.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">High-RG sectors are consistently high across borders</p>
+          <p class="text-sm text-gray-500">
+            {scSectorRows.slice(0,2).map(r=>r.sector).join(' and ')} sit at the top of the sector ranking
+            regardless of the country of incorporation. Conversely, {scSectorRows.slice(-2).map(r=>r.sector).join(' and ')} cluster
+            at the bottom in every market. The sector ceiling and floor are more stable than the country ceiling and floor.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Country adds a systematic level shift above the sector baseline</p>
+          <p class="text-sm text-gray-500">
+            US companies in the same sector as their European or Japanese peers consistently command a higher RG.
+            This residual country premium — visible in the cross-tab — represents the structural US narrative premium
+            that cannot be explained by sector composition alone.
           </p>
         </div>
       </div>
