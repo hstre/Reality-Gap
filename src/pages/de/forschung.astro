@@ -395,6 +395,56 @@ const convSectorRows = Object.entries(convBySector)
 const topConvergers = [...convDetails].filter(c => c.converging).sort((a, b) => a.distDelta - b.distDelta).slice(0, 5);
 const topDivergers  = [...convDetails].filter(c => c.diverging ).sort((a, b) => b.distDelta - a.distDelta).slice(0, 5);
 
+// ── RG-Persistenz: Quartilsstabilität je Unternehmen über alle Perioden ───────
+const PERSIST_PERIODS = ['2023_q4','2024_q1','2024_q4','2025_q1','2025_q2','2025_q3','2025_q4'];
+const periodThresholds: Record<string, { q1: number; q3: number }> = {};
+for (const pk of PERSIST_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of d.observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  const sorted = [...vals].sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n >= 30) {
+    periodThresholds[pk] = { q1: quantile(sorted, 0.25), q3: quantile(sorted, 0.75) };
+  } else {
+    const t = Math.floor(n / 3);
+    periodThresholds[pk] = { q1: sorted[t - 1]!, q3: sorted[n - t]! };
+  }
+}
+interface PersistRow {
+  company: string; sector: string;
+  nCore: number; nNarr: number; nMid: number; nTotal: number;
+  corePct: number; narrPct: number;
+}
+const persistRows: PersistRow[] = [];
+for (const d of allCompanies) {
+  let nCore = 0, nNarr = 0, nMid = 0, nTotal = 0;
+  for (const o of d.observations as any[]) {
+    const th = periodThresholds[o.periodKey as string];
+    if (!th || o.rg10 == null || o.nearBoundary) continue;
+    nTotal++;
+    if (o.rg10 <= th.q1) nCore++;
+    else if (o.rg10 >= th.q3) nNarr++;
+    else nMid++;
+  }
+  if (nTotal < 2) continue;
+  persistRows.push({
+    company: d.company as string, sector: normalizeSector(d.sector ?? ''),
+    nCore, nNarr, nMid, nTotal,
+    corePct: Math.round(nCore / nTotal * 100),
+    narrPct: Math.round(nNarr / nTotal * 100),
+  });
+}
+const PERSIST_THRESHOLD = 70;
+const permNarrative = persistRows.filter(r => r.narrPct >= PERSIST_THRESHOLD)
+  .sort((a, b) => b.narrPct - a.narrPct);
+const permCore      = persistRows.filter(r => r.corePct >= PERSIST_THRESHOLD)
+  .sort((a, b) => b.corePct - a.corePct);
+const rotators      = persistRows.filter(r => r.narrPct < 50 && r.corePct < 50 && r.nTotal >= 3)
+  .sort((a, b) => (b.nMid / b.nTotal) - (a.nMid / a.nTotal));
+
 // ── Sektorale interne Fragilität (aktueller Schnappschuss) ───────────────────
 interface SectorFragRow {
   sector: string; n: number;
@@ -1271,7 +1321,95 @@ const retroN = retroEntries.length;
       </div>
     </section>
 
-    <!-- 5c. Konvergenz zu RG = 1 -->
+    <!-- 5c. RG-Persistenz -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">RG-Persistenz</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Welche Unternehmen sind strukturell in ihrer RG-Gruppe verankert — und welche rotieren?
+        Klassifizierung über alle verfügbaren Perioden (max. {PERSIST_PERIODS.length} Quartale).
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Dauerhaft Narrative / Core = ≥ 70% der beobachteten Quartale im oberen bzw. unteren Quartil.
+        Schwellwerte je Periode unabhängig berechnet.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div>
+          <p class="text-xs font-semibold text-orange-700 mb-2 uppercase tracking-wide">
+            Dauerhaft Narrative — {permNarrative.length} Unternehmen
+          </p>
+          <div class="space-y-1">
+            {permNarrative.map(r => (
+              <div class="flex items-center justify-between text-xs border border-orange-100 bg-orange-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-orange-600 shrink-0">{r.narrPct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-teal-700 mb-2 uppercase tracking-wide">
+            Dauerhaft Core — {permCore.length} Unternehmen
+          </p>
+          <div class="space-y-1">
+            {permCore.map(r => (
+              <div class="flex items-center justify-between text-xs border border-teal-100 bg-teal-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-teal-600 shrink-0">{r.corePct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+            Mitte / Rotatoren — {rotators.length} Unternehmen (n ≥ 3)
+          </p>
+          <div class="space-y-1">
+            {rotators.map(r => (
+              <div class="flex items-center justify-between text-xs border border-gray-100 bg-gray-50/30 rounded px-2.5 py-1.5">
+                <span class="font-medium text-gray-700 truncate mr-2">{r.company}</span>
+                <span class="font-mono text-gray-400 shrink-0">{Math.round(r.nMid / r.nTotal * 100)}% mid</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Der Narrative-Cluster ist strukturell stabil — und US-dominiert</p>
+          <p class="text-sm text-gray-500">
+            Jedes Unternehmen in der dauerhaft narrativen Gruppe befand sich in jedem beobachteten
+            Quartal im oberen Quartil. Das sind keine Momentumwetten — sie sind strukturell teuer nach
+            der Logik geglätteter Gewinne. Die Gruppe besteht fast ausschließlich aus US-notierten
+            Wachstums- und Qualitätsnamen: Halbleiter, Zahlungsverkehr, Basiskonsumgüter, Streaming.
+            Kein europäisches oder japanisches Unternehmen taucht hier auf.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Der Core-Cluster ist strukturell stabil — und geographisch konzentriert</p>
+          <p class="text-sm text-gray-500">
+            Dauerhaft-Core-Unternehmen werden dominiert von deutschen Automobilherstellern (BMW,
+            Mercedes-Benz, Volkswagen, Porsche SE), japanischen Industrie- und Bankwerten (Toyota,
+            Honda, Mitsubishi UFJ) sowie deutschen Finanz- und Versorgungsunternehmen (Deutsche Bank,
+            RWE). Diese Namen lagen konsistent im unteren Quartil — strukturell günstig nach RG-Logik,
+            oder strukturell ertragsschwach.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Alphabet und Meta stehen in der Mitte — nicht bei Nvidia</p>
+          <p class="text-sm text-gray-500">
+            Obwohl sie gemeinsam mit Nvidia und AMD als Big Tech klassifiziert werden, befanden sich
+            Alphabet und Meta in keiner einzigen beobachteten Periode im oberen Quartil. Ihre geglätteten
+            Gewinne sind hoch genug relativ zur Marktkapitalisierung, um sie aus dem Narrative-Cluster
+            herauszuhalten. Das ist eine strukturelle Unterscheidung, die RG trifft — die ein
+            einfaches „Tech-Sektor"-Label nicht macht.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5d. Konvergenz zu RG = 1 -->
     <section class="mb-12">
       <h2 class="text-xl font-semibold text-gray-800 mb-1">Konvergenz zum Fairvalue (RG = 1)</h2>
       <p class="text-sm text-gray-500 mb-1">
