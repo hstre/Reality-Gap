@@ -31,6 +31,17 @@ function fmt(v: number | null | undefined, decimals = 2): string {
   return v.toFixed(decimals);
 }
 
+function gini(arr: number[]): number {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const n = s.length;
+  const sum = s.reduce((a, b) => a + b, 0);
+  if (sum === 0) return 0;
+  let num = 0;
+  for (let i = 0; i < n; i++) num += (i + 1) * s[i]!;
+  return (2 * num) / (n * sum) - (n + 1) / n;
+}
+
 // ── Latest RG10 per company (most recent quarterly obs, or latest available) ──
 interface CompanySummary {
   company: string;
@@ -310,6 +321,30 @@ const svgSpreadFillPts = [
   ...openFragSeries.map((r, i) => `${svgX(i).toFixed(1)},${(SVG_PT + SVG_IH).toFixed(1)}`),
   ...[...openFragSeries].reverse().map((r, i) => `${svgX(oN - 1 - i).toFixed(1)},${(SVG_PT + (1 - r.spread / svgSpreadMaxY) * SVG_IH).toFixed(1)}`),
 ].join(' ');
+
+// ── Gini series (same open panel periods) ────────────────────────────────────
+interface GiniRow { pk: string; label: string; n: number; g: number; }
+const giniSeries: GiniRow[] = [];
+for (const pk of OPEN_PERIODS) {
+  const vals: number[] = [];
+  for (const d of allCompanies)
+    for (const o of d.observations as any[])
+      if (o.periodKey === pk && o.rg10 != null && !o.nearBoundary) vals.push(o.rg10 as number);
+  if (vals.length < 10) continue;
+  giniSeries.push({ pk, label: OPEN_LABELS[pk]!, n: vals.length, g: gini(vals) });
+}
+const gN = giniSeries.length;
+function gX(i: number): number { return gN > 1 ? SVG_PL + (i / (gN - 1)) * SVG_IW : SVG_PL + SVG_IW / 2; }
+const GINI_MAX = 0.70; // fixed y-axis: 0 – 0.70
+function gY(v: number): number { return SVG_PT + (1 - v / GINI_MAX) * SVG_IH; }
+const svgGiniPts = giniSeries.map((r, i) => `${gX(i).toFixed(1)},${gY(r.g).toFixed(1)}`).join(' ');
+const svgGiniFillPts = [
+  ...giniSeries.map((r, i) => `${gX(i).toFixed(1)},${(SVG_PT + SVG_IH).toFixed(1)}`),
+  ...[...giniSeries].reverse().map((r, i) => `${gX(gN - 1 - i).toFixed(1)},${gY(r.g).toFixed(1)}`),
+].join(' ');
+const giniPeak    = giniSeries.reduce((a, b) => a.g > b.g ? a : b, giniSeries[0]!);
+const giniLatest  = giniSeries[giniSeries.length - 1]!;
+const giniYTicks  = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
 
 // ── Transition Matrix: Q4 2023 → Q4 2025 ────────────────────────────────────
 interface TransEntry {
@@ -878,6 +913,59 @@ const retroN = retroEntries.length;
           <text
             transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
             text-anchor="middle" font-size="9.5" fill="#9ca3af">Spread</text>
+        </svg>
+      </div>
+
+      <!-- ── SVG: Gini Coefficient of RG10 Distribution ───────────────── -->
+      <h3 class="text-sm font-semibold text-gray-700 mb-1">Gini Coefficient — Time Series</h3>
+      <p class="text-xs text-gray-400 mb-3">
+        Distributional inequality of RG10 across all companies per quarter (0 = perfect equality, 1 = maximum concentration).
+        Independent of quartile boundaries — captures the full distribution shape.
+        Peak: {giniPeak.label} ({giniPeak.g.toFixed(3)}) · Latest: {giniLatest.label} ({giniLatest.g.toFixed(3)}).
+      </p>
+      <div class="border border-gray-100 rounded-md bg-white p-3 mb-8 overflow-x-auto">
+        <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} class="w-full" style="min-width:400px; max-height:260px;">
+          {/* Y grid */}
+          {giniYTicks.map(y => (
+            <>
+              <line x1={SVG_PL} y1={gY(y)} x2={SVG_W - SVG_PR} y2={gY(y)} stroke="#f3f4f6" stroke-width="1" />
+              <text x={SVG_PL - 5} y={gY(y) + 3.5} text-anchor="end" font-size="10" fill="#9ca3af">{y.toFixed(1)}</text>
+            </>
+          ))}
+          {/* X guides */}
+          {giniSeries.map((_, i) => (
+            <line x1={gX(i)} y1={SVG_PT} x2={gX(i)} y2={SVG_PT + SVG_IH} stroke="#f9fafb" stroke-width="1" stroke-dasharray="3 2" />
+          ))}
+          {/* Area fill */}
+          {svgGiniFillPts && <polygon points={svgGiniFillPts} fill="rgba(99,102,241,0.08)" />}
+          {/* Baseline */}
+          <line x1={SVG_PL} y1={SVG_PT + SVG_IH} x2={SVG_W - SVG_PR} y2={SVG_PT + SVG_IH} stroke="#e5e7eb" stroke-width="1" />
+          {/* Gini line */}
+          {svgGiniPts && <polyline points={svgGiniPts} fill="none" stroke="rgb(99,102,241)" stroke-width="2.2" stroke-linejoin="round" />}
+          {/* Dots + labels */}
+          {giniSeries.map((r, i) => {
+            const cy = gY(r.g);
+            const isPeak = r.pk === giniPeak.pk;
+            return (
+              <>
+                <circle cx={gX(i)} cy={cy} r="3.5" fill={isPeak ? 'rgb(79,70,229)' : 'rgb(99,102,241)'} />
+                <text x={gX(i)} y={cy - 7} text-anchor="middle" font-size="9"
+                  fill={isPeak ? 'rgb(79,70,229)' : 'rgb(99,102,241)'}
+                  font-weight={isPeak ? 'bold' : 'normal'}>
+                  {r.g.toFixed(3)}{isPeak ? ' ↑' : ''}
+                </text>
+              </>
+            );
+          })}
+          {/* X labels */}
+          {giniSeries.map((r, i) => (
+            <>
+              <text x={gX(i)} y={SVG_PT + SVG_IH + 16} text-anchor="middle" font-size="10" fill="#6b7280">{r.label}</text>
+              <text x={gX(i)} y={SVG_PT + SVG_IH + 28} text-anchor="middle" font-size="8.5" fill="#d1d5db">n={r.n}</text>
+            </>
+          ))}
+          <text transform={`translate(11,${SVG_PT + SVG_IH / 2}) rotate(-90)`}
+            text-anchor="middle" font-size="9.5" fill="#9ca3af">Gini</text>
         </svg>
       </div>
 
