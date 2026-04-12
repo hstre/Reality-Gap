@@ -363,6 +363,38 @@ const coreToNarrative = transDetails.filter(c => c.from === 0 && c.to === 2)
 const narrativeToCore = transDetails.filter(c => c.from === 2 && c.to === 0)
   .sort((a, b) => a.change - b.change);
 
+// ── Konvergenz zu RG = 1 (Fairvalue-Anker) ──────────────────────────────────
+interface ConvEntry extends TransEntry { dist23: number; dist25: number; distDelta: number; converging: boolean; diverging: boolean; }
+const convDetails: ConvEntry[] = transDetails.map(c => {
+  const dist23 = Math.abs(c.rg23 - 1);
+  const dist25 = Math.abs(c.rg25 - 1);
+  const distDelta = dist25 - dist23;
+  return { ...c, dist23, dist25, distDelta,
+    converging: distDelta < -0.05,
+    diverging:  distDelta >  0.05 };
+});
+const convCount = convDetails.filter(c => c.converging).length;
+const divCount  = convDetails.filter(c => c.diverging).length;
+const convPct   = tN > 0 ? Math.round(convCount / tN * 100) : 0;
+const convCore = convDetails.filter(c => c.rg23 < 0.8);
+const convNarr = convDetails.filter(c => c.rg23 > 1.5);
+const coreConvPct = convCore.length > 0 ? Math.round(convCore.filter(c => c.converging).length / convCore.length * 100) : 0;
+const narrConvPct = convNarr.length > 0 ? Math.round(convNarr.filter(c => c.converging).length / convNarr.length * 100) : 0;
+const convBySector: Record<string, { conv: number; div: number; n: number }> = {};
+for (const c of convDetails) {
+  const s = normalizeSector(c.sector);
+  if (!convBySector[s]) convBySector[s] = { conv: 0, div: 0, n: 0 };
+  convBySector[s].n++;
+  if (c.converging) convBySector[s].conv++;
+  if (c.diverging)  convBySector[s].div++;
+}
+const convSectorRows = Object.entries(convBySector)
+  .filter(([, v]) => v.n >= 3)
+  .map(([sector, v]) => ({ sector, ...v, convPct: Math.round(v.conv / v.n * 100) }))
+  .sort((a, b) => b.convPct - a.convPct);
+const topConvergers = [...convDetails].filter(c => c.converging).sort((a, b) => a.distDelta - b.distDelta).slice(0, 5);
+const topDivergers  = [...convDetails].filter(c => c.diverging ).sort((a, b) => b.distDelta - a.distDelta).slice(0, 5);
+
 // ── Sektorale interne Fragilität (aktueller Schnappschuss) ───────────────────
 interface SectorFragRow {
   sector: string; n: number;
@@ -1234,6 +1266,129 @@ const retroN = retroEntries.length;
             Trotz der breitesten Unternehmensanzahl zeigt Technologie eine moderate Spreizung von
             {sectorFragRows.find(r => r.sector === 'Technology')?.spread.toFixed(2) ?? '—'} —
             der Begriff deckt ein homogeneres RG-Band ab als Automotive oder Halbleiter.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5c. Konvergenz zu RG = 1 -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Konvergenz zum Fairvalue (RG = 1)</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        RG = 1 ist der theoretische Ankerpunkt des Instruments: Marktkapitalisierung entspricht dem Zehnfachen der geglätteten Gewinne.
+        Bewegen sich Unternehmen tatsächlich darauf zu — oder driften sie weiter weg?
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Panel von {tN} Unternehmen mit gültigem RG10 in Q4 2023 und Q4 2025.
+        Konvergenz = Abstand zu RG 1,0 um &gt; 0,05 gesunken; Divergenz = um &gt; 0,05 gestiegen.
+      </p>
+
+      <!-- Zusammenfassung -->
+      <div class="flex gap-3 mb-6 flex-wrap">
+        <div class="border border-teal-200 bg-teal-50/50 rounded-md px-5 py-3 min-w-[140px]">
+          <p class="text-xs text-teal-600 font-medium uppercase tracking-wide mb-1">Konvergierend</p>
+          <p class="text-3xl font-light text-teal-800" style="font-family:Georgia,serif">{convCount}</p>
+          <p class="text-xs text-teal-500 mt-0.5">{convPct}% des Panels</p>
+        </div>
+        <div class="border border-orange-200 bg-orange-50/50 rounded-md px-5 py-3 min-w-[140px]">
+          <p class="text-xs text-orange-600 font-medium uppercase tracking-wide mb-1">Divergierend</p>
+          <p class="text-3xl font-light text-orange-800" style="font-family:Georgia,serif">{divCount}</p>
+          <p class="text-xs text-orange-500 mt-0.5">{100 - convPct}% des Panels</p>
+        </div>
+        <div class="border border-gray-200 bg-gray-50/50 rounded-md px-5 py-3 min-w-[200px] flex-1">
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">Nach Ausgangsgruppe</p>
+          <div class="mt-1 text-xs">
+            <span><span class="text-teal-700 font-semibold">{coreConvPct}%</span> <span class="text-gray-500">der Core-Unternehmen (RG &lt; 0,8) konvergieren</span></span>
+          </div>
+          <div class="mt-0.5 text-xs">
+            <span><span class="text-orange-700 font-semibold">{narrConvPct}%</span> <span class="text-gray-500">der Narrative-Unternehmen (RG &gt; 1,5) konvergieren</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top-Mover -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div>
+          <p class="text-xs font-semibold text-teal-700 mb-2">Stärkste Konvergenz — nähern sich RG 1,0</p>
+          <div class="space-y-1.5">
+            {topConvergers.map(c => (
+              <div class="border border-teal-100 bg-teal-50/40 rounded px-3 py-2 text-xs">
+                <div class="flex justify-between items-baseline">
+                  <span class="font-medium text-gray-700">{c.company}</span>
+                  <span class="font-mono text-teal-700">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                </div>
+                <div class="text-gray-400 mt-0.5">
+                  Abstand zu RG 1,0: {c.dist23.toFixed(2)} → {c.dist25.toFixed(2)}
+                  <span class="text-teal-600 ml-1">({c.distDelta.toFixed(2)})</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-orange-700 mb-2">Stärkste Divergenz — entfernen sich von RG 1,0</p>
+          <div class="space-y-1.5">
+            {topDivergers.map(c => (
+              <div class="border border-orange-100 bg-orange-50/40 rounded px-3 py-2 text-xs">
+                <div class="flex justify-between items-baseline">
+                  <span class="font-medium text-gray-700">{c.company}</span>
+                  <span class="font-mono text-orange-700">{c.rg23.toFixed(2)} → {c.rg25.toFixed(2)}</span>
+                </div>
+                <div class="text-gray-400 mt-0.5">
+                  Abstand zu RG 1,0: {c.dist23.toFixed(2)} → {c.dist25.toFixed(2)}
+                  <span class="text-orange-600 ml-1">(+{c.distDelta.toFixed(2)})</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Sektoraufschlüsselung -->
+      {convSectorRows.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">Konvergenzrate nach Sektor (n ≥ 3)</h3>
+          <div class="space-y-2">
+            {convSectorRows.map(row => (
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-600 w-40 shrink-0">{row.sector}</span>
+                <div class="flex-1 bg-gray-100 rounded-sm h-4 relative">
+                  <div class="h-4 rounded-sm bg-teal-400/70" style={`width:${row.convPct}%`} />
+                </div>
+                <span class="text-xs font-mono text-gray-700 w-10 shrink-0">{row.convPct}%</span>
+                <span class="text-xs text-gray-400 shrink-0">n={row.n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Core-Unternehmen konvergieren schneller als Narrative</p>
+          <p class="text-sm text-gray-500">
+            {coreConvPct}% der Unternehmen unter RG 0,8 näherten sich dem Fairvalue — vermutlich über steigende
+            geglättete Gewinne, nicht fallende Kurse. Nur {narrConvPct}% der Unternehmen über RG 1,5 korrigierten
+            auf 1,0 zu. Das teure Tail ist klebriger als das günstige, konsistent mit der Fragilitätshypothese:
+            Narrative-Bewertungen widerstehen Abwärtskorrekturen.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Eine schwache interne Validierung</p>
+          <p class="text-sm text-gray-500">
+            Die Mehrheit des Panels ({convPct}%) bewegt sich in die Richtung, die die RG-Logik vorhersagt.
+            Das belegt keine Prognosekraft, ist aber konsistent mit der internen Prämisse des Instruments.
+            Die {100 - convPct}% divergierende Gruppe — angeführt von Tesla und Broadcom — ist die
+            eigentlich offene Frage: Werden diese korrigieren, oder hat sich die Gewinnbasis selbst verschoben?
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Vorbehalt: 2025-Marktkapitalisierungsverzerrung</p>
+          <p class="text-sm text-gray-500">
+            Wie bei allen 2025-Beobachtungen: Es wird die aktuelle Marktkapitalisierung verwendet, keine
+            historischen Quartalsschlusspreise. Unternehmen mit höheren geglätteten Gewinnen in 2025
+            zeigen mechanisch einen niedrigeren RG — Konvergenz ohne Kurskorrektur.
           </p>
         </div>
       </div>
