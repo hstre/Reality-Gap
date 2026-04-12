@@ -674,6 +674,58 @@ for (const d of allCompanies) {
 superAll.sort((a,b) => b.appearances - a.appearances);
 const superCore = superAll.filter(r => r.appearances >= 5);
 const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
+
+// ── RG-Veränderungsdekomposition: Kurs vs. Ertrag ────────────────────────────
+interface DecompRow {
+  company: string; sector: string; country: string;
+  rg23: number; rg25: number; rgDelta: number;
+  mcRet: number; eGrw: number;
+  cat: 'speculative' | 'earnings_led' | 'earnings_drag';
+}
+
+const decompRows: DecompRow[] = [];
+for (const d of allCompanies) {
+  const obsMap = new Map<string, any>();
+  for (const o of (d as any).observations as any[]) {
+    if (o.rg10 != null && !o.nearBoundary) obsMap.set(o.periodKey as string, o);
+  }
+  const o23 = obsMap.get('2023_q4');
+  const o25 = obsMap.get('2025_q4');
+  if (!o23 || !o25) continue;
+  const mc23 = o23.marketCap as number;
+  const mc25 = o25.marketCap as number;
+  const e23  = o23.smoothedEarnings as number;
+  const e25  = o25.smoothedEarnings as number;
+  if (!mc23 || !mc25 || !e23 || !e25 || mc23 <= 0 || e23 <= 0) continue;
+
+  const mcRet   = (mc25 - mc23) / mc23 * 100;
+  const eGrw    = (e25 - e23) / e23 * 100;
+  const rgDelta = o25.rg10 - o23.rg10;
+
+  let cat: DecompRow['cat'];
+  if (Math.abs(rgDelta) <= 0.1) {
+    cat = 'earnings_drag';
+  } else if (rgDelta < -0.1) {
+    cat = eGrw > mcRet ? 'earnings_led' : 'earnings_drag';
+  } else {
+    cat = mcRet > eGrw ? 'speculative' : 'earnings_drag';
+  }
+
+  decompRows.push({
+    company: (d as any).company as string,
+    sector: normalizeSector((d as any).sector ?? ''),
+    country: (d as any).country ?? '',
+    rg23: o23.rg10 as number, rg25: o25.rg10 as number, rgDelta,
+    mcRet, eGrw, cat,
+  });
+}
+
+const decompSpeculative = decompRows.filter(r => r.cat === 'speculative').sort((a,b) => b.rgDelta - a.rgDelta);
+const decompEarningsLed = decompRows.filter(r => r.cat === 'earnings_led').sort((a,b) => a.rgDelta - b.rgDelta);
+const decompOther       = decompRows.filter(r => r.cat === 'earnings_drag');
+const decompN  = decompRows.length;
+const specPct  = decompN > 0 ? Math.round(decompSpeculative.length / decompN * 100) : 0;
+const elPct    = decompN > 0 ? Math.round(decompEarningsLed.length  / decompN * 100) : 0;
 ---
 
 <BaseLayout
@@ -1867,6 +1919,154 @@ const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
             Spreizung würde entweder einen deutlichen RG-Rückgang bei den Dauerläufern erfordern
             (durch Kurskorrektur oder Gewinnwachstum) oder deren Ablösung durch Unternehmen außerhalb
             des aktuellen Clusters.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5g. RG-Veränderungsdekomposition -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">RG-Veränderungsdekomposition: Kurs vs. Ertrag</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        Für {decompN} Unternehmen im balancierten Panel (Q4 2023 → Q4 2025): Was trieb die RG-Veränderung —
+        Kursbewegungen oder Ertragswachstum? Da RG = Marktkapitalisierung / (Gewinn × 10), kann ein sinkender
+        RG entweder eine Kurskorrektur (MC sinkt) oder eine Ertragsverbesserung (E steigt) widerspiegeln.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        „Ertragsgetrieben": RG sank, weil Ertragswachstum den Kursanstieg übertraf.
+        „Spekulative Expansion": RG stieg, weil Marktkapitalisierung schneller wuchs als Erträge.
+      </p>
+
+      <!-- Anteilsbalken -->
+      <div class="mb-6">
+        <div class="flex rounded overflow-hidden h-6 text-xs font-semibold mb-1" style="max-width: 480px">
+          <div class="flex items-center justify-center text-orange-800 bg-orange-200"
+            style={`width: ${specPct}%`}>
+            {specPct}%
+          </div>
+          <div class="flex items-center justify-center text-green-800 bg-green-200"
+            style={`width: ${elPct}%`}>
+            {elPct}%
+          </div>
+          <div class="flex items-center justify-center text-gray-500 bg-gray-100"
+            style={`width: ${100 - specPct - elPct}%`}>
+            {100 - specPct - elPct}%
+          </div>
+        </div>
+        <div class="flex gap-4 text-xs text-gray-500" style="max-width: 480px">
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-orange-200 mr-1"></span>Spekulative Expansion ({decompSpeculative.length})</span>
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-green-200 mr-1"></span>Ertragsgetrieben ({decompEarningsLed.length})</span>
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-gray-100 mr-1"></span>Sonstige ({decompOther.length})</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Spekulative Expansion -->
+        <div>
+          <h3 class="text-sm font-semibold text-orange-700 mb-2">
+            Spekulative Expansion — Kurs übertraf Erträge ({decompSpeculative.length} Unternehmen)
+          </h3>
+          <div class="border border-orange-200 rounded-md overflow-hidden text-xs">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-orange-50 border-b border-orange-200">
+                  <th class="text-left px-2 py-1.5 font-semibold text-gray-600">Unternehmen</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">RG Δ</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Kurs</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Ertrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decompSpeculative.slice(0, 8).map((r, i) => (
+                  <tr class={i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}>
+                    <td class="px-2 py-1 font-medium text-gray-700">{r.company}<span class="text-gray-400 font-normal ml-1">{r.country}</span></td>
+                    <td class="px-2 py-1 text-center text-orange-700 font-semibold font-mono">+{fmt(r.rgDelta)}</td>
+                    <td class="px-2 py-1 text-center text-gray-600 font-mono">{r.mcRet > 0 ? '+' : ''}{Math.round(r.mcRet)}%</td>
+                    <td class="px-2 py-1 text-center font-mono"
+                      class:list={[r.eGrw < 0 ? 'text-red-500' : 'text-gray-500']}>
+                      {r.eGrw > 0 ? '+' : ''}{Math.round(r.eGrw)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Ertragsgetriebene Konvergenz -->
+        <div>
+          <h3 class="text-sm font-semibold text-green-700 mb-2">
+            Ertragsgetriebene Konvergenz — Erträge übertrafen Kurs ({decompEarningsLed.length} Unternehmen)
+          </h3>
+          <div class="border border-green-200 rounded-md overflow-hidden text-xs">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-green-50 border-b border-green-200">
+                  <th class="text-left px-2 py-1.5 font-semibold text-gray-600">Unternehmen</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">RG Δ</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Kurs</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Ertrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decompEarningsLed.map((r, i) => (
+                  <tr class={i % 2 === 0 ? 'bg-white' : 'bg-green-50/30'}>
+                    <td class="px-2 py-1 font-medium text-gray-700">{r.company}<span class="text-gray-400 font-normal ml-1">{r.country}</span></td>
+                    <td class="px-2 py-1 text-center text-green-700 font-semibold font-mono">{fmt(r.rgDelta)}</td>
+                    <td class="px-2 py-1 text-center text-gray-600 font-mono">{r.mcRet > 0 ? '+' : ''}{Math.round(r.mcRet)}%</td>
+                    <td class="px-2 py-1 text-center text-green-600 font-mono">+{Math.round(r.eGrw)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kernerkenntnis -->
+      <div class="border border-amber-200 bg-amber-50 rounded-md px-5 py-4 mb-5">
+        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">Was Konvergenz antreibt — und was nicht</p>
+        <p class="text-sm text-amber-700">
+          Wo RG sank, war es Ertragswachstum — keine Kurskorrektur. Kein einziges Unternehmen in der
+          ertragsgetriebenen Gruppe verzeichnete einen nennenswerten Kursrückgang als Haupttreiber.
+          Der Markt hat Narrativprämien bisher nicht durch sinkende Kurse abgebaut — er wurde lediglich
+          in einer Minderheit der Fälle von den Fundamentaldaten überholt. Die Mehrheit ({specPct}%)
+          erlebte eine weitere Expansion.
+        </p>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Dominante Dynamik: Spekulative Expansion ({specPct}%)</p>
+          <p class="text-sm text-gray-500">
+            Bei {decompSpeculative.length} von {decompN} Unternehmen wuchs die Marktkapitalisierung schneller als
+            die geglätteten Erträge. Tesla ist der extremste Fall: Erträge sanken {Math.abs(Math.round(decompSpeculative.find(r => r.company === 'Tesla')?.eGrw ?? 0))}%,
+            Marktkapitalisierung stieg {Math.round(decompSpeculative.find(r => r.company === 'Tesla')?.mcRet ?? 0)}% — RG jetzt {fmt(decompSpeculative.find(r => r.company === 'Tesla')?.rg25)}.
+            Broadcom legte trotz echten Ertragswachstums von {Math.round(decompSpeculative.find(r => r.company === 'Broadcom')?.eGrw ?? 0)}%
+            um {fmt(decompSpeculative.find(r => r.company === 'Broadcom')?.rgDelta)} RG-Punkte zu,
+            weil die Marktkapitalisierung um {Math.round(decompSpeculative.find(r => r.company === 'Broadcom')?.mcRet ?? 0)}% stieg.
+          </p>
+        </div>
+        <div class="border-l-2 border-green-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Ertragsgetriebene Konvergenz: real, aber begrenzt ({elPct}%)</p>
+          <p class="text-sm text-gray-500">
+            Die {decompEarningsLed.length} Unternehmen, bei denen RG sank, zeigen echte Fundamentalverbesserungen:
+            Eli Lillys geglättete Erträge stiegen um {Math.round(decompEarningsLed.find(r => r.company === 'Eli Lilly')?.eGrw ?? 0)}%,
+            Amazons um {Math.round(decompEarningsLed.find(r => r.company === 'Amazon')?.eGrw ?? 0)}%,
+            AMDs um {Math.round(decompEarningsLed.find(r => r.company === 'AMD')?.eGrw ?? 0)}%.
+            Keines dieser Unternehmen hat sich RG = 1 angenähert — die Narrativprämie bleibt bestehen,
+            ist aber weniger extrem als 2023.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Kein Beleg für Mean-Reversion durch Kurskorrektur</p>
+          <p class="text-sm text-gray-500">
+            Kein einziges hoch bewertetes Unternehmen im Panel sah seinen RG hauptsächlich wegen eines
+            Marktkapitalisierungsrückgangs sinken. Der Markt hat im Zeitfenster 2023–2025 keine
+            Narrativprämie durch Korrekturen abgebaut. Sollte eine Mittelwertumkehr eintreten, erfordert
+            sie entweder weiteres Ertragswachstum oder ein Neubewertungsereignis, das in den bisherigen
+            Daten nicht sichtbar ist.
           </p>
         </div>
       </div>

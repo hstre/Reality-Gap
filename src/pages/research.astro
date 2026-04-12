@@ -759,6 +759,61 @@ for (const d of allCompanies) {
 superAll.sort((a,b) => b.appearances - a.appearances);
 const superCore = superAll.filter(r => r.appearances >= 5);
 const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
+
+// ── RG Change Decomposition: Price vs Earnings ────────────────────────────────
+// For balanced panel (Q4 2023 → Q4 2025): what drove RG changes?
+// RG = MC / (E × 10)  →  ΔRG decomposed into ΔMC component and ΔE component.
+interface DecompRow {
+  company: string; sector: string; country: string;
+  rg23: number; rg25: number; rgDelta: number;
+  mcRet: number;   // % change in market cap
+  eGrw: number;    // % change in smoothed earnings
+  cat: 'speculative' | 'earnings_led' | 'earnings_drag';
+}
+
+const decompRows: DecompRow[] = [];
+for (const d of allCompanies) {
+  const obsMap = new Map<string, any>();
+  for (const o of (d as any).observations as any[]) {
+    if (o.rg10 != null && !o.nearBoundary) obsMap.set(o.periodKey as string, o);
+  }
+  const o23 = obsMap.get('2023_q4');
+  const o25 = obsMap.get('2025_q4');
+  if (!o23 || !o25) continue;
+  const mc23 = o23.marketCap as number;
+  const mc25 = o25.marketCap as number;
+  const e23  = o23.smoothedEarnings as number;
+  const e25  = o25.smoothedEarnings as number;
+  if (!mc23 || !mc25 || !e23 || !e25 || mc23 <= 0 || e23 <= 0) continue;
+
+  const mcRet   = (mc25 - mc23) / mc23 * 100;
+  const eGrw    = (e25 - e23) / e23 * 100;
+  const rgDelta = o25.rg10 - o23.rg10;
+
+  let cat: DecompRow['cat'];
+  if (Math.abs(rgDelta) <= 0.1) {
+    cat = 'earnings_drag'; // catch-all for near-stable
+  } else if (rgDelta < -0.1) {
+    cat = eGrw > mcRet ? 'earnings_led' : 'earnings_drag';
+  } else {
+    cat = mcRet > eGrw ? 'speculative' : 'earnings_drag';
+  }
+
+  decompRows.push({
+    company: (d as any).company as string,
+    sector: normalizeSector((d as any).sector ?? ''),
+    country: (d as any).country ?? '',
+    rg23: o23.rg10 as number, rg25: o25.rg10 as number, rgDelta,
+    mcRet, eGrw, cat,
+  });
+}
+
+const decompSpeculative  = decompRows.filter(r => r.cat === 'speculative').sort((a,b) => b.rgDelta - a.rgDelta);
+const decompEarningsLed  = decompRows.filter(r => r.cat === 'earnings_led').sort((a,b) => a.rgDelta - b.rgDelta);
+const decompOther        = decompRows.filter(r => r.cat === 'earnings_drag');
+const decompN = decompRows.length;
+const specPct = decompN > 0 ? Math.round(decompSpeculative.length / decompN * 100) : 0;
+const elPct   = decompN > 0 ? Math.round(decompEarningsLed.length  / decompN * 100) : 0;
 ---
 
 <BaseLayout
@@ -2016,6 +2071,152 @@ const superFreq = superAll.filter(r => r.appearances >= 3 && r.appearances < 5);
             Spread measures a persistent structural gap — not noise. Any compression of the Spread would
             require either a significant RG decline in the fixture companies (via price correction or
             earnings growth) or their replacement by companies from outside the current cluster.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5g. RG Change Decomposition ──────────────────────────────────── -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">RG Change Decomposition: Price vs. Earnings</h2>
+      <p class="text-sm text-gray-500 mb-1">
+        For {decompN} companies in the balanced panel (Q4 2023 → Q4 2025): was the RG change driven
+        by market cap movement or by earnings growth? RG = MC / (E × 10), so a falling RG can reflect
+        either a price correction (MC down) or earnings improvement (E up) — or both.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        "Earnings-led": RG fell and earnings grew faster than market cap.
+        "Speculative expansion": RG rose because market cap outpaced earnings.
+      </p>
+
+      <!-- Summary proportion bar -->
+      <div class="mb-6">
+        <div class="flex rounded overflow-hidden h-6 text-xs font-semibold mb-1" style="max-width: 480px">
+          <div class="flex items-center justify-center text-orange-800 bg-orange-200"
+            style={`width: ${specPct}%`}>
+            {specPct}%
+          </div>
+          <div class="flex items-center justify-center text-green-800 bg-green-200"
+            style={`width: ${elPct}%`}>
+            {elPct}%
+          </div>
+          <div class="flex items-center justify-center text-gray-500 bg-gray-100"
+            style={`width: ${100 - specPct - elPct}%`}>
+            {100 - specPct - elPct}%
+          </div>
+        </div>
+        <div class="flex gap-4 text-xs text-gray-500" style="max-width: 480px">
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-orange-200 mr-1"></span>Speculative ({decompSpeculative.length})</span>
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-green-200 mr-1"></span>Earnings-led ({decompEarningsLed.length})</span>
+          <span><span class="inline-block w-2.5 h-2.5 rounded-sm bg-gray-100 mr-1"></span>Other ({decompOther.length})</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <!-- Speculative expansion -->
+        <div>
+          <h3 class="text-sm font-semibold text-orange-700 mb-2">
+            Speculative Expansion — MC outpaced earnings ({decompSpeculative.length} companies)
+          </h3>
+          <div class="border border-orange-200 rounded-md overflow-hidden text-xs">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-orange-50 border-b border-orange-200">
+                  <th class="text-left px-2 py-1.5 font-semibold text-gray-600">Company</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">RG Δ</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">MC</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Earnings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decompSpeculative.slice(0, 8).map((r, i) => (
+                  <tr class={i % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}>
+                    <td class="px-2 py-1 font-medium text-gray-700">{r.company}<span class="text-gray-400 font-normal ml-1">{r.country}</span></td>
+                    <td class="px-2 py-1 text-center text-orange-700 font-semibold font-mono">+{fmt(r.rgDelta)}</td>
+                    <td class="px-2 py-1 text-center text-gray-600 font-mono">{r.mcRet > 0 ? '+' : ''}{Math.round(r.mcRet)}%</td>
+                    <td class="px-2 py-1 text-center font-mono"
+                      class:list={[r.eGrw < 0 ? 'text-red-500' : 'text-gray-500']}>
+                      {r.eGrw > 0 ? '+' : ''}{Math.round(r.eGrw)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Earnings-led convergence -->
+        <div>
+          <h3 class="text-sm font-semibold text-green-700 mb-2">
+            Earnings-Led Convergence — earnings outpaced MC ({decompEarningsLed.length} companies)
+          </h3>
+          <div class="border border-green-200 rounded-md overflow-hidden text-xs">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-green-50 border-b border-green-200">
+                  <th class="text-left px-2 py-1.5 font-semibold text-gray-600">Company</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">RG Δ</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">MC</th>
+                  <th class="text-center px-2 py-1.5 font-semibold text-gray-500">Earnings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decompEarningsLed.map((r, i) => (
+                  <tr class={i % 2 === 0 ? 'bg-white' : 'bg-green-50/30'}>
+                    <td class="px-2 py-1 font-medium text-gray-700">{r.company}<span class="text-gray-400 font-normal ml-1">{r.country}</span></td>
+                    <td class="px-2 py-1 text-center text-green-700 font-semibold font-mono">{fmt(r.rgDelta)}</td>
+                    <td class="px-2 py-1 text-center text-gray-600 font-mono">{r.mcRet > 0 ? '+' : ''}{Math.round(r.mcRet)}%</td>
+                    <td class="px-2 py-1 text-center text-green-600 font-mono">+{Math.round(r.eGrw)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key insight callout -->
+      <div class="border border-amber-200 bg-amber-50 rounded-md px-5 py-4 mb-5">
+        <p class="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">What drives convergence — and what doesn't</p>
+        <p class="text-sm text-amber-700">
+          Where RG fell, it was driven by earnings growth, not price correction. No company in the
+          earnings-led group saw a significant market-cap decline as the primary driver. This means the
+          market has not repriced narrative-premium stocks downward — it simply got left behind by
+          accelerating fundamentals in a minority of cases. The majority ({specPct}%) saw market caps
+          outrun earnings further.
+        </p>
+      </div>
+
+      <!-- Interpretation -->
+      <div class="space-y-2.5">
+        <div class="border-l-2 border-orange-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Dominant dynamic: speculative expansion ({specPct}%)</p>
+          <p class="text-sm text-gray-500">
+            In {decompSpeculative.length} of {decompN} companies, market caps grew faster than smoothed earnings,
+            pushing RG higher. Tesla is the extreme case: earnings fell {Math.abs(Math.round(decompSpeculative.find(r => r.company === 'Tesla')?.eGrw ?? 0))}%
+            while market cap rose {Math.round(decompSpeculative.find(r => r.company === 'Tesla')?.mcRet ?? 0)}%, producing an RG of {fmt(decompSpeculative.find(r => r.company === 'Tesla')?.rg25)}.
+            Broadcom added {fmt(decompSpeculative.find(r => r.company === 'Broadcom')?.rgDelta)} RG points
+            despite genuine earnings growth of {Math.round(decompSpeculative.find(r => r.company === 'Broadcom')?.eGrw ?? 0)}% — because market cap rose {Math.round(decompSpeculative.find(r => r.company === 'Broadcom')?.mcRet ?? 0)}%.
+          </p>
+        </div>
+        <div class="border-l-2 border-green-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">Earnings-led convergence: real but limited ({elPct}%)</p>
+          <p class="text-sm text-gray-500">
+            The {decompEarningsLed.length} companies where RG fell show genuine fundamental improvement —
+            Eli Lilly's smoothed earnings grew {Math.round(decompEarningsLed.find(r => r.company === 'Eli Lilly')?.eGrw ?? 0)}%,
+            Amazon's {Math.round(decompEarningsLed.find(r => r.company === 'Amazon')?.eGrw ?? 0)}%,
+            AMD's {Math.round(decompEarningsLed.find(r => r.company === 'AMD')?.eGrw ?? 0)}%.
+            This is positive from a fundamental standpoint, but it has not brought any of these companies
+            close to RG = 1. The narrative premium persists; it is merely less extreme than in 2023.
+          </p>
+        </div>
+        <div class="border-l-2 border-gray-300 pl-4">
+          <p class="text-sm font-semibold text-gray-700 mb-0.5">No evidence of mean-reversion via price correction</p>
+          <p class="text-sm text-gray-500">
+            Not a single high-RG company in the panel saw RG fall primarily because its market cap
+            declined. The market has not priced out any narrative premium through a correction in the
+            2023–2025 window. If mean-reversion occurs, it will require either continued earnings
+            growth (the earnings-led path) or a repricing event not yet visible in the data.
           </p>
         </div>
       </div>
