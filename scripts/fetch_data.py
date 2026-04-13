@@ -210,6 +210,51 @@ SMI_MEMBERS: list[tuple] = [
     ("SIKA.SW", "Sika",            "Materials",              "SMI", "CH", "CHF"),
 ]
 
+# Hang Seng Index — top constituents across all major sectors
+# Note: .HK tickers; all financials in HKD. Many are semi-annual/annual reporters.
+HANG_SENG_MEMBERS: list[tuple] = [
+    # ── Already fetched individually (retained for index runs) ──────────────
+    ("9988.HK", "Alibaba",             "Consumer Discretionary",    "Hang Seng", "CN", "HKD"),
+    ("0700.HK", "Tencent",             "Technology",                "Hang Seng", "CN", "HKD"),
+    ("3690.HK", "Meituan",             "Consumer Discretionary",    "Hang Seng", "CN", "HKD"),
+    ("9618.HK", "JD.com",              "Consumer Discretionary",    "Hang Seng", "CN", "HKD"),
+    ("1211.HK", "BYD",                 "Automotive",                "Hang Seng", "CN", "HKD"),
+    ("0941.HK", "China Mobile",        "Telecommunications",        "Hang Seng", "CN", "HKD"),
+    ("0883.HK", "CNOOC",               "Energy",                    "Hang Seng", "CN", "HKD"),
+    # ── New additions ────────────────────────────────────────────────────────
+    # Internet / Tech
+    ("9999.HK", "NetEase",             "Technology",                "Hang Seng", "CN", "HKD"),
+    ("9888.HK", "Baidu",               "Technology",                "Hang Seng", "CN", "HKD"),
+    ("1810.HK", "Xiaomi",              "Technology",                "Hang Seng", "CN", "HKD"),
+    ("9961.HK", "Trip.com",            "Consumer Discretionary",    "Hang Seng", "CN", "HKD"),
+    ("1024.HK", "Kuaishou",            "Technology",                "Hang Seng", "CN", "HKD"),
+    # Financials / Insurance
+    ("1299.HK", "AIA Group",           "Financials",                "Hang Seng", "CN", "HKD"),
+    ("0388.HK", "HKEX",                "Financials",                "Hang Seng", "CN", "HKD"),
+    ("1398.HK", "ICBC",                "Financials",                "Hang Seng", "CN", "HKD"),
+    ("3988.HK", "Bank of China",       "Financials",                "Hang Seng", "CN", "HKD"),
+    ("0939.HK", "China Construction Bank", "Financials",            "Hang Seng", "CN", "HKD"),
+    ("2318.HK", "Ping An Insurance",   "Financials",                "Hang Seng", "CN", "HKD"),
+    ("2388.HK", "BOC Hong Kong",       "Financials",                "Hang Seng", "CN", "HKD"),
+    # Energy / Resources
+    ("0857.HK", "PetroChina",          "Energy",                    "Hang Seng", "CN", "HKD"),
+    ("0386.HK", "Sinopec",             "Energy",                    "Hang Seng", "CN", "HKD"),
+    ("1088.HK", "China Shenhua",       "Energy",                    "Hang Seng", "CN", "HKD"),
+    # Telecom
+    ("0762.HK", "China Unicom",        "Telecommunications",        "Hang Seng", "CN", "HKD"),
+    ("0728.HK", "China Telecom",       "Telecommunications",        "Hang Seng", "CN", "HKD"),
+    # Consumer / Retail
+    ("2331.HK", "Li Ning",             "Consumer Discretionary",    "Hang Seng", "CN", "HKD"),
+    ("1876.HK", "Budweiser APAC",      "Consumer Staples",          "Hang Seng", "CN", "HKD"),
+    ("2319.HK", "China Mengniu Dairy", "Consumer Staples",          "Hang Seng", "CN", "HKD"),
+    # Healthcare / Pharma
+    ("1093.HK", "CSPC Pharmaceutical", "Healthcare",                "Hang Seng", "CN", "HKD"),
+    ("1177.HK", "Sino Biopharmaceutical", "Healthcare",             "Hang Seng", "CN", "HKD"),
+    # Industrial / Property
+    ("0267.HK", "CITIC",               "Financials",                "Hang Seng", "CN", "HKD"),
+    ("0960.HK", "Longfor Group",       "Real Estate",               "Hang Seng", "CN", "HKD"),
+]
+
 INDEX_MAP = {
     "SP500": SP500_MEMBERS,
     "N225":  NIKKEI_MEMBERS,
@@ -217,6 +262,7 @@ INDEX_MAP = {
     "FTSE":  FTSE_MEMBERS,
     "CAC":   CAC_MEMBERS,
     "SMI":   SMI_MEMBERS,
+    "HSI":   HANG_SENG_MEMBERS,
 }
 
 NI_LABELS = [
@@ -905,7 +951,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch RG data via yfinance")
-    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "FTSE", "CAC", "SMI", "ALL"], default="ALL")
+    parser.add_argument("--index",  choices=["SP500", "N225", "DAX", "FTSE", "CAC", "SMI", "HSI", "ALL"], default="ALL")
     parser.add_argument("--limit",  type=int, default=0)
     parser.add_argument("--ticker", default="")
     parser.add_argument("--delay",  type=float, default=1.0)
