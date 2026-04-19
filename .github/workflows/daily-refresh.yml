@@ -1,0 +1,74 @@
+name: Daily Data Refresh
+
+on:
+  schedule:
+    # Every day at 06:00 UTC (after Asian close, before European open)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      index:
+        description: 'Which index to fetch (ALL, SP500, DAX, N225, FTSE, CAC, SMI, HSI)'
+        required: false
+        default: 'ALL'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Fetch & commit updated data
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history so git diff works correctly
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Fetch company data (all indices)
+        run: |
+          INDEX="${{ github.event.inputs.index || 'ALL' }}"
+          echo "Fetching index: $INDEX"
+          python3 scripts/fetch_data.py --index "$INDEX"
+        continue-on-error: true
+
+      - name: Fetch Shiller CAPE + GS10
+        run: python3 scripts/fetch_shiller.py
+        continue-on-error: true
+
+      - name: Fetch World Bank Buffett Indicator
+        # Annual data — fetch always; no-op if World Bank hasn't updated
+        run: python3 scripts/fetch_world_bank.py
+        continue-on-error: true
+
+      - name: Check for data changes
+        id: changes
+        run: |
+          git diff --quiet src/data/ && echo "changed=false" >> $GITHUB_OUTPUT || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit updated data
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/data/
+          CHANGED=$(git diff --cached --name-only | wc -l)
+          git commit -m "chore: daily data refresh $(date -u '+%Y-%m-%d') — ${CHANGED} file(s) updated"
+
+      - name: Push changes
+        if: steps.changes.outputs.changed == 'true'
+        run: git push origin main
+
+      - name: No changes — skip deploy
+        if: steps.changes.outputs.changed == 'false'
+        run: echo "Data unchanged — no rebuild needed."
