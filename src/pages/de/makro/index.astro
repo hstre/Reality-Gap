@@ -1,8 +1,10 @@
 ---
 import BaseLayout from '../../../components/layout/BaseLayout.astro';
 import capeRaw from '../../../data/macro/sp500_cape.json';
+import daxRaw  from '../../../data/macro/dax40_pe.json';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const dax = (daxRaw as any).current as { date: string; rg10: number; trailing_pe: number };
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface CapePoint { date: string; cape: number; rg10: number; }
@@ -299,15 +301,15 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
   </section>
 
-  <!-- ── Abschnitt 5: Weitere Märkte (Platzhalter) ───────────────────────── -->
+  <!-- ── Abschnitt 5: Weitere Aktienuniversen ─────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
       5. Weitere Aktienuniversen
     </h2>
     <p class="text-sm text-gray-500 mb-5">
-      Die Makro-RG-Abdeckung beschränkt sich derzeit auf den S&amp;P 500 via Shiller-Daten.
-      Weitere Märkte sind in der Erweiterungsplanung aufgeführt.
-      Es werden keine Werte angezeigt, bis die Datenbasis unabhängig verifiziert wurde.
+      S&amp;P 500 (CAPE-basiert) und DAX 40 (Trailing-KGV-Proxy) sind live verfügbar.
+      Weitere Märkte befinden sich in der Erweiterungsplanung; Werte erscheinen, sobald die
+      Datenbasis unabhängig verifiziert wurde.
     </p>
     <div class="overflow-x-auto">
       <table class="table-rg w-full">
@@ -315,32 +317,41 @@ function fmt2(v: number): string { return v.toFixed(2); }
           <tr class="bg-gray-50">
             <th class="text-left text-xs text-gray-500 font-medium">Notation</th>
             <th class="text-left text-xs text-gray-500 font-medium">Universum</th>
-            <th class="text-left text-xs text-gray-500 font-medium">Geplante Quelle</th>
+            <th class="text-right text-xs text-gray-500 font-medium">Aktuell</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Datenquelle</th>
             <th class="text-left text-xs text-gray-500 font-medium">Status</th>
           </tr>
         </thead>
         <tbody>
+          <tr>
+            <td class="font-mono text-sm text-gray-800 whitespace-nowrap">
+              <a href={`${base}/de/makro`} class="text-accent hover:underline no-underline">M(S&amp;P 500)RG10</a>
+            </td>
+            <td class="text-sm text-gray-700">S&amp;P 500 (US Large-Cap)</td>
+            <td class="text-right font-mono text-sm font-semibold text-accent">{rg10.toFixed(2)}×</td>
+            <td class="text-xs text-gray-500">Shiller ie_data.xls / Yale · CAPE / 10</td>
+            <td><span class="text-xs rounded px-2 py-0.5 font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">live</span></td>
+          </tr>
+          <tr>
+            <td class="font-mono text-sm text-gray-800 whitespace-nowrap">
+              <a href={`${base}/de/makro/dax40`} class="text-accent hover:underline no-underline">M(DAX 40)RG10</a>
+            </td>
+            <td class="text-sm text-gray-700">DAX 40 (Deutsche Large-Caps)</td>
+            <td class="text-right font-mono text-sm font-semibold text-accent">{dax.rg10.toFixed(2)}×</td>
+            <td class="text-xs text-gray-500">yfinance ETF-Proxy · Trailing-KGV / 10 <span class="text-gray-400">(kein CAPE)</span></td>
+            <td><span class="text-xs rounded px-2 py-0.5 font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">live</span></td>
+          </tr>
           {[
-            { m: 'M(S&P 500)RG10',    uni: 'S&P 500 (US Large-Cap)',            src: 'Shiller ie_data.xls / Yale',           st: 'live' },
-            { m: 'M(DAX)RG10',        uni: 'DAX 40 (Deutsche Large-Caps)',       src: 'StarCapital / Barclays CAPE-Reihe',     st: 'geplant' },
-            { m: 'M(Nikkei 225)RG10', uni: 'Nikkei 225 (Japanische Large-Caps)', src: 'StarCapital / akademische Quellen',     st: 'geplant' },
-            { m: 'M(STOXX 600)RG10',  uni: 'STOXX Europe 600',                   src: 'MSCI / Barclays europäische CAPE-Daten', st: 'explorativ' },
-            { m: 'M(EM)RG10',         uni: 'MSCI Schwellenländer',               src: 'MSCI CAPE-Daten',                       st: 'explorativ' },
+            { m: 'M(Nikkei 225)RG10', uni: 'Nikkei 225 (Japanische Large-Caps)', src: 'StarCapital / akademische Quellen' },
+            { m: 'M(STOXX 600)RG10',  uni: 'STOXX Europe 600',                   src: 'MSCI / Barclays europäische CAPE-Daten' },
+            { m: 'M(EM)RG10',         uni: 'MSCI Schwellenländer',               src: 'MSCI CAPE-Daten' },
           ].map(row => (
             <tr>
-              <td class="font-mono text-sm text-gray-800 whitespace-nowrap" set:html={row.m} />
-              <td class="text-sm text-gray-700">{row.uni}</td>
-              <td class="text-xs text-gray-500">{row.src}</td>
-              <td>
-                <span class={[
-                  'text-xs rounded px-2 py-0.5 font-medium border',
-                  row.st === 'live'        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                  row.st === 'geplant'     ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                             'bg-gray-50 text-gray-500 border-gray-200'
-                ].join(' ')}>
-                  {row.st}
-                </span>
-              </td>
+              <td class="font-mono text-sm text-gray-500 whitespace-nowrap" set:html={row.m} />
+              <td class="text-sm text-gray-600">{row.uni}</td>
+              <td class="text-right text-xs text-gray-300">—</td>
+              <td class="text-xs text-gray-400">{row.src}</td>
+              <td><span class="text-xs rounded px-2 py-0.5 font-medium border bg-gray-50 text-gray-400 border-gray-200">geplant</span></td>
             </tr>
           ))}
         </tbody>

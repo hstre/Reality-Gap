@@ -74,6 +74,56 @@ function snapshotBand(v: number): string {
     </div>
   </section>
 
+  <!-- Warum nicht einfach KGV, KBV, CAPE oder Buffett-Indikator? -->
+  <section class="max-w-5xl mx-auto px-6 pb-12">
+    <div class="border border-gray-200 rounded-md bg-white px-7 py-6">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4" style="font-family: Georgia, serif;">
+        Warum nicht einfach KGV, KBV, CAPE oder den Buffett-Indikator verwenden?
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4">
+        <div>
+          <p class="text-xs font-semibold text-gray-600 mb-1">vs. KGV (Trailing)</p>
+          <p class="text-xs text-gray-500 leading-relaxed">
+            Das KGV verwendet nur ein Jahresergebnis. Es steigt, wenn Gewinne einbrechen —
+            signalisiert „teuer" genau dann, wenn die Kurse nahe ihrem Tiefpunkt sind. RG glättet
+            die Gewinne über ein Jahrzehnt und addiert die Bilanz, sodass zyklische Verzerrungen
+            den Wert nicht mehr dominieren.
+          </p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-600 mb-1">vs. CAPE (Shiller-KGV)</p>
+          <p class="text-xs text-gray-500 leading-relaxed">
+            CAPE löst das Glättungsproblem, ignoriert aber die Bilanz vollständig. Für
+            kapitalintensive Unternehmen — Banken, Industrie, Energie — bildet das Sachvermögen
+            eine reale Wertuntergrenze, die CAPE nicht erfasst. RG ergänzt diese Dimension.
+          </p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-600 mb-1">vs. KBV (Kurs-Buchwert)</p>
+          <p class="text-xs text-gray-500 leading-relaxed">
+            Das KBV erfasst die Bilanz, ignoriert jedoch die Ertragskraft. Ein Fabrikgelände zu
+            0,5× Buchwert ist nicht günstig, wenn es keine Gewinne erwirtschaftet. RG verlangt,
+            dass Vermögenswerte in Ertragskraft übersetzt werden — beide Dimensionen müssen
+            gleichzeitig erfüllt sein.
+          </p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-600 mb-1">vs. Buffett-Indikator (MK/BIP)</p>
+          <p class="text-xs text-gray-500 leading-relaxed">
+            Der Buffett-Indikator ist ausschließlich ein Makromaß — er kann nicht beurteilen, ob
+            ein einzelnes Unternehmen günstig oder teuer relativ zu seinen eigenen Fundamentaldaten
+            ist. RG arbeitet auf Unternehmensebene und lässt sich auf jeden Index aggregieren.
+          </p>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 mt-5 border-t border-gray-100 pt-4">
+        RG = Kurs / (Materielles Eigenkapital + N × Geglättete Gewinne). Er verbindet den
+        Bilanzboden des KBV mit der Zykluskorrektur des CAPE. Keines allein reicht aus.
+        <a href={`${base}/de/methodik`} class="text-accent hover:underline ml-1 no-underline">Vollständige Methodik →</a>
+      </p>
+    </div>
+  </section>
+
   <!-- Karten -->
   <section class="max-w-5xl mx-auto px-6 pb-16">
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
