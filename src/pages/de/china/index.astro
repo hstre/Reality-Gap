@@ -1,0 +1,115 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import CompanyCard from '../../../components/ui/CompanyCard.astro';
+import type { Company } from '../../../lib/rg';
+import { sortByRG10Desc } from '../../../lib/sort';
+import chinaSlugJson from '../../../data/companies.china.index.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const slugs: string[] = chinaSlugJson;
+const companies: Company[] = await Promise.all(
+  slugs.map(slug =>
+    import(`../../../data/companies/${slug}.json`).then(m => m.default as Company)
+  )
+);
+
+const sorted = sortByRG10Desc(companies);
+const sectors = [...new Set(sorted.map(c => c.sector).filter(Boolean))].sort();
+---
+
+<BaseLayout
+  title="China — Reality Gap"
+  description="Reality-Gap-Werte für 31 bedeutende HK-notierte chinesische Unternehmen aus Technologie, Finanzen, Energie, Telekom und Konsumgütern."
+  lang="de"
+  canonicalPath="/de/china"
+  altLangPath="/china"
+  altLang="en"
+>
+  <div class="max-w-5xl mx-auto px-6 py-12">
+    <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+      China — Hang Seng
+    </h1>
+    <p class="text-gray-600 mb-2">
+      Reality-Gap-Werte für 31 bedeutende HK-notierte chinesische Unternehmen aus Technologie, Finanzen, Energie, Telekom und Konsumgütern.
+      Daten via yfinance / Yahoo Finance. Alle Werte in HKD-Milliarden.
+    </p>
+    <div class="flex flex-wrap items-center gap-3 mb-8">
+      <span class="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        HK-notiert, H-Aktien-Basis · Forschungsnäherung
+      </span>
+      <a href={`${base}/de/china/forschung`} class="text-xs text-accent hover:underline no-underline">
+        → China-Forschungsseite
+      </a>
+    </div>
+
+    <!-- Sektorfilter -->
+    {sectors.length > 1 && (
+      <div class="flex flex-wrap gap-2 mb-6" id="sector-tabs">
+        <button
+          class="sector-tab active text-sm px-3 py-1 rounded border border-gray-200 bg-white text-gray-700 hover:border-accent transition-colors"
+          data-sector=""
+        >
+          Alle
+        </button>
+        {sectors.map(s => (
+          <button
+            class="sector-tab text-sm px-3 py-1 rounded border border-gray-200 bg-white text-gray-600 hover:border-accent transition-colors"
+            data-sector={s}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="companies-grid">
+      {sorted.map(company => (
+        <div class="company-item" data-sector={company.sector ?? ''}>
+          <CompanyCard
+            company={company}
+            base={base}
+            lang="de"
+            viewDetailsLabel="Details anzeigen"
+            rg10Label="RG10"
+            detailsBasePath="/de/unternehmen"
+          />
+        </div>
+      ))}
+    </div>
+
+    <!-- Datenhinweis -->
+    <div class="mt-12 border-t border-gray-100 pt-6 text-xs text-gray-400 space-y-1">
+      <p><strong class="text-gray-500">Quelle:</strong> yfinance / Yahoo Finance. Jährliche Bilanzdaten und Gewinn- und Verlustrechnung.</p>
+      <p><strong class="text-gray-500">Marktkapitalisierung:</strong> Aktuelle MK (letzter Zeitraum) oder Aktienanzahl × Jahresschlusskurs (historische Zeiträume). H-Aktien-Basis für alle Unternehmen.</p>
+      <p><strong class="text-gray-500">RG-Formel:</strong> RG10 = Marktkapitalisierung / (Materielles Eigenkapital + 10 × Geglättete Gewinne). Geglättete Gewinne = Durchschnitt der verfügbaren Jahresnettogewinne (4 Jahre).</p>
+      <p><strong class="text-gray-500">Währung:</strong> Durchgehend HKD-Milliarden. Keine CNY/HKD-Wechselkursbereinigung.</p>
+      <p><strong class="text-gray-500">Einschränkungen:</strong> Nur 4-Jahres-Fenster. Keine CPI-Bereinigung. Alle Daten sind illustrativ und nur für Forschungszwecke. Keine Anlageberatung.</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .sector-tab.active {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background-color: color-mix(in srgb, var(--color-accent) 5%, white);
+  }
+</style>
+
+<script>
+  const tabs = document.querySelectorAll<HTMLButtonElement>('.sector-tab');
+  const items = document.querySelectorAll<HTMLElement>('.company-item');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const sector = tab.dataset.sector ?? '';
+      items.forEach(item => {
+        const show = !sector || item.dataset.sector === sector;
+        item.style.display = show ? '' : 'none';
+      });
+    });
+  });
+</script>

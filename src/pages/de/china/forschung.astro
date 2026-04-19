@@ -1,0 +1,370 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import type { Company } from '../../../lib/rg';
+import { getLatestObservation } from '../../../lib/rg';
+import chinaSlugJson from '../../../data/companies.china.index.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const slugs: string[] = chinaSlugJson;
+const companies: Company[] = await Promise.all(
+  slugs.map(slug =>
+    import(`../../../data/companies/${slug}.json`).then(m => m.default as Company)
+  )
+);
+
+function parsePeriod(key: string): number {
+  const m = key.match(/^(\d{4})_q(\d)$/);
+  return m ? parseInt(m[1]!) * 10 + parseInt(m[2]!) : 0;
+}
+function median(arr: number[]): number {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 !== 0 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
+}
+function pct(v: number | null, max: number): string {
+  if (v === null) return '0%';
+  return Math.min(100, Math.round((v / max) * 100)) + '%';
+}
+function fmt(v: number | null, d = 2): string {
+  return v == null ? '—' : v.toFixed(d);
+}
+
+interface CompanyRow {
+  slug: string; name: string; ticker: string; sector: string;
+  period: string; mc: number | null; te: number | null;
+  g: number | null; ni: number | null; gw: number | null; ia: number | null;
+  rg8: number | null; rg10: number | null; rg12: number | null;
+  obs: any[]; isSoe: boolean;
+}
+
+const SOE_SLUGS = new Set([
+  'icbc','bankofchina','chinaconstructionbank',
+  'petrochina','sinopec','chinashenhua',
+  'chinaunicom','chinatelecom','chinamobile',
+  'cnooc','citic',
+]);
+
+const rows: CompanyRow[] = companies.map(c => {
+  const obs = getLatestObservation(c);
+  const allObs = [...c.observations].sort((a, b) => parsePeriod(b.periodKey) - parsePeriod(a.periodKey));
+  return {
+    slug: c.slug, name: c.company, ticker: c.ticker, sector: c.sector,
+    period: obs?.periodLabel ?? '—',
+    mc:  (obs as any)?.marketCap       ?? null,
+    te:  (obs as any)?.tangibleEquity  ?? null,
+    g:   (obs as any)?.smoothedEarnings ?? null,
+    ni:  (obs as any)?.netIncome       ?? null,
+    gw:  (obs as any)?.goodwill        ?? null,
+    ia:  (obs as any)?.intangibles     ?? null,
+    rg8:  obs?.rg8  ?? null,
+    rg10: obs?.rg10 ?? null,
+    rg12: obs?.rg12 ?? null,
+    obs: allObs,
+    isSoe: SOE_SLUGS.has(c.slug),
+  };
+});
+
+const rowsSorted = [...rows].sort((a, b) => (b.rg10 ?? -999) - (a.rg10 ?? -999));
+const maxRG10 = Math.max(...rowsSorted.map(r => r.rg10 ?? 0), 0.1);
+
+const soeRows     = rowsSorted.filter(r => r.isSoe  && r.rg10 !== null);
+const privateRows = rowsSorted.filter(r => !r.isSoe && r.rg10 !== null);
+const soeRGs      = soeRows.map(r => r.rg10 as number);
+const privateRGs  = privateRows.map(r => r.rg10 as number);
+const allRGs      = rowsSorted.filter(r => r.rg10 !== null).map(r => r.rg10 as number);
+
+const soeMedian     = median(soeRGs);
+const privateMedian = median(privateRGs);
+const cnMedian      = median(allRGs);
+
+const benchmarks = [
+  { label: 'S&P 500',    rg: 2.55, color: '#ef4444' },
+  { label: 'CAC 40',     rg: 1.52, color: '#f97316' },
+  { label: 'SMI',        rg: 1.41, color: '#a855f7' },
+  { label: 'FTSE 100',   rg: 1.12, color: '#22c55e' },
+  { label: 'DAX 40',     rg: 1.05, color: '#3b82f6' },
+  { label: 'Nikkei 225', rg: 0.98, color: '#64748b' },
+  { label: 'Hang Seng (gesamt)',   rg: cnMedian,      color: '#dc2626' },
+  { label: 'Hang Seng (SOE)',      rg: soeMedian,     color: '#991b1b' },
+  { label: 'Hang Seng (privat)',   rg: privateMedian, color: '#f59e0b' },
+];
+const benchMax = Math.max(...benchmarks.map(b => b.rg), 0.1);
+---
+
+<BaseLayout
+  title="China Forschung — Reality Gap"
+  description={`Reality-Gap-Analyse für ${rows.length} HK-notierte chinesische Unternehmen. Strukturelle Bifurkation: Staatsunternehmen (Median RG10 ${soeMedian.toFixed(2)}) vs. Privatsektor (Median RG10 ${privateMedian.toFixed(2)}).`}
+  lang="de"
+  canonicalPath="/de/china/forschung"
+  altLangPath="/china/research"
+  altLang="en"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <div class="mb-2">
+    <a href={`${base}/de/china`} class="text-sm text-gray-400 hover:text-accent no-underline">← China Unternehmen</a>
+  </div>
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    China — RG-Forschung
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Reality-Gap-Analyse für {rows.length} HK-notierte Unternehmen aus allen wichtigen Hang-Seng-Sektoren.
+    Alle Werte in HKD-Milliarden.
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Näherung · yfinance / Yahoo Finance</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">H-Aktien-Marktkapitalisierung</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Keine Anlageberatung</span>
+  </div>
+
+  <!-- ── 1. Kernbefund ──────────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">1. Kernbefund: Strukturelle Bifurkation</h2>
+
+    <div class="grid grid-cols-2 gap-4 mb-6" style="max-width:440px">
+      <div class="border border-gray-200 rounded-md p-5 bg-red-50/40">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Staatsunternehmen ({soeRows.length} Unternehmen)</div>
+        <div class="text-3xl font-light text-red-700 mb-0.5">{soeMedian.toFixed(2)}</div>
+        <div class="text-xs text-gray-400">Median RG10</div>
+      </div>
+      <div class="border border-gray-200 rounded-md p-5 bg-amber-50/40">
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Privatsektor ({privateRows.length} Unternehmen)</div>
+        <div class="text-3xl font-light text-amber-600 mb-0.5">{privateMedian.toFixed(2)}</div>
+        <div class="text-xs text-gray-400">Median RG10</div>
+      </div>
+    </div>
+
+    <div class="space-y-3 mb-6">
+      <div class="border-l-2 border-red-300 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-0.5">Chinesische Staatsunternehmen handeln weit unterhalb konservativer Fundamentaldeckung</p>
+        <p class="text-sm text-gray-500">
+          Die großen Staatsbanken (ICBC, Bank of China: RG10 = 0,06 je), Ölkonzerne (PetroChina: 0,06, Sinopec: 0,09)
+          und Staatstelekoms (China Telecom: 0,08) haben Marktkapitalisierungen, die einen Bruchteil ihrer geschätzten
+          Fundamentalbasis ausmachen. RG10 von 0,06 bedeutet: der Markt bewertet das Unternehmen bei nur 6 % der konservativen
+          Ertrags- und Eigenkapitaldeckung — ein Abschlag, der in US-, europäischen oder sogar japanischen Großkapitalmärkten nicht vorkommt.
+        </p>
+      </div>
+      <div class="border-l-2 border-amber-300 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-0.5">Privater Technologiesektor verhält sich wie Europa, nicht wie die USA</p>
+        <p class="text-sm text-gray-500">
+          Tencent ({rows.find(r=>r.slug==='tencent')?.rg10?.toFixed(2)}), Alibaba ({rows.find(r=>r.slug==='alibaba')?.rg10?.toFixed(2)}),
+          Meituan ({rows.find(r=>r.slug==='meituan')?.rg10?.toFixed(2)}), Xiaomi ({rows.find(r=>r.slug==='xiaomi')?.rg10?.toFixed(2)})
+          liegen im Bereich 1,3–2,2 — vergleichbar mit französischem oder schweizer Tech, aber deutlich unter US-Pendants
+          (Meta ~4, Alphabet ~4, Nvidia ≫ 10). Die Narrativprämie existiert, ist aber strukturell gedämpft.
+        </p>
+      </div>
+      <div class="border-l-2 border-gray-200 pl-4">
+        <p class="text-sm font-semibold text-gray-700 mb-0.5">Der SOE-Abschlag ist nicht einfach „billig" — er spiegelt Gewinnskepsis wider</p>
+        <p class="text-sm text-gray-500">
+          Ein niedriger RG bedeutet nicht automatisch Unterbewertung. Bei chinesischen Staatsunternehmen reflektiert er
+          wahrscheinlich den strukturellen Abschlag für Gewinnqualität, politisches Risiko und unsichere Kapitalrückführungspolitik —
+          eine implizite Anerkennung, dass ausgewiesene Gewinne möglicherweise nicht vollständig an Minderheitsaktionäre fließen.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 2. RG10-Ranking ────────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1">2. RG10-Ranking — Alle {rows.length} Unternehmen</h2>
+    <p class="text-sm text-gray-500 mb-1">Sortiert absteigend. <span class="text-red-600 font-medium">Rote Beschriftung</span> = Staatsunternehmen. Vertikale Linie bei RG10 = 1,0.</p>
+    <p class="text-xs text-gray-400 mb-5">Aktueller / aktuellster Zeitraum je Unternehmen.</p>
+
+    <div class="space-y-1.5">
+      {rowsSorted.map(r => (
+        <div class="flex items-center gap-2 text-xs">
+          <a href={`${base}/de/unternehmen/${r.slug}`}
+             class={`shrink-0 no-underline font-medium hover:underline ${r.isSoe ? 'text-red-700' : 'text-gray-700'}`}
+             style="width:170px; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+             title={r.name}>{r.name}</a>
+          <div class="flex-1 bg-gray-100 rounded-sm h-5 relative" style="max-width:320px">
+            <div class="absolute top-0 bottom-0 w-px bg-gray-400 z-10"
+                 style={`left:${pct(1.0, maxRG10)}`} title="RG10=1.0"/>
+            {r.rg10 !== null && (
+              <div class="h-5 rounded-sm"
+                   style={`width:${pct(r.rg10, maxRG10)};background:${
+                     r.rg10 < 0.3  ? '#fca5a5' :
+                     r.rg10 < 1.0  ? '#6ee7b7' :
+                     r.rg10 < 2.0  ? '#93c5fd' : '#fbbf24'}`}/>
+            )}
+          </div>
+          <span class="font-mono font-semibold text-gray-700 w-8 shrink-0">{fmt(r.rg10)}</span>
+          <span class="text-gray-400 shrink-0 hidden sm:inline" style="width:80px; overflow:hidden; text-overflow:ellipsis;">{r.sector}</span>
+        </div>
+      ))}
+    </div>
+    <div class="flex flex-wrap gap-3 mt-3 text-xs text-gray-400">
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#fca5a5"></span>SOE-Tiefabschlag (&lt;0,3)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#6ee7b7"></span>Unter Fundamentaldeckung (0,3–1,0)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#93c5fd"></span>Narrativprämie (1–2)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded" style="background:#fbbf24"></span>Erhöht (&gt;2)</span>
+    </div>
+  </section>
+
+  <!-- ── 3. SOE vs. Privat ──────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1">3. Staatsunternehmen vs. Privatsektor: Vergleich</h2>
+    <p class="text-xs text-gray-400 mb-5">
+      Staatsunternehmen: mehrheitlich staatlich kontrolliert (Großbanken, Ölkonzerne, Staatstelekoms, CNOOC, CITIC).
+      Alle anderen als privat / nicht-staatlich klassifiziert.
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="border border-red-100 rounded-md p-4">
+        <div class="text-xs font-semibold text-red-700 uppercase tracking-wide mb-3">
+          Staatsunternehmen ({soeRows.length}) · Median RG10 {soeMedian.toFixed(2)}
+        </div>
+        {soeRows.map(r => (
+          <div class="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+            <a href={`${base}/de/unternehmen/${r.slug}`} class="text-xs text-gray-700 hover:text-accent no-underline">{r.name}</a>
+            <div class="flex items-center gap-2">
+              <div class="w-16 h-2 bg-gray-100 rounded-sm overflow-hidden">
+                <div class="h-full rounded-sm bg-red-300" style={`width:${Math.min(100,(r.rg10!/soeMedian/2)*100).toFixed(0)}%`}/>
+              </div>
+              <span class="font-mono text-xs font-semibold text-red-700 w-8 text-right">{fmt(r.rg10)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div class="border border-amber-100 rounded-md p-4">
+        <div class="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">
+          Privatsektor ({privateRows.length}) · Median RG10 {privateMedian.toFixed(2)}
+        </div>
+        {privateRows.map(r => (
+          <div class="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
+            <a href={`${base}/de/unternehmen/${r.slug}`} class="text-xs text-gray-700 hover:text-accent no-underline">{r.name}</a>
+            <div class="flex items-center gap-2">
+              <div class="w-16 h-2 bg-gray-100 rounded-sm overflow-hidden">
+                <div class="h-full rounded-sm bg-amber-300" style={`width:${Math.min(100,(r.rg10!/privateMedian/2)*100).toFixed(0)}%`}/>
+              </div>
+              <span class="font-mono text-xs font-semibold text-amber-700 w-8 text-right">{fmt(r.rg10)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 4. Marktvergleich ──────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1">4. Internationaler Marktvergleich</h2>
+    <p class="text-sm text-gray-500 mb-1">Median-RG10 wichtiger Indizes im Vergleich mit Hang-Seng-Untergruppen.</p>
+    <p class="text-xs text-gray-400 mb-5">Westliche Indexmediane sind Näherungswerte aus dem Gesamtforschungsdatensatz. Nicht direkt vergleichbar (unterschiedliche Rechnungslegungsstandards, Währungsbasen).</p>
+
+    <div class="space-y-2">
+      {benchmarks.sort((a,b) => b.rg - a.rg).map(b => (
+        <div class="flex items-center gap-3 text-xs">
+          <span class="text-gray-600 shrink-0" style="width:180px; text-align:right;">{b.label}</span>
+          <div class="flex-1 bg-gray-100 rounded-sm h-5 relative" style="max-width:340px">
+            <div class="h-5 rounded-sm" style={`width:${(b.rg/benchMax*100).toFixed(1)}%;background:${b.color};opacity:0.75`}/>
+          </div>
+          <span class="font-mono font-semibold text-gray-700 w-8 shrink-0">{b.rg.toFixed(2)}</span>
+        </div>
+      ))}
+    </div>
+    <div class="mt-6 border border-gray-100 rounded-md p-4 bg-gray-50/50 text-sm text-gray-600">
+      <p class="font-semibold text-gray-700 mb-1">Was der Vergleich zeigt</p>
+      <ul class="space-y-1 text-xs text-gray-500 list-none">
+        <li>— Der Hang Seng <em>insgesamt</em> (Median {cnMedian.toFixed(2)}) liegt unter Japan und nahe dem DAX — weder offensichtlich günstig noch erhöht.</li>
+        <li>— Die Privatsektor-Untergruppe (Median {privateMedian.toFixed(2)}) überschneidet sich mit FTSE- und DAX-Territorium — vergleichbar mit konservativem europäischem Pricing.</li>
+        <li>— Die SOE-Untergruppe (Median {soeMedian.toFixed(2)}) hat kein westliches Pendant. US-, europäische und japanische Großkapitalwerte handeln schlicht nicht mit diesem Abschlag zur konservativen Deckung.</li>
+        <li>— Die US-Prämie ({benchmarks.find(b=>b.label==='S&P 500')?.rg.toFixed(2)}) bleibt der Ausreißer am oberen Ende: eine strukturelle Narrativprämie, die chinesische Märkte auch in ihren besten Privatsektorwerten nicht replizieren.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── 5. Vollständige Kennzahlentabelle ─────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1">5. Vollständige Kennzahlentabelle</h2>
+    <p class="text-xs text-gray-400 mb-4">Aktueller / aktuellster Zeitraum. Alle Werte in HKD-Milliarden. G = 4-Jahres-Durchschnitt Nettogewinn.</p>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full text-xs">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">Unternehmen</th>
+            <th class="text-center text-gray-400 font-normal whitespace-nowrap px-2 py-1.5">Typ</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">MK</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">ME</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">G Ø</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">RG8</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">RG10</th>
+            <th class="text-right text-gray-500 font-medium whitespace-nowrap px-2 py-1.5">RG12</th>
+            <th class="text-left text-gray-400 font-normal whitespace-nowrap px-2 py-1.5">Zeitraum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rowsSorted.map(r => (
+            <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+              <td class="whitespace-nowrap px-2 py-1.5">
+                <a href={`${base}/de/unternehmen/${r.slug}`}
+                   class={`font-medium hover:text-accent no-underline ${r.isSoe ? 'text-red-700' : 'text-gray-800'}`}>
+                  {r.name}
+                </a>
+              </td>
+              <td class="text-center px-2 py-1.5">
+                <span class={`text-xs rounded px-1.5 py-0.5 ${r.isSoe ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'}`}>
+                  {r.isSoe ? 'SOE' : 'priv'}
+                </span>
+              </td>
+              <td class="text-right font-mono px-2 py-1.5 text-gray-600">{r.mc != null ? Math.round(r.mc).toLocaleString() : '—'}</td>
+              <td class="text-right font-mono px-2 py-1.5 text-gray-600">{r.te != null ? Math.round(r.te).toLocaleString() : '—'}</td>
+              <td class="text-right font-mono px-2 py-1.5 text-gray-600">{r.g  != null ? Math.round(r.g).toLocaleString()  : '—'}</td>
+              <td class="text-right font-mono px-2 py-1.5">{fmt(r.rg8)}</td>
+              <td class="text-right font-mono px-2 py-1.5 font-semibold text-accent">{fmt(r.rg10)}</td>
+              <td class="text-right font-mono px-2 py-1.5">{fmt(r.rg12)}</td>
+              <td class="text-left text-gray-400 px-2 py-1.5">{r.period}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr class="border-t-2 border-gray-200 bg-gray-50">
+            <td class="px-2 py-1.5 text-gray-600 font-semibold" colspan={6}>Gesamtmedian</td>
+            <td class="text-right font-mono font-semibold text-gray-800 px-2 py-1.5">{cnMedian.toFixed(2)}</td>
+            <td colspan={2}></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── 6. Methodik ────────────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">6. Methodik und Einschränkungen</h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full text-xs">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-gray-500 font-medium px-2 py-1.5 w-36">Dimension</th>
+            <th class="text-left text-gray-500 font-medium px-2 py-1.5">Hinweis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['Quelle', 'yfinance / Yahoo Finance, auf Basis von HKEX-gemeldeten Finanzdaten. Nicht geprüft. Nur Prototyp-Qualität.'],
+            ['Marktkapitalisierung', 'Aktuelle MK (letzter Zeitraum) oder Aktienanzahl × Jahresschlusskurs (historische Zeiträume). Aktienanzahl-Drift nicht korrigiert.'],
+            ['Gewinnglättung', '4-Jahres-Durchschnitt Nettogewinn (G). Viele CN-Unternehmen berichten halbjährlich oder jährlich; quartalsweise Glättung wie in USA/EU ist nicht immer verfügbar.'],
+            ['Währung', 'Alle Werte durchgehend in HKD-Milliarden. Keine CNY/HKD-Umrechnung. Keine CPI-Inflationsbereinigung.'],
+            ['Rechnungslegungsstandards', 'ASBE (chinesisches GAAP) weicht von IFRS/US-GAAP bei Goodwill-Wertminderung, F&E-Aktivierung und Minderheitsbeteiligungsbehandlung ab. RG-Werte sind über Standards hinweg nicht direkt vergleichbar.'],
+            ['SOE-Klassifizierung', '11 Unternehmen als Staatsunternehmen klassifiziert (mehrheitlich staatskontrolliert). Grenzfälle (Ping An, Longfor) als privat eingestuft. Die Klassifizierung beeinflusst die Bifurkationsanalyse.'],
+            ['Historische Tiefe', 'Typischerweise 3–6 Beobachtungen pro Unternehmen. Unzureichend für Langzeit-Fragilitätsanalyse. Der US-Datensatz reicht über SEC-XBRL bis 2009 zurück.'],
+            ['Interpretation', 'Niedriger RG bei Staatsunternehmen spiegelt den Investorenabschlag für Gewinnqualität und Kapitalrückführungsunsicherheit wider — nicht notwendigerweise Unterbewertung im fundamentalen Sinne.'],
+          ].map(([dim, note]) => (
+            <tr class="border-b border-gray-50">
+              <td class="font-medium text-gray-700 whitespace-nowrap px-2 py-2 align-top">{dim}</td>
+              <td class="text-gray-500 px-2 py-2">{note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+    Alle Daten sind illustrativ und dienen ausschließlich Forschungszwecken. Keine Anlageberatung.
+    Daten via yfinance / Yahoo Finance. Werte in HKD-Milliarden.
+    RG = Marktkapitalisierung / (Materielles Eigenkapital + N × Geglättete Gewinne).
+  </p>
+
+</div>
+</BaseLayout>
