@@ -5,14 +5,16 @@ import daxRaw   from '../../../data/macro/dax40_pe.json';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
+interface SeriesPoint { date: string; trailing_pe: number; rg10: number; }
 interface DaxData {
   source: string; method: string; method_note: string; cape_note: string;
-  fetched: string;
+  fetched: string; series_source?: string;
   current: {
     date: string; trailing_pe: number; rg10: number;
     dax_price: number | null; ytd_52w_pct: number | null;
     sources_used: string[];
   };
+  series?: SeriesPoint[];
 }
 interface Sp500Current { date: string; cape: number; rg10: number; trend: string; }
 
@@ -20,6 +22,18 @@ const data   = daxRaw   as unknown as DaxData;
 const sp500  = (sp500Raw as any).current as Sp500Current;
 const cur    = data.current;
 const rg10   = cur.rg10;
+
+const hasSeries  = Array.isArray(data.series) && data.series.length > 12;
+const seriesAvg  = hasSeries
+  ? data.series!.reduce((s, p) => s + p.rg10, 0) / data.series!.length
+  : null;
+const chartData  = hasSeries
+  ? JSON.stringify({
+      labels: data.series!.map(p => p.date),
+      rg10:   data.series!.map(p => p.rg10),
+      avg:    data.series!.map(() => parseFloat((seriesAvg!).toFixed(3))),
+    })
+  : null;
 
 function bandFor(v: number): { label: string; color: string; bg: string; border: string; } {
   if (v < 1.0) return { label: 'Unter langfristigem Durchschnitt — historisch selten',
@@ -65,7 +79,7 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
   </div>
 
   <!-- ── Index-Umschalter ────────────────────────────────────────────────── -->
-  <div class="flex items-center gap-2 mb-6">
+  <div class="flex items-center gap-2 mb-6 flex-wrap">
     <a href={`${base}/de/makro`}
        class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
       S&amp;P 500
@@ -73,6 +87,10 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
     <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
       DAX 40 ←
     </span>
+    <a href={`${base}/de/makro/global`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      Globaler Buffett-Indikator
+    </a>
   </div>
 
   <!-- ── Überschrift ─────────────────────────────────────────────────────── -->
@@ -221,50 +239,96 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
     </div>
   </section>
 
-  <!-- ── Abschnitt 4: Verlauf nicht verfügbar ───────────────────────────── -->
+  <!-- ── Abschnitt 4: Historischer Verlauf ──────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
-      4. Historischer Verlauf — Nicht verfügbar
+      4. Historischer Verlauf
     </h2>
-    <p class="text-sm text-gray-500 mb-4">
-      Für den S&amp;P 500 stellt Robert Shiller (Yale University) eine monatliche CAPE-Zeitreihe
-      ab 1881 bereit. Eine vergleichbare frei verfügbare Zeitreihe für den DAX 40 existiert nicht.
-    </p>
 
-    <div class="border border-dashed border-gray-300 rounded-md bg-gray-50/60 px-6 py-8">
-      <p class="text-sm font-semibold text-gray-600 mb-2">Keine historische CAPE-Zeitreihe für den DAX 40 verfügbar</p>
-      <p class="text-sm text-gray-500 mb-4">
-        Alle geprüften freien Datenquellen für historische DAX-KGV- oder CAPE-Daten lieferten Fehler oder waren gesperrt:
-      </p>
-      <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-gray-400 mb-4">
-        {[
-          ['multpl.com/dax-pe', '404 — Seite existiert nicht'],
-          ['Deutsche Bundesbank API', '503 — Dienst nicht verfügbar'],
-          ['OECD MEI_FIN (Deutschland)', 'Kein KGV-Datensatz vorhanden'],
-          ['macrotrends.net', '403 — Zugriff gesperrt'],
-          ['stooq.com', 'API-Schlüssel mit Captcha erforderlich'],
-          ['StarCapital-Archiv', '403 — Zugriff gesperrt'],
-          ['JST macrohistory', '404 — Seite nicht gefunden'],
-          ['Quandl / Nasdaq Data Link', '403 — Zugriff gesperrt'],
-        ].map(([src, status]) => (
-          <div class="flex gap-2">
-            <span class="shrink-0 text-gray-300">✗</span>
-            <span><span class="font-medium text-gray-500">{src}:</span> {status}</span>
+    {hasSeries ? (
+      <>
+        <p class="text-sm text-gray-500 mb-1">
+          Monatliche Trailing-KGV-Zeitreihe für den DAX. Gleicher Standard wie der aktuelle Wert.
+          {seriesAvg !== null && (
+            <> Gestrichelte Linie = Reihendurchschnitt ({seriesAvg.toFixed(2)}×).</>
+          )}
+        </p>
+        <p class="text-xs text-gray-400 mb-4">
+          Quelle: {data.series_source} · {data.series!.length} Beobachtungen ·
+          {data.series![0].date} – {data.series![data.series!.length - 1].date}
+        </p>
+        <div class="flex flex-wrap gap-5 mb-3 text-xs text-gray-500 select-none">
+          <span class="flex items-center gap-1.5">
+            <svg width="24" height="10" aria-hidden="true">
+              <line x1="0" y1="5" x2="24" y2="5" stroke="#b45309" stroke-width="2.5"/>
+            </svg>
+            M(DAX 40)RG10
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg width="24" height="10" aria-hidden="true">
+              <line x1="0" y1="5" x2="24" y2="5" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="4 3"/>
+            </svg>
+            Reihendurchschnitt ({seriesAvg?.toFixed(2)}×)
+          </span>
+          <span class="flex items-center gap-1.5">
+            <svg width="24" height="10" aria-hidden="true">
+              <line x1="0" y1="5" x2="24" y2="5" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2"/>
+            </svg>
+            RG10 = 1,0 Referenz
+          </span>
+        </div>
+        <div class="relative" style="height: 260px;">
+          <canvas
+            id="dax-history-chart"
+            data-chart={chartData}
+            data-avg={seriesAvg?.toFixed(3) ?? '0'}
+            aria-label="M(DAX40)RG10 historische Zeitreihe"
+            role="img"
+            style="width: 100%; height: 100%;"
+          ></canvas>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">
+          Hinweis: Trailing-KGV ist volatiler als CAPE. Der Ausreißer 2020 spiegelt den
+          pandemischen Gewinneinbruch wider, keine echte Bewertungsextremität.
+          DAX-30→40-Komponentenbruch: September 2021.
+        </p>
+      </>
+    ) : (
+      <>
+        <p class="text-sm text-gray-500 mb-4">
+          Für den S&amp;P 500 stellt Robert Shiller (Yale University) eine monatliche CAPE-Zeitreihe
+          ab 1881 bereit. Eine vergleichbare frei verfügbare Zeitreihe für den DAX 40 existiert nicht.
+        </p>
+        <div class="border border-dashed border-gray-300 rounded-md bg-gray-50/60 px-6 py-8">
+          <p class="text-sm font-semibold text-gray-600 mb-2">Historische Zeitreihe noch nicht verfügbar</p>
+          <p class="text-sm text-gray-500 mb-4">
+            Alle geprüften freien Datenquellen für historische DAX-KGV- oder CAPE-Daten lieferten Fehler oder waren gesperrt:
+          </p>
+          <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-gray-400 mb-4">
+            {[
+              ['multpl.com/dax-pe', '404 — Seite existiert nicht'],
+              ['Deutsche Bundesbank API', '503 — Dienst nicht verfügbar'],
+              ['OECD MEI_FIN (Deutschland)', 'Kein KGV-Datensatz vorhanden'],
+              ['macrotrends.net', '403 — Zugriff gesperrt'],
+              ['stooq.com', 'Täglich versucht — von Cloud-IPs gesperrt'],
+              ['StarCapital-Archiv', '403 — Zugriff gesperrt'],
+              ['JST macrohistory', '404 — Seite nicht gefunden'],
+              ['Quandl / Nasdaq Data Link', '403 — Zugriff gesperrt'],
+            ].map(([src, status]) => (
+              <div class="flex gap-2">
+                <span class="shrink-0 text-gray-300">✗</span>
+                <span><span class="font-medium text-gray-500">{src}:</span> {status}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <p class="text-xs text-gray-400 mb-3">
-        Sobald DAX-CAPE-Daten frei zugänglich werden, wird diese Seite mit einem vollständigen Verlaufschart aktualisiert.
-        Das Trailing-KGV der ETF-Anbieter (nur aktueller Wert) ist der einzige frei verfügbare automatisierte Datenpunkt.
-      </p>
-      <p class="text-xs text-gray-400">
-        <span class="font-medium text-gray-500">Hinweis für Forscher:</span> Siblis Research
-        (siblisresearch.com) veröffentlicht historische CAPE-Daten für über 35 Länder inkl.
-        Deutschland / DAX Index über 40 Jahre zurück (48 USD/Monat). Für eine vollständige
-        M(DAX)RG10-Zeitreihe: CAPE-Spalte für Deutschland herunterladen, durch 10 dividieren,
-        als M(DAX)RG10 kennzeichnen und den DAX-30→40-Komponentenbruch im September 2021 markieren.
-      </p>
-    </div>
+          <p class="text-xs text-gray-400">
+            <span class="font-medium text-gray-500">Hinweis für Forscher:</span> Siblis Research
+            (siblisresearch.com) veröffentlicht historische CAPE-Daten für über 35 Länder inkl.
+            Deutschland / DAX Index über 40 Jahre zurück (48 USD/Monat).
+          </p>
+        </div>
+      </>
+    )}
   </section>
 
   <!-- ── Abschnitt 5: Methodik ───────────────────────────────────────────── -->
@@ -336,4 +400,52 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
   </div>
 
 </div>
+
+{hasSeries && (
+<script>
+  function initDaxChart(): void {
+    const canvas = document.getElementById('dax-history-chart') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if ((canvas as any).__daxChartInit) return;
+    (canvas as any).__daxChartInit = true;
+    const Chart = (window as any).Chart;
+    if (!Chart) return;
+    const raw = canvas.getAttribute('data-chart');
+    const avgVal = parseFloat(canvas.getAttribute('data-avg') ?? '0');
+    if (!raw) return;
+    const { labels, rg10, avg } = JSON.parse(raw) as { labels: string[]; rg10: number[]; avg: number[]; };
+    const refLine = labels.map(() => 1.0);
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'M(DAX40)RG10', data: rg10, borderColor: '#b45309', backgroundColor: 'rgba(180,83,9,0.05)', fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0.2, spanGaps: false },
+          { label: `Ø ${avgVal.toFixed(2)}×`, data: avg, borderColor: '#9ca3af', backgroundColor: 'transparent', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, tension: 0, spanGaps: true },
+          { label: 'RG10 = 1,0', data: refLine, borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 1, borderDash: [2, 3], pointRadius: 0, tension: 0, spanGaps: true },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx: any) => { const v = ctx.parsed.y; if (v == null) return ''; return `${ctx.dataset.label}: ${Number(v).toFixed(2)}×`; } } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, border: { color: '#e5e7eb' } },
+          y: { beginAtZero: true, min: 0, grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any) => `${Number(v).toFixed(1)}×` }, border: { color: '#e5e7eb' } },
+        },
+      },
+    });
+  }
+  function loadChartJs(cb: () => void): void {
+    if ((window as any).Chart) { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload = cb;
+    s.onerror = () => console.warn('DaxChart: failed to load Chart.js');
+    document.head.appendChild(s);
+  }
+  loadChartJs(initDaxChart);
+</script>
+)}
+
 </BaseLayout>

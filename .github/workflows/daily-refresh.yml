@@ -51,6 +51,10 @@ jobs:
         run: python3 scripts/fetch_world_bank.py
         continue-on-error: true
 
+      - name: Fetch DAX 40 trailing P/E
+        run: python3 scripts/fetch_dax_pe.py
+        continue-on-error: true
+
       - name: Check for data changes
         id: changes
         run: |

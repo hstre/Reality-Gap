@@ -54,10 +54,18 @@ Output JSON schema:
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import sys
-from datetime import date, datetime
+import time
+from datetime import date
 from pathlib import Path
+
+try:
+    import requests
+except ImportError:
+    sys.exit("requests not installed: pip install requests")
 
 try:
     import yfinance as yf
@@ -110,6 +118,58 @@ def fetch_trailing_pe() -> tuple[float, list[str]]:
     return avg_pe, sources
 
 
+def fetch_historical_pe_stooq() -> list[dict]:
+    """
+    Attempt to fetch monthly historical P/E for the DAX from stooq.com.
+    stooq provides time-series downloads via URL; the P/E symbol may be 'pe:^dax'.
+    Returns a sorted list of {date, trailing_pe, rg10} dicts, or [] on failure.
+    """
+    urls = [
+        "https://stooq.com/q/d/l/?s=pe%3A%5Edax&i=m",
+        "https://stooq.com/q/d/l/?s=pe%3A%5Egdaxi&i=m",
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+        "Accept": "text/csv, text/plain, */*",
+    }
+    for url in urls:
+        try:
+            resp = requests.get(url, headers=headers, timeout=20)
+            if resp.status_code != 200:
+                print(f"  stooq: HTTP {resp.status_code} for {url}")
+                continue
+            text = resp.text.strip()
+            if not text or "<html" in text[:200].lower() or "No data" in text:
+                print(f"  stooq: no usable data at {url}")
+                continue
+            reader = csv.DictReader(io.StringIO(text))
+            series: list[dict] = []
+            for row in reader:
+                date_raw = (row.get("Date") or "").strip()
+                close_raw = (row.get("Close") or "").strip()
+                if not date_raw or not close_raw:
+                    continue
+                try:
+                    pe = float(close_raw)
+                    if 3 < pe < 300:
+                        series.append({
+                            "date": date_raw[:7],
+                            "trailing_pe": round(pe, 2),
+                            "rg10": round(pe / 10, 3),
+                        })
+                except ValueError:
+                    continue
+            if len(series) >= 12:
+                series.sort(key=lambda x: x["date"])
+                print(f"  stooq: {len(series)} monthly observations from {series[0]['date']} to {series[-1]['date']}")
+                return series
+        except Exception as exc:
+            print(f"  stooq ({url}): {exc}")
+        time.sleep(1)
+    print("  stooq: no historical P/E data available — current-only mode")
+    return []
+
+
 def fetch_dax_price() -> tuple[float, float]:
     """
     Fetch current DAX price and 52-week change percent from yfinance.
@@ -136,11 +196,14 @@ def main() -> None:
     pe, sources = fetch_trailing_pe()
     price, ytd  = fetch_dax_price()
 
+    print("\n  Attempting historical P/E from stooq...")
+    series = fetch_historical_pe_stooq()
+
     rg10 = round(pe / 10, 3)
     today = date.today()
     date_str = today.strftime("%Y-%m")
 
-    out = {
+    out: dict = {
         "source":   "yfinance / Yahoo Finance — iShares Core DAX UCITS ETF (EXS1.DE), "
                     "Xtrackers DAX UCITS ETF (DBXD.DE)",
         "method":   "trailing_pe",
@@ -164,6 +227,10 @@ def main() -> None:
         },
     }
 
+    if series:
+        out["series_source"] = "stooq.com — monthly DAX P/E download"
+        out["series"] = series
+
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT_PATH, "w") as f:
         json.dump(out, f, separators=(",", ":"), indent=2)
@@ -172,6 +239,8 @@ def main() -> None:
     print(f"  Current: {date_str}  trailing P/E={pe:.2f}  M(DAX40)RG10={rg10}")
     print(f"  DAX price: {price:.0f}  52w change: {ytd:.1f}%")
     print(f"  Sources: {sources}")
+    if series:
+        print(f"  Historical series: {len(series)} monthly observations")
 
 
 if __name__ == "__main__":
