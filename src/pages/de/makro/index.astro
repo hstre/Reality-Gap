@@ -62,7 +62,8 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
 const chartLabels = data.series.map(p => p.date);
 const chartRg10   = data.series.map(p => p.rg10);
 const chartAvg    = data.series.map(() => parseFloat(avgRg10.toFixed(3)));
-const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg });
+const chartGs10   = data.series.map((p: any) => p.gs10 ?? null);
+const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg, gs10: chartGs10 });
 
 const hasMultpl = data.sources.includes('multpl_supplement');
 
@@ -85,13 +86,17 @@ function fmt2(v: number): string { return v.toFixed(2); }
   </div>
 
   <!-- Index-Umschalter -->
-  <div class="flex items-center gap-2 mb-4">
+  <div class="flex items-center gap-2 mb-4 flex-wrap">
     <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
       S&amp;P 500 ←
     </span>
     <a href={`${base}/de/makro/dax40`}
        class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
       DAX 40
+    </a>
+    <a href={`${base}/de/makro/global`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      Globaler Buffett-Indikator
     </a>
   </div>
 
@@ -106,7 +111,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
     <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Makro-Näherung — kein vollständiger RG</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Monatliche Reihe · {data.series.length} Beobachtungen</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Daten bis {cur.date} · abgerufen {data.fetched}</span>
-    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Materielles Eigenkapital nicht enthalten</span>
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Vollständige Eigenkapital-Korrektur in Vorbereitung (P/B-Daten ausstehend)</span>
   </div>
 
   <!-- ── Abschnitt 1: Aktueller Wert ────────────────────────────────────── -->
@@ -135,12 +140,14 @@ function fmt2(v: number): string { return v.toFixed(2); }
       <!-- Formel -->
       <div class="border border-gray-200 rounded-md p-5 bg-white">
         <div class="text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">Konstruktion</div>
-        <div class="font-mono text-sm text-gray-800 mb-3">M(S&amp;P 500)RG10 = CAPE / 10</div>
+        <div class="font-mono text-sm text-gray-800 mb-1">Aktuell: CAPE / 10</div>
+        <div class="font-mono text-xs text-gray-500 mb-3">Vollständig (P/B ausstehend): 1 / (1/PB + 10/CAPE)</div>
         <p class="text-xs text-gray-500">
-          Der vollständige firmenspezifische RG lautet MC / (TE + 10·G). Auf Makroebene
-          fehlt das tangible Eigenkapital. CAPE erfasst das Verhältnis Preis / geglätteter
-          Realgewinn und entspricht damit dem Zähler des RG-Nenners.
-          Die Division durch 10 passt die Skala an den Kapitalisierungsfaktor N = 10 an.
+          Der vollständige Makro-RG lautet <span class="font-mono">MC / (Buchwert + 10·Gewinne)</span>.
+          Da <span class="font-mono">Buchwert = MC/PB</span> und <span class="font-mono">Gewinne = MC/CAPE</span>,
+          vereinfacht sich das zu <span class="font-mono">1/(1/PB + 10/CAPE)</span>.
+          Die P/B-Datenquelle wird recherchiert; bis dahin bleibt CAPE/10 die veröffentlichte
+          Näherung — sie liegt immer über der vollständigen Konstruktion.
         </p>
       </div>
     </div>
@@ -224,6 +231,12 @@ function fmt2(v: number): string { return v.toFixed(2); }
           <line x1="0" y1="5" x2="24" y2="5" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2"/>
         </svg>
         RG10 = 1,0 Referenz
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true">
+          <line x1="0" y1="5" x2="24" y2="5" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </svg>
+        10-J. Treasury GS10 (rechte Achse)
       </span>
     </div>
 
@@ -402,10 +415,11 @@ function fmt2(v: number): string { return v.toFixed(2); }
     if (!raw) return;
     const avg = parseFloat(canvas.getAttribute('data-avg') ?? '0');
 
-    const { labels, rg10, avg: avgLine } = JSON.parse(raw) as {
+    const { labels, rg10, avg: avgLine, gs10 } = JSON.parse(raw) as {
       labels: string[];
       rg10: number[];
       avg: number[];
+      gs10: (number | null)[];
     };
 
     const refLine = labels.map(() => 1.0);
@@ -426,6 +440,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointHoverRadius: 4,
             tension: 0.2,
             spanGaps: false,
+            yAxisID: 'y',
             order: 1,
           },
           {
@@ -438,6 +453,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointRadius: 0,
             tension: 0,
             spanGaps: true,
+            yAxisID: 'y',
             order: 2,
           },
           {
@@ -450,7 +466,21 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointRadius: 0,
             tension: 0,
             spanGaps: true,
+            yAxisID: 'y',
             order: 3,
+          },
+          {
+            label: '10-J. Treasury (GS10)',
+            data: gs10,
+            borderColor: '#10b981',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [3, 2],
+            pointRadius: 0,
+            tension: 0.2,
+            spanGaps: false,
+            yAxisID: 'y2',
+            order: 4,
           },
         ],
       },
@@ -465,7 +495,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
             callbacks: {
               label: (ctx: any): string => {
                 const v = ctx.parsed.y;
-                if (v === null || v === undefined) return `${ctx.dataset.label}: —`;
+                if (v === null || v === undefined) return '';
+                if (ctx.datasetIndex === 3) return `GS10: ${Number(v).toFixed(2)} %`;
                 return `${ctx.dataset.label}: ${Number(v).toFixed(2)}×`;
               },
             },
@@ -474,25 +505,20 @@ function fmt2(v: number): string { return v.toFixed(2); }
         scales: {
           x: {
             grid: { display: false },
-            ticks: {
-              color: '#9ca3af',
-              font: { size: 10 },
-              maxRotation: 0,
-              autoSkip: true,
-              maxTicksLimit: 15,
-            },
+            ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 15 },
             border: { color: '#e5e7eb' },
           },
           y: {
-            beginAtZero: true,
-            min: 0,
+            beginAtZero: true, min: 0, position: 'left',
             grid: { color: '#f3f4f6' },
-            ticks: {
-              color: '#9ca3af',
-              font: { size: 10 },
-              callback: (v: any): string => `${Number(v).toFixed(1)}×`,
-            },
+            ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any): string => `${Number(v).toFixed(1)}×` },
             border: { color: '#e5e7eb' },
+          },
+          y2: {
+            beginAtZero: true, min: 0, max: 20, position: 'right',
+            grid: { display: false },
+            ticks: { color: '#10b981', font: { size: 9 }, callback: (v: any): string => `${Number(v).toFixed(0)}%` },
+            border: { color: '#d1fae5' },
           },
         },
       },

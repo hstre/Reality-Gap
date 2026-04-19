@@ -1,0 +1,352 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import rawData from '../../../data/macro/buffett_global.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+interface YearPoint { year: number; value: number; }
+interface CountryData { name: string; iso3: string; series: YearPoint[]; latest: YearPoint | null; }
+interface BuffettData {
+  indicator: string; description: string; source: string;
+  fetched: string; note: string;
+  countries: Record<string, CountryData>;
+}
+
+const data = rawData as unknown as BuffettData;
+
+const COUNTRY_CFG: Array<{ iso2: string; label: string; labelDE: string; color: string }> = [
+  { iso2: 'US', label: 'United States', labelDE: 'USA',           color: '#1e4d78' },
+  { iso2: 'JP', label: 'Japan',         labelDE: 'Japan',         color: '#b45309' },
+  { iso2: 'CH', label: 'Switzerland',   labelDE: 'Schweiz',       color: '#15803d' },
+  { iso2: 'GB', label: 'United Kingdom',labelDE: 'Vereinigtes Königreich', color: '#7c3aed' },
+  { iso2: 'FR', label: 'France',        labelDE: 'Frankreich',    color: '#db2777' },
+  { iso2: 'CN', label: 'China',         labelDE: 'China',         color: '#dc2626' },
+  { iso2: 'DE', label: 'Germany',       labelDE: 'Deutschland',   color: '#64748b' },
+];
+
+function bandFor(v: number | null): { label: string; color: string; bg: string; border: string } {
+  if (v === null) return { label: 'Keine aktuellen Daten', color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200' };
+  if (v < 50)  return { label: 'Niedrig',     color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+  if (v < 100) return { label: 'Moderat',     color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' };
+  if (v < 150) return { label: 'Erhöht',      color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' };
+  if (v < 200) return { label: 'Hoch',        color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200' };
+  return               { label: 'Sehr hoch',  color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200' };
+}
+
+const rows = COUNTRY_CFG.map(cfg => {
+  const cd = data.countries[cfg.iso2];
+  const latest = cd?.latest ?? null;
+  return { iso2: cfg.iso2, name: cfg.labelDE, latest, color: cfg.color, band: bandFor(latest?.value ?? null) };
+}).sort((a, b) => (b.latest?.value ?? 0) - (a.latest?.value ?? 0));
+
+// Chart data (1990+)
+const allYears = new Set<number>();
+for (const cfg of COUNTRY_CFG) {
+  for (const pt of data.countries[cfg.iso2]?.series ?? []) {
+    if (pt.year >= 1990) allYears.add(pt.year);
+  }
+}
+const sortedYears = [...allYears].sort((a, b) => a - b);
+
+const chartDatasets = COUNTRY_CFG.map(cfg => {
+  const byYear = new Map<number, number>((data.countries[cfg.iso2]?.series ?? []).map(p => [p.year, p.value]));
+  return {
+    label: cfg.labelDE,
+    color: cfg.color,
+    data: sortedYears.map(y => byYear.get(y) ?? null),
+  };
+});
+
+const chartPayload = JSON.stringify({ labels: sortedYears, datasets: chartDatasets });
+---
+
+<BaseLayout
+  title="Globaler Buffett-Indikator — Reality Gap"
+  description="Marktkapitalisierung als Anteil am BIP für USA, Japan, Schweiz, UK, Frankreich, China, Deutschland. Weltbank-Daten."
+  lang="de"
+  canonicalPath="/de/makro/global"
+  altLangPath="/macro/global"
+  altLang="en"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <div class="mb-2">
+    <a href={`${base}/de/makro`} class="text-sm text-gray-400 hover:text-accent no-underline">← Makro-RG</a>
+  </div>
+
+  <div class="flex items-center gap-2 mb-4 flex-wrap">
+    <a href={`${base}/de/makro`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      S&amp;P 500
+    </a>
+    <a href={`${base}/de/makro/dax40`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      DAX 40
+    </a>
+    <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
+      Globaler Buffett-Indikator ←
+    </span>
+  </div>
+
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    Globaler Buffett-Indikator
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Marktkapitalisierung als Prozentsatz des BIP — ein länderübergreifendes Makro-Bewertungsmaß.
+    Werte über 100 % bedeuten, dass der Aktienmarkt mehr wert ist als die gesamte Jahreswirtschaftsleistung.
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Jährliche Daten · Weltbank</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">7 Länder · 1975–2024</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Abgerufen {data.fetched}</span>
+  </div>
+
+  <!-- ── Abschnitt 1: Indikator & Bezug zu RG ──────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-3" style="font-family: Georgia, serif;">
+      1. Der Indikator und sein Bezug zum RG
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Formel</div>
+        <div class="font-mono text-sm text-gray-800 mb-2">Buffett = MK / BIP × 100</div>
+        <p class="text-xs text-gray-500">
+          MK = Gesamtmarktkapitalisierung aller börsennotierten Unternehmen.
+          BIP = Nominales Bruttoinlandsprodukt. Ergebnis in Prozent.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Bezug zum RG</div>
+        <div class="font-mono text-sm text-gray-800 mb-2">RG ≈ MK / (EK + N·G)</div>
+        <p class="text-xs text-gray-500">
+          Beide Kennzahlen messen, wie weit die Marktkapitalisierung über wirtschaftlichen
+          Fundamentaldaten liegt. Das BIP korreliert mit aggregierten Unternehmensgewinnen —
+          hohe Buffett-Werte gehen typischerweise mit hohen RG-Werten einher.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Unterschied</div>
+        <p class="text-xs text-gray-500">
+          Der Buffett-Indikator verwendet das BIP als Nenner (volkswirtschaftliche
+          Gesamtleistung), nicht Gewinne oder Buchwert. Er ignoriert den
+          Eigenkapitalterm und verwendet einen einjährigen statt einen geglätteten Nenner.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Abschnitt 2: Aktuelle Werte ───────────────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      2. Aktuelle Werte
+    </h2>
+    <div class="mb-6" style="height: 180px; position: relative;">
+      <canvas id="current-bar-chart-de" data-values={JSON.stringify(
+        rows.map(r => ({ label: r.iso2, value: r.latest?.value ?? null, year: r.latest?.year, color: r.color }))
+      )}></canvas>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Land</th>
+            <th class="text-right text-xs text-gray-500 font-medium">MK / BIP</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Jahr</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Niveau</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr>
+              <td class="text-sm font-medium text-gray-800">
+                <span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style={`background:${row.color}`}></span>
+                {row.name}
+              </td>
+              <td class="text-right font-mono text-sm font-semibold text-gray-800">
+                {row.latest ? `${row.latest.value.toFixed(0)} %` : '—'}
+              </td>
+              <td class="text-sm text-gray-500">{row.latest?.year ?? '—'}</td>
+              <td>
+                <span class={`text-xs rounded px-2 py-0.5 border font-medium ${row.band.bg} ${row.band.color} ${row.band.border}`}>
+                  {row.band.label}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Abschnitt 3: Historischer Vergleich ───────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      3. Historischer Vergleich (1990–2024)
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Jährliche Beobachtungen. Einige Länderreihen enden vor 2024 wegen Meldeverzögerungen der Weltbank.
+    </p>
+    <div class="flex flex-wrap gap-x-5 gap-y-1.5 mb-3 text-xs text-gray-500">
+      {COUNTRY_CFG.map(cfg => (
+        <span class="flex items-center gap-1.5">
+          <svg width="18" height="10" aria-hidden="true">
+            <line x1="0" y1="5" x2="18" y2="5" stroke={cfg.color} stroke-width="2.5"/>
+          </svg>
+          {cfg.labelDE}
+        </span>
+      ))}
+    </div>
+    <div class="flex flex-wrap gap-3 mb-3 text-xs">
+      {[
+        { v: '< 50 %',    label: 'Niedrig',    color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        { v: '50–100 %',  label: 'Moderat',    color: 'bg-blue-50 text-blue-700 border-blue-200' },
+        { v: '100–150 %', label: 'Erhöht',     color: 'bg-amber-50 text-amber-700 border-amber-200' },
+        { v: '150–200 %', label: 'Hoch',       color: 'bg-orange-50 text-orange-700 border-orange-200' },
+        { v: '> 200 %',   label: 'Sehr hoch',  color: 'bg-red-50 text-red-700 border-red-200' },
+      ].map(b => (
+        <span class={`border rounded px-2 py-0.5 font-medium ${b.color}`}>{b.v} — {b.label}</span>
+      ))}
+    </div>
+    <div class="relative" style="height: 320px;">
+      <canvas id="global-line-chart-de" data-chart={chartPayload}
+        aria-label="Globaler Buffett-Indikator historisch 1990–2024" role="img"
+        style="width: 100%; height: 100%;"></canvas>
+    </div>
+    <p class="text-xs text-gray-400 mt-2">
+      Quelle: Weltbank — CM.MKT.LCAP.GD.ZS. Jährliche Daten.
+      China ab 2003; Frankreich/UK mit Meldeverzögerungen bis 2018/2022.
+    </p>
+  </section>
+
+  <!-- ── Abschnitt 4: Interpretation ───────────────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      4. Interpretation und Einschränkungen
+    </h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Dimension</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Erläuterung</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['Was gemessen wird', 'Gesamtmarktkapitalisierung inländisch notierter Unternehmen als Anteil am nominalen BIP. Ein Wert von 100 % bedeutet: Der Aktienmarkt ist ein Jahres-BIP wert.'],
+            ['Buffett-Referenz', 'Warren Buffett erwähnte diesen Indikator 2001 in einem Fortune-Artikel als „wahrscheinlich das beste einzelne Maß für die aktuelle Bewertungslage". Er hat seitdem breite Verwendung gefunden, obwohl Buffett selbst auf Einschränkungen hinwies.'],
+            ['Warum Deutschland niedrig', 'Deutschland hat ein stark bankbasiertes Finanzsystem. Viele bedeutende Unternehmen (Mittelstand) sind nicht börsennotiert. Der DAX 40 repräsentiert einen viel kleineren Wirtschaftsanteil als der S&P 500 in den USA.'],
+            ['Warum die Schweiz hoch', 'Die Schweiz beherbergt global bedeutende Unternehmen (Nestlé, Novartis, Roche, UBS), deren Marktkapitalisierung das Schweizer BIP bei weitem übersteigt — sie operieren global, sind aber lokal notiert.'],
+            ['Warum Japan hoch', 'Nikkei 225 und TOPIX decken einen sehr großen Teil der japanischen Wirtschaft ab. Der hohe Wert spiegelt Japans reifen Großkapitalmarkt im Verhältnis zum BIP wider.'],
+            ['Strukturelle Unterschiede', 'Ländervergleiche werden beeinflusst durch: (1) Anteil der börsennotierten Wirtschaft, (2) Listings ausländischer Unternehmen, (3) Konzernstrukturen. Deutschland und Frankreich erscheinen systematisch „günstiger" aufgrund ihrer Notierungsstruktur.'],
+            ['Bezug zum RG', 'Beide Kennzahlen sind hoch, wenn Märkte aggressiv im Verhältnis zur Wirtschaftsleistung bewertet sind. Das RG-Framework nutzt geglättete Gewinne und tangibles Eigenkapital auf Unternehmensebene — präziser, aber datenintensiver.'],
+            ['Datenquelle', 'Weltbank Open Data — World Development Indicators. Indikator CM.MKT.LCAP.GD.ZS. Jährlich. Meldeverzögerungen variieren (USA/DE/JP/CH bis 2024; UK bis 2022; Frankreich bis 2018).'],
+          ].map(([dim, detail]) => (
+            <tr>
+              <td class="text-sm font-medium text-gray-700 whitespace-nowrap align-top">{dim}</td>
+              <td class="text-sm text-gray-600">{detail}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+    Quelle: Weltbank Open Data — World Development Indicators (CM.MKT.LCAP.GD.ZS).
+    Abgerufen: {data.fetched}. Jährliche Beobachtungen. Nicht bereinigt um Unterschiede in Notierungsstrukturen.
+    Diese Seite dient ausschließlich Forschungszwecken und stellt keine Anlageberatung dar.
+  </p>
+
+</div>
+
+<script>
+  function initCharts(): void {
+    // @ts-ignore
+    const Chart = (window as any).Chart;
+    if (!Chart) return;
+
+    const barCanvas = document.getElementById('current-bar-chart-de') as HTMLCanvasElement | null;
+    if (barCanvas) {
+      const rows = JSON.parse(barCanvas.getAttribute('data-values') ?? '[]') as
+        Array<{ label: string; value: number | null; year: number; color: string }>;
+      const validRows = rows.filter(r => r.value !== null);
+      new Chart(barCanvas, {
+        type: 'bar',
+        data: {
+          labels: validRows.map(r => r.label),
+          datasets: [{ data: validRows.map(r => r.value), backgroundColor: validRows.map(r => r.color + 'cc'), borderColor: validRows.map(r => r.color), borderWidth: 1 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx: any) => { const row = validRows[ctx.dataIndex]; return `${row.year}: ${(ctx.parsed.y as number).toFixed(0)} %`; } } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 11 } } },
+            y: { beginAtZero: true, ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any) => `${v}%` }, grid: { color: '#f3f4f6' } },
+          },
+        },
+      });
+    }
+
+    const lineCanvas = document.getElementById('global-line-chart-de') as HTMLCanvasElement | null;
+    if (lineCanvas) {
+      const raw = lineCanvas.getAttribute('data-chart');
+      if (!raw) return;
+      const payload = JSON.parse(raw) as {
+        labels: number[];
+        datasets: Array<{ label: string; data: (number | null)[]; color: string }>;
+      };
+      const ref100 = payload.labels.map(() => 100);
+      const ref150 = payload.labels.map(() => 150);
+      const ref200 = payload.labels.map(() => 200);
+      new Chart(lineCanvas, {
+        type: 'line',
+        data: {
+          labels: payload.labels,
+          datasets: [
+            ...payload.datasets.map(ds => ({
+              label: ds.label, data: ds.data, borderColor: ds.color,
+              backgroundColor: 'transparent', borderWidth: 2,
+              pointRadius: 0, pointHoverRadius: 4, tension: 0.2, spanGaps: false,
+            })),
+            { label: '100 %', data: ref100, borderColor: '#d1d5db', borderWidth: 1, borderDash: [4,3], pointRadius: 0, backgroundColor: 'transparent', spanGaps: true },
+            { label: '150 %', data: ref150, borderColor: '#fbbf24', borderWidth: 1, borderDash: [4,3], pointRadius: 0, backgroundColor: 'transparent', spanGaps: true },
+            { label: '200 %', data: ref200, borderColor: '#f87171', borderWidth: 1, borderDash: [4,3], pointRadius: 0, backgroundColor: 'transparent', spanGaps: true },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              filter: (item: any) => item.datasetIndex < payload.datasets.length,
+              callbacks: { label: (ctx: any): string => { const v = ctx.parsed.y as number | null; if (!v) return ''; return `${ctx.dataset.label}: ${v.toFixed(0)} %`; } },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, border: { color: '#e5e7eb' } },
+            y: { beginAtZero: true, min: 0, grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any) => `${v}%` }, border: { color: '#e5e7eb' } },
+          },
+        },
+      });
+    }
+  }
+
+  function loadChartJs(cb: () => void): void {
+    // @ts-ignore
+    if ((window as any).Chart) { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload = cb;
+    s.onerror = () => console.warn('GlobalChartDE: failed to load Chart.js');
+    document.head.appendChild(s);
+  }
+
+  loadChartJs(initCharts);
+</script>
+
+</BaseLayout>
