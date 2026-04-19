@@ -1,41 +1,27 @@
 #!/usr/bin/env python3
 """
-Reality Gap — Shiller CAPE Data Fetcher
-========================================
-Primary source: Robert Shiller's ie_data.xls (Yale University).
-Supplement:     multpl.com monthly CAPE table for months after the Yale cutoff.
+Reality Gap — Shiller CAPE + S&P 500 P/B Fetcher
+==================================================
+Primary CAPE source:  Robert Shiller ie_data.xls (Yale University).
+CAPE supplement:      multpl.com monthly CAPE table (months after Yale cutoff).
+P/B source:           multpl.com S&P 500 Price-to-Book monthly table (~1960–present).
 
-The Yale file updates sporadically; multpl.com tracks the same Shiller CAPE
-series on a monthly basis and is used to fill the gap to the present.
+Full RG formula (where P/B available):
+    M(S&P500)RG10_full = 1 / (1/PB + 10/CAPE)
+                       = (PB × CAPE) / (CAPE + 10 × PB)
+  Derivation:
+    RG10 = Price / (BookValue + 10 × SmoothedEarnings)
+         = Price / (Price/PB + 10 × Price/CAPE)
+         = 1 / (1/PB + 10/CAPE)
 
-All data uses a single consistent standard: monthly observations.
-- "current" field = the most recent monthly observation available
-- "series"  field = all monthly observations 1881-present
-- The page chart uses the same monthly series; no annual downsampling
+Approximation (no P/B data, pre-1960):
+    M(S&P500)RG10 = CAPE / 10  (tangible equity omitted)
 
 Usage:
     python3 scripts/fetch_shiller.py
 
 Dependencies: requests, pandas, xlrd, beautifulsoup4
     pip install requests pandas xlrd beautifulsoup4
-
-Output JSON schema:
-  {
-    "source": "...",
-    "sources": ["yale_xls", "multpl_supplement"],
-    "yale_cutoff": "YYYY-MM",
-    "fetched": "YYYY-MM-DD",
-    "series_standard": "monthly",
-    "note": "...",
-    "current": {
-      "date": "YYYY-MM",
-      "cape": 39.35,
-      "rg10": 3.935,
-      "trend": "+"
-    },
-    "series": [{"date": "1881-01", "cape": 18.5, "rg10": 1.85}, ...],
-    "peaks": [...]
-  }
 """
 
 from __future__ import annotations
@@ -65,8 +51,9 @@ except ImportError:
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_PATH  = REPO_ROOT / "src" / "data" / "macro" / "sp500_cape.json"
 
-SHILLER_URL = "http://www.econ.yale.edu/~shiller/data/ie_data.xls"
-MULTPL_URL  = "https://www.multpl.com/shiller-pe/table/by-month"
+SHILLER_URL  = "http://www.econ.yale.edu/~shiller/data/ie_data.xls"
+MULTPL_URL   = "https://www.multpl.com/shiller-pe/table/by-month"
+MULTPL_PB_URL = "https://www.multpl.com/s-and-p-500-price-to-book-value/table/by-month"
 
 HEADERS_YALE   = {"User-Agent": "reality-gap-research rentschler@lbsmail.de"}
 HEADERS_MULTPL = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
@@ -84,21 +71,16 @@ PEAK_DATES = {
 # ---------------------------------------------------------------------------
 
 def fetch_yale() -> pd.DataFrame:
-    """
-    Download and parse Shiller ie_data.xls.
-    Returns a DataFrame with columns: date_str (YYYY-MM), cape (float).
-    Series standard: monthly.
-    """
     print(f"  [Yale] Fetching {SHILLER_URL} ...")
     r = requests.get(SHILLER_URL, headers=HEADERS_YALE, timeout=60)
     r.raise_for_status()
     print(f"  [Yale] Downloaded {len(r.content):,} bytes")
 
     buf = io.BytesIO(r.content)
-    # skiprows=8: 8 intro/header rows; col 0=Date, col 12=CAPE
+    # col 0=Date, col 6=GS10 (10-yr Treasury), col 12=CAPE
     df = pd.read_excel(buf, sheet_name="Data", header=None,
-                       engine="xlrd", skiprows=8, usecols=[0, 12])
-    df.columns = ["date_raw", "cape"]
+                       engine="xlrd", skiprows=8, usecols=[0, 6, 12])
+    df.columns = ["date_raw", "gs10", "cape"]
 
     df["date_raw"] = pd.to_numeric(df["date_raw"], errors="coerce")
     df = df.dropna(subset=["date_raw"]).copy()
@@ -108,8 +90,9 @@ def fetch_yale() -> pd.DataFrame:
                       df["month"].map(lambda m: f"{m:02d}"))
 
     df["cape"] = pd.to_numeric(df["cape"], errors="coerce")
+    df["gs10"] = pd.to_numeric(df["gs10"], errors="coerce")
     df = df[df["cape"].notna() & (df["cape"] > 0) & (df["year"] >= 1871)].copy()
-    df = df[["date_str", "cape"]].sort_values("date_str").reset_index(drop=True)
+    df = df[["date_str", "cape", "gs10"]].sort_values("date_str").reset_index(drop=True)
 
     print(f"  [Yale] Parsed {len(df)} monthly observations "
           f"({df['date_str'].iloc[0]} – {df['date_str'].iloc[-1]})")
@@ -117,14 +100,10 @@ def fetch_yale() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# 2. multpl.com supplement
+# 2. multpl.com helpers
 # ---------------------------------------------------------------------------
 
 def parse_multpl_date(raw: str) -> str | None:
-    """
-    Parse 'Apr 10, 2026', 'Mar 1, 2026', 'Jan 1, 2025' → 'YYYY-MM'.
-    multpl.com uses 'Mon DD, YYYY' or 'Mon D, YYYY' format.
-    """
     months = {
         "Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
         "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
@@ -138,51 +117,50 @@ def parse_multpl_date(raw: str) -> str | None:
     return None
 
 
-def fetch_multpl_supplement(after: str) -> pd.DataFrame:
+def fetch_multpl_table(url: str, label: str, value_min: float, value_max: float,
+                       after: str | None = None) -> pd.DataFrame:
     """
-    Scrape monthly CAPE values from multpl.com for months strictly after `after` (YYYY-MM).
-    Returns DataFrame with columns: date_str, cape.
-    Falls back to empty DataFrame on any error.
+    Generic multpl.com table scraper.
+    `after`: if set, only return rows with date_str > after.
     """
-    print(f"  [multpl] Fetching supplement for months after {after} ...")
+    print(f"  [multpl/{label}] Fetching {url} ...")
     try:
-        r = requests.get(MULTPL_URL, headers=HEADERS_MULTPL, timeout=20)
+        r = requests.get(url, headers=HEADERS_MULTPL, timeout=20)
         r.raise_for_status()
     except Exception as e:
-        print(f"  [multpl] WARNING: fetch failed ({e}). Continuing without supplement.")
-        return pd.DataFrame(columns=["date_str", "cape"])
+        print(f"  [multpl/{label}] WARNING: fetch failed ({e}). Returning empty.")
+        return pd.DataFrame(columns=["date_str", "value"])
 
     soup = BeautifulSoup(r.text, "html.parser")
     table = soup.find("table", id="datatable")
     if not table:
-        print("  [multpl] WARNING: datatable not found. Continuing without supplement.")
-        return pd.DataFrame(columns=["date_str", "cape"])
+        print(f"  [multpl/{label}] WARNING: datatable not found.")
+        return pd.DataFrame(columns=["date_str", "value"])
 
     rows_out = []
-    for tr in table.find_all("tr")[1:]:  # skip header
+    for tr in table.find_all("tr")[1:]:
         cells = tr.find_all("td")
         if len(cells) < 2:
             continue
         date_str = parse_multpl_date(cells[0].text.strip())
         if date_str is None:
             continue
-        # Only keep months strictly after the Yale cutoff
-        if date_str <= after:
+        if after and date_str <= after:
             continue
-        cape_text = cells[1].text.strip().replace(",", "")
+        val_text = cells[1].text.strip().replace(",", "")
         try:
-            cape = float(cape_text)
+            val = float(val_text)
         except ValueError:
             continue
-        if 5 < cape < 200:
-            rows_out.append({"date_str": date_str, "cape": cape})
+        if value_min < val < value_max:
+            rows_out.append({"date_str": date_str, "value": val})
 
     df = pd.DataFrame(rows_out).sort_values("date_str").reset_index(drop=True)
     if not df.empty:
-        print(f"  [multpl] Supplement: {len(df)} months "
+        print(f"  [multpl/{label}] {len(df)} rows "
               f"({df['date_str'].iloc[0]} – {df['date_str'].iloc[-1]})")
     else:
-        print("  [multpl] No supplement months found after cutoff.")
+        print(f"  [multpl/{label}] No rows found.")
     return df
 
 
@@ -191,10 +169,6 @@ def fetch_multpl_supplement(after: str) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def compute_trend(series: list[dict]) -> str:
-    """
-    12-month % change in CAPE (most recent vs 12 monthly observations ago).
-    ++ >+20%  + >+5%  = ±5%  - >-5%  -- >-20%
-    """
     if len(series) < 13:
         return "="
     current  = series[-1]["cape"]
@@ -215,46 +189,82 @@ def compute_trend(series: list[dict]) -> str:
 
 def main() -> None:
     print("=" * 60)
-    print("  Shiller CAPE → M(S&P500)RG10 Fetcher  [monthly standard]")
+    print("  Shiller CAPE + S&P500 P/B → M(S&P500)RG10 Fetcher")
     print("=" * 60)
 
-    # -- Fetch Yale data --------------------------------------------------
+    # -- CAPE: Yale + multpl supplement ------------------------------------
     yale_df      = fetch_yale()
     yale_cutoff  = yale_df["date_str"].iloc[-1]
 
-    # -- Fetch multpl supplement ------------------------------------------
-    supp_df      = fetch_multpl_supplement(after=yale_cutoff)
+    supp_df = fetch_multpl_table(
+        MULTPL_URL, label="CAPE", value_min=5, value_max=200, after=yale_cutoff
+    )
+    supp_df = supp_df.rename(columns={"value": "cape"})
 
-    # -- Merge and deduplicate --------------------------------------------
-    combined     = pd.concat([yale_df, supp_df], ignore_index=True)
-    combined     = combined.drop_duplicates(subset="date_str").sort_values("date_str")
-    combined     = combined.reset_index(drop=True)
+    cape_df = pd.concat([yale_df, supp_df[["date_str", "cape"]]], ignore_index=True)
+    cape_df = cape_df.drop_duplicates(subset="date_str").sort_values("date_str").reset_index(drop=True)
+    # gs10 comes only from Yale; fill NaN for supplement months
+    if "gs10" not in cape_df.columns:
+        cape_df["gs10"] = None
 
     sources = ["yale_xls"]
     if not supp_df.empty:
         sources.append("multpl_supplement")
 
-    print(f"\n  Combined: {len(combined)} monthly observations "
-          f"({combined['date_str'].iloc[0]} – {combined['date_str'].iloc[-1]})")
+    # -- P/B: multpl.com (no cutoff — take full table) ---------------------
+    pb_raw = fetch_multpl_table(
+        MULTPL_PB_URL, label="P/B", value_min=0.3, value_max=30.0
+    )
+    pb_map: dict[str, float] = {}
+    if not pb_raw.empty:
+        pb_map = dict(zip(pb_raw["date_str"], pb_raw["value"]))
+        sources.append("multpl_pb")
+        pb_series_start = pb_raw["date_str"].iloc[0]
+    else:
+        pb_series_start = None
+
+    print(f"\n  CAPE series:  {len(cape_df)} months "
+          f"({cape_df['date_str'].iloc[0]} – {cape_df['date_str'].iloc[-1]})")
+    print(f"  P/B map:      {len(pb_map)} months")
 
     # -- Build output series ----------------------------------------------
-    series = [
-        {
-            "date": row["date_str"],
-            "cape": round(float(row["cape"]), 2),
-            "rg10": round(float(row["cape"]) / 10, 3),
-        }
-        for _, row in combined.iterrows()
-    ]
+    series = []
+    for _, row in cape_df.iterrows():
+        ds   = row["date_str"]
+        cape = round(float(row["cape"]), 2)
+        rg10 = round(cape / 10, 3)
+        pb   = pb_map.get(ds)
+
+        gs10_val = row.get("gs10")
+        gs10 = round(float(gs10_val), 2) if gs10_val is not None and not pd.isna(gs10_val) else None
+
+        if pb is not None and pb > 0 and cape > 0:
+            rg10_full = round(1.0 / (1.0 / pb + 10.0 / cape), 3)
+        else:
+            rg10_full = None
+
+        point: dict = {"date": ds, "cape": cape, "rg10": rg10}
+        if gs10 is not None:
+            point["gs10"] = gs10
+        if pb is not None:
+            point["pb"]        = round(pb, 2)
+            point["rg10_full"] = rg10_full
+        series.append(point)
 
     trend   = compute_trend(series)
     current = series[-1]
 
     # -- Long-run stats ---------------------------------------------------
-    all_rg10 = [s["rg10"] for s in series]
+    all_rg10      = [s["rg10"]      for s in series]
+    all_rg10_full = [s["rg10_full"] for s in series if s.get("rg10_full") is not None]
+
     avg_rg10 = sum(all_rg10) / len(all_rg10)
     max_rg10 = max(all_rg10)
     min_rg10 = min(all_rg10)
+
+    avg_rg10_full = (sum(all_rg10_full) / len(all_rg10_full)) if all_rg10_full else None
+    max_rg10_full = max(all_rg10_full) if all_rg10_full else None
+    min_rg10_full = min(all_rg10_full) if all_rg10_full else None
 
     # -- Annotate peaks ---------------------------------------------------
     by_date = {s["date"]: s for s in series}
@@ -262,8 +272,13 @@ def main() -> None:
     for dt, note in PEAK_DATES.items():
         match = by_date.get(dt)
         if match:
-            peaks.append({"date": dt, "note": note,
-                          "cape": match["cape"], "rg10": match["rg10"]})
+            entry = {"date": dt, "note": note,
+                     "cape": match["cape"], "rg10": match["rg10"]}
+            if match.get("rg10_full") is not None:
+                entry["rg10_full"] = match["rg10_full"]
+            if match.get("pb") is not None:
+                entry["pb"] = match["pb"]
+            peaks.append(entry)
         else:
             peaks.append({"date": dt, "note": note})
 
@@ -274,22 +289,31 @@ def main() -> None:
         "yale_cutoff": yale_cutoff,
         "url": SHILLER_URL,
         "supplement_url": MULTPL_URL if "multpl_supplement" in sources else None,
+        "pb_url": MULTPL_PB_URL if "multpl_pb" in sources else None,
+        "pb_series_start": pb_series_start,
         "fetched": date.today().isoformat(),
         "series_standard": "monthly",
         "note": (
-            "M(S&P500)RG10 = CAPE / 10. Macro approximation — tangible equity not included. "
-            f"Primary source: Yale (up to {yale_cutoff}). "
+            "M(S&P500)RG10 = CAPE/10 (pre-1960, no P/B available). "
+            "M(S&P500)RG10_full = 1/(1/PB + 10/CAPE) (1960+, includes book value). "
+            f"Primary CAPE source: Yale (up to {yale_cutoff}). "
             + (f"Supplemented with multpl.com for {supp_df['date_str'].iloc[0]}–{supp_df['date_str'].iloc[-1]}."
-               if not supp_df.empty else "No supplement applied.")
+               if not supp_df.empty else "No CAPE supplement applied.")
         ),
-        "long_run_avg_rg10": round(avg_rg10, 4),
-        "long_run_max_rg10": round(max_rg10, 3),
-        "long_run_min_rg10": round(min_rg10, 3),
+        "long_run_avg_rg10":       round(avg_rg10, 4),
+        "long_run_max_rg10":       round(max_rg10, 3),
+        "long_run_min_rg10":       round(min_rg10, 3),
+        "long_run_avg_rg10_full":  round(avg_rg10_full, 4) if avg_rg10_full else None,
+        "long_run_max_rg10_full":  round(max_rg10_full, 3) if max_rg10_full else None,
+        "long_run_min_rg10_full":  round(min_rg10_full, 3) if min_rg10_full else None,
         "current": {
-            "date":  current["date"],
-            "cape":  current["cape"],
-            "rg10":  current["rg10"],
-            "trend": trend,
+            "date":      current["date"],
+            "cape":      current["cape"],
+            "rg10":      current["rg10"],
+            "gs10":      current.get("gs10"),
+            "pb":        current.get("pb"),
+            "rg10_full": current.get("rg10_full"),
+            "trend":     trend,
         },
         "series": series,
         "peaks":  peaks,
@@ -302,9 +326,11 @@ def main() -> None:
     size_kb = OUT_PATH.stat().st_size / 1024
     print(f"\n  Written: {OUT_PATH}  ({size_kb:.0f} KB)")
     print(f"  Current: {current['date']}  CAPE={current['cape']}  "
-          f"M(S&P500)RG10={current['rg10']}  trend={trend}")
-    print(f"  Long-run avg RG10: {avg_rg10:.3f}  "
-          f"max={max_rg10:.3f}  min={min_rg10:.3f}")
+          f"M(S&P500)RG10={current['rg10']}  "
+          f"P/B={current.get('pb')}  "
+          f"RG10_full={current.get('rg10_full')}  trend={trend}")
+    if avg_rg10_full:
+        print(f"  Full RG: avg={avg_rg10_full:.3f}  max={max_rg10_full:.3f}  min={min_rg10_full:.3f}")
     print(f"  Sources: {sources}")
 
 

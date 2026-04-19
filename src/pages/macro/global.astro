@@ -1,0 +1,486 @@
+---
+import BaseLayout from '../../components/layout/BaseLayout.astro';
+import rawData from '../../data/macro/buffett_global.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// ── Types ────────────────────────────────────────────────────────────────────
+interface YearPoint { year: number; value: number; }
+interface CountryData {
+  name: string;
+  iso3: string;
+  series: YearPoint[];
+  latest: YearPoint | null;
+}
+interface BuffettData {
+  indicator: string;
+  description: string;
+  source: string;
+  fetched: string;
+  note: string;
+  countries: Record<string, CountryData>;
+}
+
+const data = rawData as unknown as BuffettData;
+
+// ── Country config ────────────────────────────────────────────────────────────
+const COUNTRY_CFG: Array<{ iso2: string; label: string; color: string; dash?: number[] }> = [
+  { iso2: 'US', label: 'United States', color: '#1e4d78' },
+  { iso2: 'JP', label: 'Japan',         color: '#b45309' },
+  { iso2: 'CH', label: 'Switzerland',   color: '#15803d' },
+  { iso2: 'GB', label: 'United Kingdom',color: '#7c3aed' },
+  { iso2: 'FR', label: 'France',        color: '#db2777' },
+  { iso2: 'CN', label: 'China',         color: '#dc2626' },
+  { iso2: 'DE', label: 'Germany',       color: '#64748b' },
+];
+
+// ── Build table rows ──────────────────────────────────────────────────────────
+interface Row {
+  iso2: string;
+  name: string;
+  latest: YearPoint | null;
+  color: string;
+  band: { label: string; color: string; bg: string; border: string };
+}
+
+function bandFor(v: number | null): { label: string; color: string; bg: string; border: string } {
+  if (v === null) return { label: 'No recent data', color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200' };
+  if (v < 50)  return { label: 'Low',      color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+  if (v < 100) return { label: 'Moderate', color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' };
+  if (v < 150) return { label: 'Elevated', color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' };
+  if (v < 200) return { label: 'High',     color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200' };
+  return               { label: 'Very High',color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200' };
+}
+
+const rows: Row[] = COUNTRY_CFG.map(cfg => {
+  const cd = data.countries[cfg.iso2];
+  const latest = cd?.latest ?? null;
+  return { iso2: cfg.iso2, name: cfg.label, latest, color: cfg.color, band: bandFor(latest?.value ?? null) };
+}).sort((a, b) => (b.latest?.value ?? 0) - (a.latest?.value ?? 0));
+
+// ── Chart data ────────────────────────────────────────────────────────────────
+// Build aligned year axis from 1990 onwards where most countries have data
+const allYears = new Set<number>();
+for (const cfg of COUNTRY_CFG) {
+  const cd = data.countries[cfg.iso2];
+  for (const pt of cd?.series ?? []) {
+    if (pt.year >= 1990) allYears.add(pt.year);
+  }
+}
+const sortedYears = [...allYears].sort((a, b) => a - b);
+
+interface ChartDataset {
+  label: string;
+  data: (number | null)[];
+  color: string;
+  dash?: number[];
+}
+
+const chartDatasets: ChartDataset[] = COUNTRY_CFG.map(cfg => {
+  const cd = data.countries[cfg.iso2];
+  const byYear = new Map<number, number>((cd?.series ?? []).map(p => [p.year, p.value]));
+  return {
+    label: cfg.label,
+    color: cfg.color,
+    dash: cfg.dash,
+    data: sortedYears.map(y => byYear.get(y) ?? null),
+  };
+});
+
+const chartPayload = JSON.stringify({
+  labels: sortedYears,
+  datasets: chartDatasets,
+});
+
+// ── Long-run data for history comparison ─────────────────────────────────────
+// US data from 1975 for the longer historical chart
+const usLongSeries = data.countries['US']?.series ?? [];
+const usLongChartData = JSON.stringify({
+  labels: usLongSeries.map(p => p.year),
+  values: usLongSeries.map(p => p.value),
+});
+---
+
+<BaseLayout
+  title="Global Buffett Indicator — Reality Gap"
+  description="Stock market capitalization to GDP (%) for US, Japan, Switzerland, UK, France, China, Germany. World Bank data."
+  lang="en"
+  canonicalPath="/macro/global"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <!-- Back -->
+  <div class="mb-2">
+    <a href={`${base}/macro`} class="text-sm text-gray-400 hover:text-accent no-underline">← Macro RG</a>
+  </div>
+
+  <!-- Index switcher -->
+  <div class="flex items-center gap-2 mb-4 flex-wrap">
+    <a href={`${base}/macro`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      S&amp;P 500
+    </a>
+    <a href={`${base}/macro/dax40`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      DAX 40
+    </a>
+    <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
+      Global ←
+    </span>
+  </div>
+
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    Global Buffett Indicator
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Stock market capitalization as a percentage of GDP — a cross-country macro valuation gauge.
+    Values above 100 % mean the market is worth more than the entire annual economic output.
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Annual data · World Bank</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">7 countries · 1975–2024</span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Fetched {data.fetched}</span>
+  </div>
+
+  <!-- ── Section 1: What is the Buffett Indicator ──────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-3" style="font-family: Georgia, serif;">
+      1. The Indicator and its Relation to RG
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Formula</div>
+        <div class="font-mono text-sm text-gray-800 mb-2">Buffett = MC / GDP × 100</div>
+        <p class="text-xs text-gray-500">
+          MC = total stock market capitalization.
+          GDP = nominal annual gross domestic product.
+          Result in percent.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Relation to RG</div>
+        <div class="font-mono text-sm text-gray-800 mb-2">RG ≈ MC / (TE + N·E)</div>
+        <p class="text-xs text-gray-500">
+          Both measure how stretched market cap is relative to economic fundamentals.
+          GDP correlates with aggregate earnings; high Buffett readings tend to accompany
+          high RG values.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <div class="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">What's different</div>
+        <p class="text-xs text-gray-500">
+          The Buffett Indicator uses GDP as the denominator (economy-wide output),
+          not earnings or book value. It ignores the tangible equity term and uses
+          a single-year denominator rather than a smoothed multi-year measure.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 2: Current Readings ──────────────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      2. Current Readings
+    </h2>
+
+    <!-- Bar chart of current values -->
+    <div class="mb-6" style="height: 180px; position: relative;">
+      <canvas id="current-bar-chart" data-values={JSON.stringify(
+        rows.map(r => ({ label: r.iso2, value: r.latest?.value ?? null, year: r.latest?.year, color: r.color }))
+      )}></canvas>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Country</th>
+            <th class="text-right text-xs text-gray-500 font-medium">Market Cap / GDP</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Year</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr>
+              <td class="text-sm font-medium text-gray-800">
+                <span class="inline-block w-2.5 h-2.5 rounded-full mr-2" style={`background:${row.color}`}></span>
+                {row.name}
+              </td>
+              <td class="text-right font-mono text-sm font-semibold text-gray-800">
+                {row.latest ? `${row.latest.value.toFixed(0)} %` : '—'}
+              </td>
+              <td class="text-sm text-gray-500">{row.latest?.year ?? '—'}</td>
+              <td>
+                <span class={`text-xs rounded px-2 py-0.5 border font-medium ${row.band.bg} ${row.band.color} ${row.band.border}`}>
+                  {row.band.label}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Historical Chart (1990–present) ────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      3. Historical Comparison (1990–2024)
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Annual observations. Some country series end before 2024 due to World Bank reporting lags.
+    </p>
+
+    <!-- Legend -->
+    <div class="flex flex-wrap gap-x-5 gap-y-1.5 mb-3 text-xs text-gray-500">
+      {COUNTRY_CFG.map(cfg => (
+        <span class="flex items-center gap-1.5">
+          <svg width="18" height="10" aria-hidden="true">
+            <line x1="0" y1="5" x2="18" y2="5" stroke={cfg.color} stroke-width="2.5"/>
+          </svg>
+          {cfg.label}
+        </span>
+      ))}
+    </div>
+
+    <!-- Reference band labels -->
+    <div class="flex flex-wrap gap-3 mb-3 text-xs">
+      {[
+        { v: '< 50 %',    label: 'Low',       color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        { v: '50–100 %',  label: 'Moderate',  color: 'bg-blue-50 text-blue-700 border-blue-200' },
+        { v: '100–150 %', label: 'Elevated',  color: 'bg-amber-50 text-amber-700 border-amber-200' },
+        { v: '150–200 %', label: 'High',      color: 'bg-orange-50 text-orange-700 border-orange-200' },
+        { v: '> 200 %',   label: 'Very High', color: 'bg-red-50 text-red-700 border-red-200' },
+      ].map(b => (
+        <span class={`border rounded px-2 py-0.5 font-medium ${b.color}`}>
+          {b.v} — {b.label}
+        </span>
+      ))}
+    </div>
+
+    <div class="relative" style="height: 320px;">
+      <canvas
+        id="global-line-chart"
+        data-chart={chartPayload}
+        aria-label="Global Buffett Indicator historical series 1990–2024"
+        role="img"
+        style="width: 100%; height: 100%;"
+      ></canvas>
+    </div>
+    <p class="text-xs text-gray-400 mt-2">
+      Source: World Bank — CM.MKT.LCAP.GD.ZS. Annual data.
+      China series starts 2003; France/UK have reporting lags to 2018/2022.
+    </p>
+  </section>
+
+  <!-- ── Section 4: Interpretation ────────────────────────────────────────── -->
+  <section class="mb-10">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      4. Interpretation and Caveats
+    </h2>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Dimension</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            ['What it measures',    'Total equity market capitalization of domestically listed companies as a share of nominal GDP. A value of 100 % means the stock market is worth one year of economic output.'],
+            ['Buffett reference',   'Warren Buffett mentioned this indicator in a 2001 Fortune article as "probably the best single measure of where valuations stand at any given moment." It has since become widely cited, though Buffett himself noted its limitations.'],
+            ['Why Germany is low',  'Germany has a large bank-dominated financial system. Many major companies (Mittelstand) are privately held and not listed. The DAX 40 represents a much smaller share of the economy than the S&P 500 does for the US.'],
+            ['Why Switzerland is high', 'Switzerland hosts globally significant companies (Nestlé, Novartis, Roche, UBS) whose market cap vastly exceeds Switzerland\'s domestic GDP — they operate globally but are listed locally.'],
+            ['Why Japan is high',   'The Nikkei 225 and TOPIX encompass a very large share of the Japanese economy. The high reading reflects Japan\'s mature large-cap market relative to its GDP.'],
+            ['Structural differences', 'Cross-country comparisons are affected by: (1) share of economy that is publicly listed, (2) foreign company listings, (3) dual-class structures, (4) conglomerate discount/premium. Germany and France will systematically appear "cheaper" due to listing structure.'],
+            ['Relation to RG',     'Both metrics are high when markets are priced aggressively relative to economic output. The RG framework uses smoothed earnings and tangible book value at the firm level — more precise but also more data-intensive.'],
+            ['Data source',        'World Bank Open Data — World Development Indicators. Indicator CM.MKT.LCAP.GD.ZS. Annual. Reporting lags vary by country (US/DE/JP/CH updated to 2024; UK to 2022; France to 2018).'],
+          ].map(([dim, detail]) => (
+            <tr>
+              <td class="text-sm font-medium text-gray-700 whitespace-nowrap align-top">{dim}</td>
+              <td class="text-sm text-gray-600">{detail}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+    Source: World Bank Open Data — World Development Indicators (CM.MKT.LCAP.GD.ZS).
+    Fetched: {data.fetched}. Annual observations. Not adjusted for listing structure differences.
+    This page is for research purposes only and does not constitute investment advice.
+  </p>
+
+</div>
+
+<!-- ── Charts ──────────────────────────────────────────────────────────────── -->
+<script>
+  function initCharts(): void {
+    // @ts-ignore
+    const Chart = (window as any).Chart;
+    if (!Chart) return;
+
+    // ── Current values bar chart ────────────────────────────────────────────
+    const barCanvas = document.getElementById('current-bar-chart') as HTMLCanvasElement | null;
+    if (barCanvas) {
+      const rows = JSON.parse(barCanvas.getAttribute('data-values') ?? '[]') as
+        Array<{ label: string; value: number | null; year: number; color: string }>;
+      const validRows = rows.filter(r => r.value !== null);
+
+      new Chart(barCanvas, {
+        type: 'bar',
+        data: {
+          labels: validRows.map(r => r.label),
+          datasets: [{
+            data: validRows.map(r => r.value),
+            backgroundColor: validRows.map(r => r.color + 'cc'),
+            borderColor: validRows.map(r => r.color),
+            borderWidth: 1,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: any) => {
+                  const row = validRows[ctx.dataIndex];
+                  return `${row.year}: ${(ctx.parsed.y as number).toFixed(0)} %`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 11 } } },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any) => `${v}%` },
+              grid: { color: '#f3f4f6' },
+            },
+          },
+        },
+      });
+    }
+
+    // ── Historical multi-line chart ─────────────────────────────────────────
+    const lineCanvas = document.getElementById('global-line-chart') as HTMLCanvasElement | null;
+    if (lineCanvas) {
+      const raw = lineCanvas.getAttribute('data-chart');
+      if (!raw) return;
+      const payload = JSON.parse(raw) as {
+        labels: number[];
+        datasets: Array<{ label: string; data: (number | null)[]; color: string; dash?: number[] }>;
+      };
+
+      // Reference lines at 100 and 150
+      const ref100 = payload.labels.map(() => 100);
+      const ref150 = payload.labels.map(() => 150);
+      const ref200 = payload.labels.map(() => 200);
+
+      new Chart(lineCanvas, {
+        type: 'line',
+        data: {
+          labels: payload.labels,
+          datasets: [
+            ...payload.datasets.map(ds => ({
+              label: ds.label,
+              data: ds.data,
+              borderColor: ds.color,
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.2,
+              spanGaps: false,
+              borderDash: ds.dash ?? [],
+            })),
+            {
+              label: '100 % — Economy size',
+              data: ref100,
+              borderColor: '#d1d5db',
+              borderWidth: 1,
+              borderDash: [4, 3],
+              pointRadius: 0,
+              backgroundColor: 'transparent',
+              spanGaps: true,
+            },
+            {
+              label: '150 % — High',
+              data: ref150,
+              borderColor: '#fbbf24',
+              borderWidth: 1,
+              borderDash: [4, 3],
+              pointRadius: 0,
+              backgroundColor: 'transparent',
+              spanGaps: true,
+            },
+            {
+              label: '200 % — Very High',
+              data: ref200,
+              borderColor: '#f87171',
+              borderWidth: 1,
+              borderDash: [4, 3],
+              pointRadius: 0,
+              backgroundColor: 'transparent',
+              spanGaps: true,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              filter: (item: any) => item.datasetIndex < payload.datasets.length,
+              callbacks: {
+                label: (ctx: any): string => {
+                  const v = ctx.parsed.y as number | null;
+                  if (v === null || v === undefined) return '';
+                  return `${ctx.dataset.label}: ${v.toFixed(0)} %`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+              border: { color: '#e5e7eb' },
+            },
+            y: {
+              beginAtZero: true,
+              min: 0,
+              grid: { color: '#f3f4f6' },
+              ticks: { color: '#9ca3af', font: { size: 10 }, callback: (v: any) => `${v}%` },
+              border: { color: '#e5e7eb' },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  function loadChartJs(cb: () => void): void {
+    // @ts-ignore
+    if ((window as any).Chart) { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload = cb;
+    s.onerror = () => console.warn('GlobalChart: failed to load Chart.js');
+    document.head.appendChild(s);
+  }
+
+  loadChartJs(initCharts);
+</script>
+
+</BaseLayout>

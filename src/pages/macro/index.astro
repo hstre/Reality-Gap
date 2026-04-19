@@ -59,12 +59,12 @@ const bands = [
 const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
 
 // ── Monthly chart series (all observations — same standard as current value) ──
-// The chart and the displayed current value both come from the same monthly series.
-// X-axis labels are YYYY-MM; Chart.js autoSkip shows ~15 tick marks (≈ every decade).
 const chartLabels = data.series.map(p => p.date);
 const chartRg10   = data.series.map(p => p.rg10);
 const chartAvg    = data.series.map(() => parseFloat(avgRg10.toFixed(3)));
-const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg });
+// GS10: monthly 10-year Treasury rate from Yale data (available 1871–2023)
+const chartGs10   = data.series.map((p: any) => p.gs10 ?? null);
+const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg, gs10: chartGs10 });
 
 // ── Provenance labels ────────────────────────────────────────────────────────
 const hasMultpl     = data.sources.includes('multpl_supplement');
@@ -92,13 +92,17 @@ function fmt2(v: number): string { return v.toFixed(2); }
   </div>
 
   <!-- Index switcher -->
-  <div class="flex items-center gap-2 mb-4">
+  <div class="flex items-center gap-2 mb-4 flex-wrap">
     <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
       S&amp;P 500 ←
     </span>
     <a href={`${base}/macro/dax40`}
        class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
       DAX 40
+    </a>
+    <a href={`${base}/macro/global`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      Global Buffett Indicator
     </a>
   </div>
 
@@ -113,7 +117,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
     <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Macro approximation — not full RG</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Monthly series · {data.series.length} observations</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Data through {cur.date} · fetched {data.fetched}</span>
-    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Tangible equity not included in this construction</span>
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Tangible equity approximation pending P/B data availability</span>
   </div>
 
   <!-- ── Section 1: Current Reading ─────────────────────────────────────── -->
@@ -142,12 +146,14 @@ function fmt2(v: number): string { return v.toFixed(2); }
       <!-- Formula card -->
       <div class="border border-gray-200 rounded-md p-5 bg-white">
         <div class="text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">Construction</div>
-        <div class="font-mono text-sm text-gray-800 mb-3">M(S&amp;P 500)RG10 = CAPE / 10</div>
+        <div class="font-mono text-sm text-gray-800 mb-1">Current: CAPE / 10</div>
+        <div class="font-mono text-xs text-gray-500 mb-3">Full (pending P/B): 1 / (1/PB + 10/CAPE)</div>
         <p class="text-xs text-gray-500">
-          The firm-level RG is MC / (TE + 10·G). At the macro level, tangible equity
-          data is not available. CAPE captures the price / smoothed-earnings ratio,
-          which maps to the RG denominator's earnings term.
-          The division by 10 aligns the scale with the capitalization factor N = 10.
+          The full macro RG is <span class="font-mono">MC / (BookValue + 10·SmoothedEarnings)</span>.
+          Since <span class="font-mono">BookValue = MC/PB</span> and <span class="font-mono">SmoothedEarnings = MC/CAPE</span>,
+          this simplifies to <span class="font-mono">1/(1/PB + 10/CAPE)</span>.
+          P/B data sourcing is ongoing; until then, CAPE/10 is the published approximation
+          and will always be higher than the full construction.
         </p>
       </div>
     </div>
@@ -231,6 +237,12 @@ function fmt2(v: number): string { return v.toFixed(2); }
           <line x1="0" y1="5" x2="24" y2="5" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2"/>
         </svg>
         RG10 = 1.0 reference
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true">
+          <line x1="0" y1="5" x2="24" y2="5" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 2"/>
+        </svg>
+        10-yr Treasury (GS10, right axis)
       </span>
     </div>
 
@@ -361,7 +373,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             ['Measure name',          'M(S&P 500)RG10 — M for macro, (S&P 500) for the universe, RG10 for the capitalization factor N=10'],
             ['Formula',               'M(S&P 500)RG10 = CAPE / 10, where CAPE = P / (10-year average real EPS). This equals Price / (10 × smoothed real earnings), mirroring the RG earnings term.'],
             ['What is included',      'Price relative to long-run inflation-adjusted earnings (CAPE numerics). Captures earnings smoothing and cyclicality.'],
-            ['What is NOT included',  'Tangible equity is absent. The firm-level RG uses MC / (TE + N·G); at the macro level, aggregate tangible equity is not reliably available. This makes the macro measure systematically higher than a full-RG construction would be.'],
+            ['What is NOT included',  'Tangible equity is currently absent from the published figure. The full macro RG formula is 1/(1/PB + 10/CAPE), which includes book value via the S&P 500 Price-to-Book ratio. The P/B data source is being finalized. Until then, CAPE/10 is the published approximation and will always be higher than the full construction.'],
             ['Series standard',       `All values — current reading and historical chart — use the same <strong>monthly</strong> series. No annual downsampling. ${data.series.length} monthly observations (1881-01 – ${cur.date}).`],
             ['Current value',         `Latest monthly observation: ${cur.date}, CAPE = ${cur.cape.toFixed(2)}, M(S&P500)RG10 = ${rg10.toFixed(3)}. Trend (${trend}) = 12-month % change in CAPE.`],
             ['Long-run average',      `Long-run CAPE mean ≈ ${(avgRg10 * 10).toFixed(1)} (1881–${cur.date.slice(0,4)}), implying an M(S&P500)RG10 long-run mean of ≈ ${avgRg10.toFixed(2)}. The "normal" zone is around 1.7, not 1.0.`],
@@ -370,6 +382,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
               ? `multpl.com Shiller PE table — used for months after the Yale cutoff (${data.yale_cutoff}). multpl.com tracks the same Shiller CAPE series. Supplement covers ${data.yale_cutoff} – ${cur.date}.`
               : 'No supplement applied — Yale data covers full range.'],
             ['Trend computation',     '12-month % change in CAPE (monthly). ++ &gt;+20% · + &gt;+5% · = ±5% · − &gt;−5% · −− &gt;−20%.'],
+            ['10-yr Treasury (GS10)', 'The 10-year US Treasury rate is shown on the chart\'s right axis (green dashed line). Source: Shiller ie_data.xls column GS10. Available monthly from 1871 through the Yale data cutoff. This context line helps distinguish high-RG periods driven by zero-rate policy (2010s–2021) from structurally driven peaks (1929, 2000).'],
             ['Interpretation',        'The bands are heuristic reference points, not thresholds for buy/sell decisions. High CAPE can persist for years. Low CAPE does not guarantee near-term outperformance.'],
           ].map(([dim, detail]) => (
             <tr>
@@ -410,13 +423,13 @@ function fmt2(v: number): string { return v.toFixed(2); }
     if (!raw) return;
     const avg  = parseFloat(canvas.getAttribute('data-avg') ?? '0');
 
-    const { labels, rg10, avg: avgLine } = JSON.parse(raw) as {
+    const { labels, rg10, avg: avgLine, gs10 } = JSON.parse(raw) as {
       labels: string[];
       rg10: number[];
       avg: number[];
+      gs10: (number | null)[];
     };
 
-    // Reference line at 1.0
     const refLine = labels.map(() => 1.0);
 
     new Chart(canvas, {
@@ -435,6 +448,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointHoverRadius: 4,
             tension: 0.2,
             spanGaps: false,
+            yAxisID: 'y',
             order: 1,
           },
           {
@@ -447,6 +461,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointRadius: 0,
             tension: 0,
             spanGaps: true,
+            yAxisID: 'y',
             order: 2,
           },
           {
@@ -459,7 +474,21 @@ function fmt2(v: number): string { return v.toFixed(2); }
             pointRadius: 0,
             tension: 0,
             spanGaps: true,
+            yAxisID: 'y',
             order: 3,
+          },
+          {
+            label: '10-yr Treasury (GS10)',
+            data: gs10,
+            borderColor: '#10b981',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [3, 2],
+            pointRadius: 0,
+            tension: 0.2,
+            spanGaps: false,
+            yAxisID: 'y2',
+            order: 4,
           },
         ],
       },
@@ -474,7 +503,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
             callbacks: {
               label: (ctx: any): string => {
                 const v = ctx.parsed.y;
-                if (v === null || v === undefined) return `${ctx.dataset.label}: —`;
+                if (v === null || v === undefined) return '';
+                if (ctx.datasetIndex === 3) return `GS10: ${Number(v).toFixed(2)} %`;
                 return `${ctx.dataset.label}: ${Number(v).toFixed(2)}×`;
               },
             },
@@ -495,6 +525,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
           y: {
             beginAtZero: true,
             min: 0,
+            position: 'left',
             grid: { color: '#f3f4f6' },
             ticks: {
               color: '#9ca3af',
@@ -502,6 +533,19 @@ function fmt2(v: number): string { return v.toFixed(2); }
               callback: (v: any): string => `${Number(v).toFixed(1)}×`,
             },
             border: { color: '#e5e7eb' },
+          },
+          y2: {
+            beginAtZero: true,
+            min: 0,
+            max: 20,
+            position: 'right',
+            grid: { display: false },
+            ticks: {
+              color: '#10b981',
+              font: { size: 9 },
+              callback: (v: any): string => `${Number(v).toFixed(0)}%`,
+            },
+            border: { color: '#d1fae5' },
           },
         },
       },
