@@ -1,0 +1,397 @@
+---
+import BaseLayout from '../../../components/layout/BaseLayout.astro';
+import capeRaw     from '../../../data/macro/sp500_cape.json';
+import buffettRaw  from '../../../data/macro/buffett_global.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const decByYear: Record<string, number> = {};
+for (const p of (capeRaw as any).series as Array<{ date: string; rg10: number }>) {
+  if (p.date.endsWith('-12')) decByYear[p.date.slice(0, 4)] = p.rg10;
+}
+const usSeries: Array<{ year: number; value: number }> =
+  (buffettRaw as any).countries.US.series;
+
+interface Pair { year: number; rg10: number; buffett: number; }
+const pairs: Pair[] = usSeries
+  .filter(d => decByYear[String(d.year)] !== undefined)
+  .map(d => ({ year: d.year, rg10: decByYear[String(d.year)], buffett: d.value }));
+
+const n       = pairs.length;
+const meanRg  = pairs.reduce((s, p) => s + p.rg10, 0) / n;
+const meanBuf = pairs.reduce((s, p) => s + p.buffett, 0) / n;
+const cov     = pairs.reduce((s, p) => s + (p.rg10 - meanRg) * (p.buffett - meanBuf), 0) / n;
+const stdRg   = Math.sqrt(pairs.reduce((s, p) => s + (p.rg10 - meanRg) ** 2, 0) / n);
+const stdBuf  = Math.sqrt(pairs.reduce((s, p) => s + (p.buffett - meanBuf) ** 2, 0) / n);
+const corr    = cov / (stdRg * stdBuf);
+
+const curRg10   = (capeRaw as any).current.rg10 as number;
+const curBuf    = (buffettRaw as any).countries.US.latest.value as number;
+const curBufYr  = (buffettRaw as any).countries.US.latest.year as number;
+
+const chartData = JSON.stringify({
+  years:    pairs.map(p => p.year),
+  rg10:     pairs.map(p => p.rg10),
+  buffett:  pairs.map(p => p.buffett),
+  avgRg10:  pairs.map(() => parseFloat(meanRg.toFixed(3))),
+  avgBuf:   pairs.map(() => parseFloat(meanBuf.toFixed(1))),
+});
+
+const episodes = [
+  { period: '1975–1994', label: 'Strukturell günstige Ära', rg10: '0,9–2,0', buffett: '37–71 %',
+    note: 'Beide Kennzahlen weit unter heutigem Niveau. Buffett-Indikator jedes Jahr unter 100 %; CAPE auf oder unter langfristigem Durchschnitt.' },
+  { period: '1995–2000', label: 'Tech-Boom', rg10: '2,5→4,4', buffett: '91→153 %',
+    note: 'Synchroner Anstieg. CAPE-Höchststand 44,2 (Dez. 1999). Buffett erstmals über 100 %.' },
+  { period: '2001–2002', label: 'Dot-com-Abschwung', rg10: '3,1→2,3', buffett: '132→101 %',
+    note: 'Beide sanken gemeinsam, blieben aber erhöht. CAPE fiel langsam, da Gewinne zuvor aufgebläht waren.' },
+  { period: '2008',      label: 'Finanzkrise', rg10: '1,5', buffett: '79 %',
+    note: 'Buffett fiel 43 % in einem Jahr. CAPE sank weniger stark — Gewinnverzögerungseffekt.' },
+  { period: '2009',      label: 'Erholung nach der Krise', rg10: '2,0', buffett: '104 %',
+    note: 'Buffett erholte sich +32 %, da Märkte vor den Gewinnen anzogen. Divergenz: Buffett stieg, CAPE verzögerte.' },
+  { period: '2020–2021', label: 'COVID-Ära', rg10: '3,4→3,8', buffett: '197→208 %',
+    note: 'Beide auf historischen Höchstständen. Buffett überproportional: Fiskalprogramme ließen BIP langsam wachsen, Aktienmärkte explodierten.' },
+  { period: '2024',      label: 'Aktuell: neues Allzeithoch', rg10: curRg10.toFixed(2).replace('.', ','), buffett: `${curBuf} %`,
+    note: `Buffett auf Allzeithoch (${curBuf} %). CAPE/10 bei ${curRg10.toFixed(2).replace('.', ',')}× — erhöht, aber unter dem Dot-com-Höchstwert (4,42×). Strukturelle Divergenz: Aktien jetzt ${curBuf} % des BIP, historisch einmalig.` },
+];
+
+function fmt(v: number, d = 2): string { return v.toFixed(d); }
+---
+
+<BaseLayout
+  title="Makro-RG × Buffett-Indikator — Korrelationsanalyse"
+  description="Wie stark korrelieren der CAPE-basierte Makro-RG und der US-Buffett-Indikator? Historische Analyse 1975–2024."
+  lang="de"
+  canonicalPath="/de/makro/korrelation"
+  altLangPath="/macro/correlation"
+  altLang="en"
+>
+<div class="max-w-5xl mx-auto px-6 py-12">
+
+  <!-- Breadcrumb -->
+  <div class="mb-2 flex items-center gap-2 text-sm text-gray-400">
+    <a href={`${base}/de/`} class="hover:text-accent no-underline">Startseite</a>
+    <span>›</span>
+    <a href={`${base}/de/makro`} class="hover:text-accent no-underline">Makro-RG</a>
+    <span>›</span>
+    <span class="text-gray-600 font-medium">Korrelationsanalyse</span>
+  </div>
+
+  <!-- Index-Umschalter -->
+  <div class="flex items-center gap-2 mb-6 flex-wrap">
+    <a href={`${base}/de/makro`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      S&amp;P 500
+    </a>
+    <a href={`${base}/de/makro/dax40`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      DAX 40
+    </a>
+    <a href={`${base}/de/makro/global`}
+       class="text-xs border border-gray-200 rounded px-3 py-1 text-gray-500 hover:text-accent hover:border-accent no-underline transition-colors">
+      Globaler Buffett-Indikator
+    </a>
+    <span class="text-xs border border-accent bg-accent/5 text-accent rounded px-3 py-1 font-medium">
+      Korrelation ←
+    </span>
+  </div>
+
+  <!-- Überschrift -->
+  <h1 class="text-3xl font-normal text-gray-900 mb-2" style="font-family: Georgia, serif;">
+    Makro-RG × Buffett-Indikator — Korrelation
+  </h1>
+  <p class="text-gray-600 mb-1">
+    Wie eng bewegen sich der CAPE-basierte Makro-RG und der US-Buffett-Indikator
+    (Marktkapitalisierung / BIP) gemeinsam — und wo weichen sie voneinander ab?
+  </p>
+  <div class="flex flex-wrap gap-2 mb-8">
+    <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">
+      r = {fmt(corr, 3)} über {n} Jahre
+    </span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">
+      Jahresreihe · 1975–{pairs[pairs.length - 1].year}
+    </span>
+    <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">
+      CAPE: Yale / Shiller · Buffett: Weltbank
+    </span>
+  </div>
+
+  <!-- Abschnitt 1: Kernbefund -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      1. Kernbefund
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="border border-blue-200 rounded-md p-5 bg-blue-50">
+        <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">Pearson r (1975–{pairs[pairs.length-1].year})</div>
+        <div class="text-4xl font-mono font-semibold text-blue-700 mb-1">{fmt(corr, 3)}</div>
+        <div class="text-xs text-blue-600 font-medium mt-1">Sehr starke positive Korrelation</div>
+        <div class="text-xs text-gray-500 mt-2">Dez. CAPE/10 vs. jährl. Buffett, {n} Beobachtungspaare</div>
+      </div>
+      <div class="border border-gray-200 rounded-md p-5 bg-gray-50">
+        <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">M(S&amp;P 500)RG10 — aktuell</div>
+        <div class="text-3xl font-mono font-semibold text-orange-700 mb-1">{fmt(curRg10)}×</div>
+        <div class="text-xs text-gray-500">CAPE/10 · {(capeRaw as any).current.date}</div>
+        <div class="text-xs text-gray-400 mt-2">Ø Überschneidungszeitraum: {fmt(meanRg)}×</div>
+      </div>
+      <div class="border border-gray-200 rounded-md p-5 bg-gray-50">
+        <div class="text-xs text-gray-500 mb-1 font-medium tracking-wide uppercase">US-Buffett-Indikator — {curBufYr}</div>
+        <div class="text-3xl font-mono font-semibold text-orange-700 mb-1">{curBuf} %</div>
+        <div class="text-xs text-gray-500">Marktkapitalisierung / BIP · Weltbank</div>
+        <div class="text-xs text-gray-400 mt-2">Ø Überschneidungszeitraum: {fmt(meanBuf, 1)} %</div>
+      </div>
+    </div>
+    <div class="border-l-2 border-blue-200 pl-4 text-sm text-gray-600 space-y-2">
+      <p>
+        Eine Pearson-Korrelation von <strong>{fmt(corr, 3)}</strong> bedeutet, dass sich beide Kennzahlen
+        in ca. <strong>{Math.round(corr * corr * 100)} %</strong> der Fälle in dieselbe Richtung bewegen (R²).
+        Sie teilen dieselben Makrotreiber — Zinszyklen, Konjunkturaufschwünge und Risikobereitschaft —
+        messen aber unterschiedliche Dimensionen desselben Phänomens.
+      </p>
+      <p>
+        <strong>Was jede Kennzahl erfasst:</strong> Makro-RG (CAPE/10) zeigt, wie teuer Unternehmensgewinne
+        relativ zu einem geglätteten 10-Jahres-Basiszeitraum bewertet sind. Der Buffett-Indikator gibt an,
+        wie stark der Aktienmarkt relativ zur Gesamtwirtschaft gewachsen ist. Die hohe Korrelation bedeutet,
+        dass beide gleichzeitig Überhitzung signalisieren — doch <em>Ausmaß</em> und <em>Timing</em>
+        ihrer Bewegungen unterscheiden sich, und diese Divergenz enthält Information.
+      </p>
+    </div>
+  </section>
+
+  <!-- Abschnitt 2: Historischer Vergleich -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      2. Historischer Vergleich (1975–{pairs[pairs.length-1].year})
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Jahresreihe. Linke Achse: M(S&amp;P 500)RG10 = CAPE ÷ 10. Rechte Achse: US-Buffett-Indikator (%).
+      Gestrichelte Linien = Durchschnitte des Überschneidungszeitraums.
+    </p>
+    <div class="flex flex-wrap gap-5 mb-3 text-xs text-gray-500 select-none">
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true"><line x1="0" y1="5" x2="24" y2="5" stroke="#1e4d78" stroke-width="2.5"/></svg>
+        M(S&amp;P 500)RG10 (links)
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true"><line x1="0" y1="5" x2="24" y2="5" stroke="#b45309" stroke-width="2.5"/></svg>
+        US-Buffett-Indikator % (rechts)
+      </span>
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true"><line x1="0" y1="5" x2="24" y2="5" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="4 3"/></svg>
+        Periodendurchschnitte
+      </span>
+    </div>
+    <div class="relative" style="height: 300px;">
+      <canvas
+        id="correlation-chart"
+        data-chart={chartData}
+        data-avg-rg={fmt(meanRg, 3)}
+        data-avg-buf={fmt(meanBuf, 1)}
+        aria-label="Makro-RG vs. Buffett-Indikator 1975–2024"
+        role="img"
+        style="width: 100%; height: 100%;"
+      ></canvas>
+    </div>
+    <p class="text-xs text-gray-400 mt-2">
+      CAPE-Quelle: Robert Shiller / Yale (Dezember-Monatswert für jährliche Angleichung verwendet).
+      Buffett-Indikator-Quelle: Weltbank — CM.MKT.LCAP.GD.ZS.
+    </p>
+  </section>
+
+  <!-- Abschnitt 3: Warum sie korrelieren -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      3. Warum sie korrelieren — und was jede Kennzahl einzigartig erfasst
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="border border-gray-200 rounded-md p-5">
+        <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Gemeinsame Treiber (warum r = {fmt(corr, 2)})</div>
+        <ul class="space-y-2 text-xs text-gray-500">
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Zinsen.</strong> Niedrigere Zinsen erhöhen Aktienbewertungen (CAPE steigt) und weiten die Marktkapitalisierung relativ zum BIP aus (Buffett steigt). Gleichzeitig.</span>
+          </li>
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Konjunkturaufschwünge.</strong> BIP-Wachstum und Gewinnwachstum fallen tendenziell zusammen und ziehen beide Kennzahlen in dieselbe Richtung.</span>
+          </li>
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Risikobereitschaft.</strong> Bullenmärkte komprimieren Risikoprämien und treiben sowohl das Gewinnmultiplikator (CAPE) als auch das gesamte Markt-Wirtschafts-Verhältnis nach oben.</span>
+          </li>
+        </ul>
+      </div>
+      <div class="border border-gray-200 rounded-md p-5">
+        <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Was jede Kennzahl einzigartig erfasst</div>
+        <ul class="space-y-2 text-xs text-gray-500">
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Makro-RG / CAPE.</strong> Zyklusbereinigte Gewinnbewertung. Glättet über einen vollen Konjunkturzyklus und erkennt, ob Kurse relativ zur <em>langfristigen</em> Ertragskraft teuer sind.</span>
+          </li>
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Buffett-Indikator.</strong> Strukturelle Konzentration. Wie groß ist der börsennotierte Sektor relativ zur Gesamtwirtschaft? Erfasst Finanzialisierung — den wachsenden Anteil des BIP, den börsennotierte Unternehmen repräsentieren.</span>
+          </li>
+          <li class="flex gap-2"><span class="text-gray-300 shrink-0">—</span>
+            <span><strong class="text-gray-600">Die Lücke zwischen ihnen</strong> signalisiert, ob Gewinne teuer sind (CAPE-Problem) oder ob Märkte schlicht größer gewachsen sind, als die Wirtschaft rechtfertigen kann (strukturelles Problem).</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Abschnitt 4: Historische Episoden -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      4. Wichtige historische Episoden
+    </h2>
+    <p class="text-sm text-gray-500 mb-5">
+      Zeiträume, in denen beide Kennzahlen konvergierten, divergierten oder widersprüchliche Signale gaben.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Zeitraum</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Episode</th>
+            <th class="text-left text-xs text-gray-500 font-medium">RG10</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Buffett</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Kernbeobachtung</th>
+          </tr>
+        </thead>
+        <tbody>
+          {episodes.map(ep => (
+            <tr>
+              <td class="font-mono text-xs text-gray-600 whitespace-nowrap">{ep.period}</td>
+              <td class="text-sm font-medium text-gray-800 whitespace-nowrap">{ep.label}</td>
+              <td class="font-mono text-sm text-gray-700 whitespace-nowrap">{ep.rg10}</td>
+              <td class="font-mono text-sm text-gray-700 whitespace-nowrap">{ep.buffett}</td>
+              <td class="text-xs text-gray-500">{ep.note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Abschnitt 5: Aktuelle Lesart -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      5. Aktuelle Lesart ({(capeRaw as any).current.date} / {curBufYr})
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+      <div class="border border-orange-200 rounded-md p-5 bg-orange-50">
+        <div class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">M(S&amp;P 500)RG10</div>
+        <div class="text-3xl font-mono font-semibold text-orange-700 mb-1">{fmt(curRg10)}×</div>
+        <div class="text-xs text-gray-600">
+          {fmt(((curRg10 - meanRg) / meanRg * 100), 0)} % über dem Ø des Überschneidungszeitraums ({fmt(meanRg)}×).
+          Unter dem Dot-com-Höchststand (4,42×). Historisch im 85.–90. Perzentil.
+        </div>
+      </div>
+      <div class="border border-orange-200 rounded-md p-5 bg-orange-50">
+        <div class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">US-Buffett-Indikator</div>
+        <div class="text-3xl font-mono font-semibold text-orange-700 mb-1">{curBuf} %</div>
+        <div class="text-xs text-gray-600">
+          {fmt(((curBuf - meanBuf) / meanBuf * 100), 0)} % über dem Ø ({fmt(meanBuf, 1)} %).
+          Allzeithoch — kein Vorjahr im Datensatz übertraf dieses Niveau.
+        </div>
+      </div>
+    </div>
+    <div class="border-l-2 border-orange-200 pl-4 text-sm text-gray-600 space-y-2">
+      <p>
+        <strong>Die Divergenz in der Extremität ist bedeutsam.</strong> CAPE ist erhöht, aber nicht auf dem
+        Niveau der Dot-com-Blase. Der Buffett-Indikator befindet sich auf einem echten Allzeithoch ohne
+        historisches Vorbild in 50 Jahren Daten. Diese Asymmetrie deutet darauf hin, dass der Exzess
+        teilweise strukturell ist — Aktien sind als Anteil der Wirtschaft über das hinausgewachsen,
+        was Gewinnmultiplikatoren allein implizieren würden.
+      </p>
+      <p>
+        Eine Erklärung: Die Post-2010-Ära kombinierte Nullzinspolitik (die CAPE ausweitet) mit
+        Tech-Sektor-Konzentration und Aktienrückkäufen (die die Marktkapitalisierung ausweiten, ohne
+        proportionales BIP-Wachstum). Das Ergebnis ist ein Buffett-Indikator, der strukturell höher
+        gedriftet ist, selbst als CAPE zeitweise korrigierte.
+      </p>
+    </div>
+  </section>
+
+  <!-- Abschnitt 6: Einschränkungen -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
+      6. Einschränkungen
+    </h2>
+    <div class="space-y-3 text-xs text-gray-500">
+      <div class="flex gap-3"><span class="text-gray-300 shrink-0 mt-0.5">—</span>
+        <span><strong class="text-gray-600">Korrelation ≠ Kausalität.</strong> Beide Kennzahlen steigen in Bullenmärkten, weil sie gemeinsame Makrotreiber teilen, nicht weil eine die andere verursacht.</span>
+      </div>
+      <div class="flex gap-3"><span class="text-gray-300 shrink-0 mt-0.5">—</span>
+        <span><strong class="text-gray-600">Strukturelle Verschiebung der Buffett-Basis.</strong> Der US-Buffett-Indikator ist seit 1990 säkular gestiegen. Der Durchschnitt von {fmt(meanBuf, 1)} % enthält eine lange Niedrigwertperiode (1975–1995), die möglicherweise nicht repräsentativ ist.</span>
+      </div>
+      <div class="flex gap-3"><span class="text-gray-300 shrink-0 mt-0.5">—</span>
+        <span><strong class="text-gray-600">CAPE-Zeitverzögerung.</strong> CAPE verwendet 10-jährige Trailing-Gewinne. Bei scharfen Rezessionen brechen Gewinne schnell ein, während der 10-Jahres-Durchschnitt sich langsam bewegt. Buffett reagiert unmittelbarer.</span>
+      </div>
+      <div class="flex gap-3"><span class="text-gray-300 shrink-0 mt-0.5">—</span>
+        <span><strong class="text-gray-600">Jährliche vs. monatliche Granularität.</strong> Die Buffett-Reihe ist jährlich (Weltbank); CAPE ist monatlich. Diese Analyse verwendet den Dezember-CAPE zur Angleichung.</span>
+      </div>
+      <div class="flex gap-3"><span class="text-gray-300 shrink-0 mt-0.5">—</span>
+        <span><strong class="text-gray-600">Kein Prognosemodell.</strong> Eine hohe Korrelation zwischen zwei Bewertungskennzahlen prognostiziert keine kurzfristigen Renditen. Beide können jahrelang erhöht bleiben.</span>
+      </div>
+    </div>
+  </section>
+
+  <p class="text-xs text-gray-400 border-t border-gray-100 pt-6">
+    CAPE-Quelle: Robert Shiller, Yale University — ie_data.xls, Monatsreihe 1881–heute.
+    Buffett-Indikator-Quelle: Weltbank Open Data — CM.MKT.LCAP.GD.ZS, jährlich 1975–{curBufYr}.
+    Korrelation berechnet auf {n} angeglichenen Jahresbeobachtungen (Dezember CAPE/10 vs. jährlicher Buffett).
+    Nur für Forschungszwecke. Keine Anlageberatung.
+  </p>
+
+</div>
+
+<script>
+  function initCorrelationChart(): void {
+    const canvas = document.getElementById('correlation-chart') as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if ((canvas as any).__corrChartInit) return;
+    (canvas as any).__corrChartInit = true;
+    const Chart = (window as any).Chart;
+    if (!Chart) return;
+    const raw    = canvas.getAttribute('data-chart');
+    const avgRg  = parseFloat(canvas.getAttribute('data-avg-rg') ?? '0');
+    const avgBuf = parseFloat(canvas.getAttribute('data-avg-buf') ?? '0');
+    if (!raw) return;
+    const { years, rg10, buffett, avgRg10, avgBuf: avgBufLine } = JSON.parse(raw) as {
+      years: number[]; rg10: number[]; buffett: number[];
+      avgRg10: number[]; avgBuf: number[];
+    };
+    new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: [
+          { label: 'M(S&P500)RG10', data: rg10, borderColor: '#1e4d78', backgroundColor: 'rgba(30,77,120,0.07)', fill: false, borderWidth: 2.5, pointRadius: 2, pointHoverRadius: 5, tension: 0.2, yAxisID: 'y', order: 1 },
+          { label: `RG-Ø (${avgRg.toFixed(2)}×)`, data: avgRg10, borderColor: '#1e4d78', backgroundColor: 'transparent', borderWidth: 1, borderDash: [5, 4], pointRadius: 0, tension: 0, yAxisID: 'y', order: 3 },
+          { label: 'US-Buffett-Indikator', data: buffett, borderColor: '#b45309', backgroundColor: 'rgba(180,83,9,0.07)', fill: false, borderWidth: 2.5, pointRadius: 2, pointHoverRadius: 5, tension: 0.2, yAxisID: 'y2', order: 2 },
+          { label: `Buffett-Ø (${avgBuf.toFixed(1)}%)`, data: avgBufLine, borderColor: '#b45309', backgroundColor: 'transparent', borderWidth: 1, borderDash: [5, 4], pointRadius: 0, tension: 0, yAxisID: 'y2', order: 4 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx: any): string => { const v = ctx.parsed.y; if (v == null) return ''; return ctx.datasetIndex <= 1 ? `${ctx.dataset.label}: ${Number(v).toFixed(2)}×` : `${ctx.dataset.label}: ${Number(v).toFixed(1)}%`; } } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, border: { color: '#e5e7eb' } },
+          y: { beginAtZero: true, min: 0, max: 5, position: 'left', grid: { color: '#f3f4f6' }, ticks: { color: '#1e4d78', font: { size: 10 }, callback: (v: any): string => `${Number(v).toFixed(1)}×` }, border: { color: '#dbeafe' }, title: { display: true, text: 'RG10', color: '#1e4d78', font: { size: 9 } } },
+          y2: { beginAtZero: true, min: 0, max: 250, position: 'right', grid: { display: false }, ticks: { color: '#b45309', font: { size: 10 }, callback: (v: any): string => `${Number(v).toFixed(0)}%` }, border: { color: '#fef3c7' }, title: { display: true, text: 'Buffett %', color: '#b45309', font: { size: 9 } } },
+        },
+      },
+    });
+  }
+  function loadChartJs(cb: () => void): void {
+    if ((window as any).Chart) { cb(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload = cb;
+    s.onerror = (): void => console.warn('CorrChart: Chart.js failed to load');
+    document.head.appendChild(s);
+  }
+  loadChartJs(initCorrelationChart);
+</script>
+
+</BaseLayout>
