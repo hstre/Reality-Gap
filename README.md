@@ -2,7 +2,9 @@
 
 A static public website for the **Reality Gap (RG)** research project.
 
-Reality Gap is a heuristic indicator measuring whether a company's market capitalisation is approximately covered by its estimated fundamental base (derived from smoothed earnings and tangible equity). This site presents the methodology, working paper, and an initial set of illustrative company data.
+Reality Gap is a heuristic indicator measuring whether a company's market capitalisation is approximately covered by its estimated fundamental base (derived from smoothed earnings and tangible equity). This site presents the methodology, working paper, per-company RG profiles, cross-sectional research, a dedicated China (Hang Seng) view, and index-level ("macro") RG approximations.
+
+The current dataset covers roughly **150 large-cap companies across seven indices** — S&P 500 (US), DAX 40 (Germany), Nikkei 225 (Japan), Hang Seng (China, H-share basis), FTSE 100 (UK), CAC 40 (France), and SMI (Switzerland). All figures are illustrative research approximations, not audited financials.
 
 **Live site:** https://hstre.github.io/Reality-Gap/
 
@@ -16,6 +18,8 @@ Reality Gap is a heuristic indicator measuring whether a company's market capita
 | Styling | [Tailwind CSS](https://tailwindcss.com/) v3 |
 | Language | TypeScript |
 | Data | Local JSON files |
+| Charts | Chart.js 4 (CDN, runtime) |
+| Analytics | GoatCounter (privacy-friendly, no cookies) |
 | Hosting | GitHub Pages |
 | i18n | Manual (English + German) |
 
@@ -92,23 +96,29 @@ npm run build
 src/
 ├── components/
 │   ├── layout/
-│   │   ├── BaseLayout.astro   # HTML head, global layout
+│   │   ├── BaseLayout.astro   # HTML head, global layout, GoatCounter analytics
 │   │   ├── Header.astro       # Navigation + language switcher
 │   │   └── Footer.astro       # Footer
 │   ├── ui/
 │   │   ├── CompanyCard.astro  # Card for company overview
 │   │   ├── MetricBlock.astro  # Single RG metric display block
-│   │   └── TrendBadge.astro   # Trend code badge (++, +, =, -, --)
+│   │   ├── TrendBadge.astro   # Trend code badge (++, +, =, -, --)
+│   │   └── RGChart.astro      # Historical RG line chart (Chart.js)
 │   └── RankingTable.astro     # Sortable rankings table (with JS)
 ├── data/
-│   ├── companies/
-│   │   ├── tesla.json
-│   │   ├── apple.json
-│   │   ├── nvidia.json
-│   │   ├── microsoft.json
-│   │   └── samsung.json
-│   ├── companies.index.json   # List of company slugs
-│   └── sectors.json           # List of sectors (for filter)
+│   ├── companies/             # One JSON file per company (~150 files)
+│   │   ├── tesla.json, apple.json, nvidia.json, …
+│   │   └── tencent.json, alibaba.json, …          (Hang Seng / China)
+│   ├── companies.index.json         # Main list of company slugs
+│   ├── companies.china.index.json   # China (Hang Seng) slug subset
+│   ├── sectors.json                 # List of sectors (for filter)
+│   ├── macro/                       # Index-level macro inputs
+│   │   ├── sp500_cape.json          # Shiller CAPE (S&P 500)
+│   │   ├── dax40_pe.json            # Trailing P/E (DAX 40)
+│   │   └── buffett_global.json      # Global Buffett-indicator series
+│   └── reference/
+│       ├── cpi_us_monthly.csv       # US CPI (inflation adjustment)
+│       └── fundamentals.db          # SQLite historical fundamentals
 ├── i18n/
 │   ├── en.ts                  # English translations
 │   └── de.ts                  # German translations
@@ -124,16 +134,26 @@ src/
 │   │   ├── index.astro        # Companies overview (EN)
 │   │   └── [slug].astro       # Company detail page (EN)
 │   ├── rankings.astro         # Rankings (EN)
+│   ├── research.astro         # Cross-sectional fragility research (EN)
 │   ├── about.astro            # About (EN)
+│   ├── china/                 # China (Hang Seng) section (EN)
+│   │   ├── index.astro        # China overview
+│   │   ├── [slug].astro       # China company detail
+│   │   └── research.astro     # China research page
+│   ├── macro/                 # Index-level ("macro") RG (EN)
+│   │   ├── index.astro        # Macro overview
+│   │   ├── dax40.astro        # DAX 40 macro RG
+│   │   ├── global.astro       # Global / Buffett view
+│   │   └── correlation.astro  # RG vs other metrics
+│   ├── data/                  # Build-time data exports
+│   │   ├── companies.json.ts  # → /data/companies.json
+│   │   └── companies.csv.ts   # → /data/companies.csv
 │   └── de/                    # German equivalents
-│       ├── index.astro
-│       ├── methodik.astro
-│       ├── paper.astro
-│       ├── unternehmen/
-│       │   ├── index.astro
-│       │   └── [slug].astro
-│       ├── rankings.astro
-│       └── ueber.astro
+│       ├── index.astro · methodik.astro · paper.astro · rankings.astro
+│       ├── forschung.astro · ueber.astro
+│       ├── unternehmen/{index,[slug]}.astro
+│       ├── china/{index,forschung}.astro
+│       └── makro/{index,dax40,global,korrelation}.astro
 └── styles/
     ├── global.css             # Tailwind imports + custom layers
     └── tokens.css             # CSS custom properties (colors, fonts)
@@ -142,7 +162,18 @@ public/
 ├── favicon.svg
 └── papers/
     └── reality-gap-working-paper.pdf   ← place PDF here
+
+scripts/                       # Python data pipeline (offline / not part of build)
+├── fetch_data.py              # yfinance → company JSON (RG8/10/12)
+├── fetch_dax_pe.py            # DAX trailing P/E
+├── fetch_shiller.py           # Shiller CAPE
+├── build_historical_db.py     # Build reference/fundamentals.db
+└── backfill_pre2009.py        # Backfill historical observations
 ```
+
+> Note: the Python `scripts/` require `yfinance` and live network access to
+> Yahoo Finance. They are an offline data-prep step and are **not** invoked by
+> `npm run build` — the site builds purely from the committed JSON files.
 
 ---
 
@@ -315,6 +346,13 @@ The site supports **English** (default) and **German**.
 | `/companies` | `/de/unternehmen` |
 | `/companies/tesla` | `/de/unternehmen/tesla` |
 | `/rankings` | `/de/rankings` |
+| `/research` | `/de/forschung` |
+| `/china` | `/de/china` |
+| `/china/research` | `/de/china/forschung` |
+| `/macro` | `/de/makro` |
+| `/macro/dax40` | `/de/makro/dax40` |
+| `/macro/global` | `/de/makro/global` |
+| `/macro/correlation` | `/de/makro/korrelation` |
 | `/about` | `/de/ueber` |
 
 Translations are in `src/i18n/en.ts` and `src/i18n/de.ts`. To add a new language, create a new translation file and add pages under a new language directory.
@@ -439,8 +477,16 @@ The architecture is designed to support these additions without restructuring:
 - **Longer historical charts**: append real quarterly observations over time; the chart grows automatically
 - **Quarter selector**: add a dropdown on detail pages to switch between observations
 - **Status badges**: add `dataStatus`, `isApproximation` etc. fields to observations
-- **CSV/JSON export**: generate export files during build from existing JSON data
 - **Semi-automated data updates**: write a script to update JSON files from a data source
+
+### Already implemented
+
+- **CSV/JSON export**: generated at build time from the company JSON files and
+  served at `/data/companies.json` and `/data/companies.csv` (see
+  `src/pages/data/`).
+- **Macro RG view**: index-level RG approximation at `/macro` (CAPE / trailing P/E).
+- **China (Hang Seng) section**: dedicated overview, detail, and research pages at `/china`.
+- **Historical RG charts**: per-company time-series via Chart.js (`RGChart.astro`).
 
 ---
 

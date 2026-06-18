@@ -57,6 +57,10 @@ export const en = {
         title: 'Macro RG',
         description: 'Market-level RG approximation via Shiller CAPE (S&P 500) and trailing P/E (DAX 40).',
       },
+      china: {
+        title: 'China',
+        description: 'RG profiles for major HK-listed Chinese companies (Hang Seng), on an H-share basis.',
+      },
     },
     cta: 'Explore',
   },

@@ -57,6 +57,10 @@ export const de = {
         title: 'Makro-RG',
         description: 'Marktweite RG-Näherung via Shiller-CAPE (S&P 500) und Trailing-KGV (DAX 40).',
       },
+      china: {
+        title: 'China',
+        description: 'RG-Profile für bedeutende HK-notierte chinesische Unternehmen (Hang Seng), auf H-Aktien-Basis.',
+      },
     },
     cta: 'Erkunden',
   },
