@@ -651,9 +651,21 @@ def fetch_company(ticker: str, display_name: str, sector: str,
         # --- Market cap -------------------------------------------------------
         mc = info.get("marketCap")
         if not mc or mc <= 0:
+            # Some tickers (e.g. RWE.DE) omit marketCap from .info while
+            # fast_info still has it. Fall back before giving up.
+            try:
+                mc = stock.fast_info.get("marketCap")
+            except Exception:
+                mc = None
+        if not mc or mc <= 0:
             print("SKIP (no market cap)")
             return None
         shares = float(info.get("sharesOutstanding") or 0)
+        if not shares:
+            try:
+                shares = float(stock.fast_info.get("shares") or 0)
+            except Exception:
+                shares = 0.0
 
         # --- Price history (for historical market cap) -------------------------
         try:

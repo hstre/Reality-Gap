@@ -42,7 +42,7 @@ _spec = importlib.util.spec_from_file_location("fetch_data", Path(__file__).with
 fd = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fd)
 
-META_KEYS = ["company", "ticker", "slug", "sector", "currency", "country", "index", "description"]
+META_KEYS = ["company", "ticker", "dataTicker", "slug", "sector", "currency", "country", "index", "description"]
 
 
 def period_sort_key(pk: str) -> tuple[int, int]:
@@ -74,10 +74,13 @@ def merge_observations(existing: list[dict], fresh: list[dict]) -> tuple[list[di
 
 def fetch_with_retry(meta: dict, retries: int = 3, base_delay: float = 4.0):
     last = None
+    # dataTicker overrides the display ticker for fetching only (e.g. a delisted
+    # local symbol mapped to a live ADR so market cap is still retrievable).
+    fetch_ticker = meta.get("dataTicker") or meta["ticker"]
     for attempt in range(retries):
         try:
             return fd.fetch_company(
-                meta["ticker"], meta.get("company", meta["ticker"]),
+                fetch_ticker, meta.get("company", meta["ticker"]),
                 meta.get("sector", ""), meta.get("index", ""),
                 meta.get("country", ""), meta.get("currency", "USD"),
                 slug_override=meta.get("slug"),
