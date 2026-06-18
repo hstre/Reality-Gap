@@ -869,6 +869,7 @@ const scMaxSectorMed = scSectorRows[0]?.med ?? 1;
 interface CovRow {
   company: string; rg10: number; te: number; fb: number;
   substanceShare: number; coveragePct: number; negTE: boolean;
+  nElastic: number | null;
 }
 const covRows: CovRow[] = [];
 for (const d of allCompanies) {
@@ -879,7 +880,8 @@ for (const d of allCompanies) {
   if (te == null || g == null || rg == null || rg <= 0) continue;
   const fb = te + 10 * Math.max(g, 0);
   if (fb <= 0) continue;
-  covRows.push({ company: d.company as string, rg10: rg, te, fb, substanceShare: te / fb, coveragePct: 100 / rg, negTE: te < 0 });
+  const nElastic = (o.rg8 != null && o.rg12 != null) ? (o.rg8 - o.rg12) / rg : null;
+  covRows.push({ company: d.company as string, rg10: rg, te, fb, substanceShare: te / fb, coveragePct: 100 / rg, negTE: te < 0, nElastic });
 }
 const covN = covRows.length;
 const covNegTE = covRows.filter(r => r.negTE).sort((a, b) => a.te - b.te);
@@ -887,6 +889,21 @@ const covNegTEPct = covN > 0 ? Math.round(covNegTE.length / covN * 100) : 0;
 const covEarningsBacked = covRows.filter(r => !r.negTE).sort((a, b) => a.substanceShare - b.substanceShare).slice(0, 8);
 const covSubstanceBacked = covRows.filter(r => !r.negTE).sort((a, b) => b.substanceShare - a.substanceShare).slice(0, 8);
 const covMedCoverage = median(covRows.map(r => r.coveragePct));
+
+// N-elasticity: how much a firm's RG moves across the N=8/10/12 band — driven by
+// the substance share, so earnings-backed firms are the N-fragile ones.
+const covElastic = covRows.filter(r => r.nElastic != null) as (CovRow & { nElastic: number })[];
+const covNFragile = [...covElastic].sort((a, b) => b.nElastic - a.nElastic).slice(0, 8);
+const covNRobust  = [...covElastic].sort((a, b) => a.nElastic - b.nElastic).slice(0, 8);
+const covMedElastic = median(covElastic.map(r => r.nElastic));
+function covPearson(xs: number[], ys: number[]): number {
+  const n = xs.length; if (n < 3) return 0;
+  const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+  let cov = 0, sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) { const dx = xs[i]! - mx, dy = ys[i]! - my; cov += dx * dy; sx += dx * dx; sy += dy * dy; }
+  return (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : 0;
+}
+const covElasticCorr = covPearson(covElastic.map(r => r.substanceShare), covElastic.map(r => r.nElastic));
 
 // ── RG × Earnings-Trend Interaction (forward return) ─────────────────────────
 const TI_ANCHORS = ['2024_q4', '2024_q3', '2024_q2', '2024_q1'];
@@ -2709,6 +2726,57 @@ const tiHiUpVsDown = tiGrid.hiUp.avg - tiGrid.hiDown.avg;
           Antwort ist der Kehrwert <span class="font-mono">1 / RG = FB / MC</span>, beschränkt und intuitiv:
           RG10 2,0 → 50% gedeckt, RG10 4,0 → 25% gedeckt, RG10 0,8 → 125% (überdeckt). Das Median-Unternehmen hier
           ist zu {covMedCoverage.toFixed(0)}% gedeckt.
+        </p>
+      </div>
+    </section>
+
+    <!-- 6d. Parameter-Fragilität: N-Sensitivität pro Firma -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Parameter-Fragilität: N-Sensitivität pro Firma</h2>
+      <p class="text-sm text-gray-500 mb-2">
+        RG fällt monoton im Kapitalisierungsfaktor N. Das Band zwischen RG8 und RG12 misst, wie stark der Wert einer
+        Firma von dieser Annahme abhängt: Elastizität <span class="font-mono">e = (RG8 − RG12) / RG10</span>.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">Jeweils jüngste gültige Beobachtung pro Unternehmen; n={covElastic.length}. Median e = {covMedElastic.toFixed(2)}.</p>
+
+      <div class="grid grid-cols-1 gap-6 mb-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Am N-fragilsten (hohes e)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covNFragile.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">e {r.nElastic.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Am N-robustesten (niedriges e)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covNRobust.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">e {r.nElastic.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="border border-gray-200 rounded-md bg-gray-50/50 px-5 py-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Der Substanzanteil sagt die N-Fragilität fast perfekt voraus</p>
+        <p class="text-sm text-gray-600">
+          Über {covElastic.length} Unternehmen: <span class="font-mono">corr(s, e) = {covElasticCorr.toFixed(2)}</span>.
+          Die N-fragilen Namen sind exakt die ertragsgetragenen und Negativ-TE-Firmen aus dem Abschnitt oben. RG8/RG10/RG12
+          sind daher nicht drei unabhängige Zahlen, sondern eine einzige Substanzanteil-Achse: Je stärker die Deckung einer
+          Firma auf kapitalisiertem Ertrag ruht, desto stärker hängt ihr RG vom gewählten N ab — eine robuste Lesart braucht den Substanzanteil, nicht alle drei RG-Varianten.
         </p>
       </div>
     </section>
