@@ -869,7 +869,7 @@ const scMaxSectorMed = scSectorRows[0]?.med ?? 1;
 interface CovRow {
   company: string; rg10: number; te: number; fb: number;
   substanceShare: number; coveragePct: number; negTE: boolean;
-  nElastic: number | null;
+  nElastic: number | null; earningsCV: number | null;
 }
 const covRows: CovRow[] = [];
 for (const d of allCompanies) {
@@ -881,7 +881,7 @@ for (const d of allCompanies) {
   const fb = te + 10 * Math.max(g, 0);
   if (fb <= 0) continue;
   const nElastic = (o.rg8 != null && o.rg12 != null) ? (o.rg8 - o.rg12) / rg : null;
-  covRows.push({ company: d.company as string, rg10: rg, te, fb, substanceShare: te / fb, coveragePct: 100 / rg, negTE: te < 0, nElastic });
+  covRows.push({ company: d.company as string, rg10: rg, te, fb, substanceShare: te / fb, coveragePct: 100 / rg, negTE: te < 0, nElastic, earningsCV: o.earningsCV ?? null });
 }
 const covN = covRows.length;
 const covNegTE = covRows.filter(r => r.negTE).sort((a, b) => a.te - b.te);
@@ -904,6 +904,21 @@ function covPearson(xs: number[], ys: number[]): number {
   return (sx > 0 && sy > 0) ? cov / Math.sqrt(sx * sy) : 0;
 }
 const covElasticCorr = covPearson(covElastic.map(r => r.substanceShare), covElastic.map(r => r.nElastic));
+
+// Earnings dispersion within the smoothing window (earningsCV = stdev/|mean| of
+// the quarters behind G). High CV = the earnings component of FB rests on volatile
+// quarters. "Double fragility" = earnings-backed (low s) AND volatile (high CV).
+// CV is only meaningful where earnings actually carry FB; exclude substance-backed
+// firms whose smoothed earnings are ~0 (their CV is a divide-by-near-zero artifact).
+const covCV = covRows.filter(r => r.earningsCV != null && (1 - r.substanceShare) > 0.05) as (CovRow & { earningsCV: number })[];
+const covCVHigh = [...covCV].sort((a, b) => b.earningsCV - a.earningsCV).slice(0, 8);
+const covCVLow = [...covCV].sort((a, b) => a.earningsCV - b.earningsCV).slice(0, 8);
+const covMedCV = covCV.length ? median(covCV.map(r => r.earningsCV)) : 0;
+const covMedShareCV = covCV.length ? median(covCV.map(r => r.substanceShare)) : 0;
+const covDoubleFragile = covCV
+  .filter(r => r.substanceShare < covMedShareCV && r.earningsCV >= covMedCV)
+  .sort((a, b) => b.earningsCV - a.earningsCV)
+  .slice(0, 10);
 
 // ── RG × Earnings-Trend Interaction (forward return) ─────────────────────────
 const TI_ANCHORS = ['2024_q4', '2024_q3', '2024_q2', '2024_q1'];
@@ -2778,6 +2793,70 @@ const tiHiUpVsDown = tiGrid.hiUp.avg - tiGrid.hiDown.avg;
           sind daher nicht drei unabhängige Zahlen, sondern eine einzige Substanzanteil-Achse: Je stärker die Deckung einer
           Firma auf kapitalisiertem Ertrag ruht, desto stärker hängt ihr RG vom gewählten N ab — eine robuste Lesart braucht den Substanzanteil, nicht alle drei RG-Varianten.
         </p>
+      </div>
+    </section>
+
+    <!-- 6e. Ertragsqualität: Streuung im Glättungsfenster -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Ertragsqualität: Streuung im Glättungsfenster</h2>
+      <p class="text-sm text-gray-500 mb-2">
+        Die Ertragskomponente von FB ist ein geglätteter Mittelwert <span class="font-mono">Ḡ</span> über das
+        operative 8-Quartals-Fenster. Die Streuung dieser Quartale — Variationskoeffizient
+        <span class="font-mono">CV = Stdabw / |Mittel|</span> — misst, wie verlässlich dieser Mittelwert ist:
+        ein niedriges CV bedeutet stetige Ertragskraft; ein hohes CV, dass Ḡ auf volatilen, zyklischen oder
+        einmaleffekt-belasteten Quartalen ruht.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Jeweils jüngste gültige Beobachtung pro Unternehmen; n={covCV.length}. Median CV = {covMedCV.toFixed(2)}.
+        8-Quartals-Fenster (entspricht der Näherung der Seite, nicht dem 10-Jahres-Fenster des Papers).
+      </p>
+
+      <div class="grid grid-cols-1 gap-6 mb-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Volatilste Erträge (hohes CV)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covCVHigh.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">CV {r.earningsCV.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Stetigste Erträge (niedriges CV)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covCVLow.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">CV {r.earningsCV.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="border border-orange-200 bg-orange-50/40 rounded-md px-5 py-4">
+        <p class="text-sm font-semibold text-gray-800 mb-1">Doppelte Fragilität: ertragsgetragen <em>und</em> volatil</p>
+        <p class="text-sm text-gray-600 mb-3">
+          Die folgenden Firmen liegen unter dem Median-Substanzanteil <em>und</em> über dem Median-CV: Ihre
+          Fundamentalbasis wird vor allem von kapitalisiertem Ertrag getragen — und genau dieser Ertrag ist am
+          wenigsten stabil. Für sie ist ein hoher RG am wenigsten verlässlich; der Nenner ruht auf einem
+          schwankenden Strom.
+        </p>
+        <div class="flex flex-wrap gap-1.5">
+          {covDoubleFragile.map(r => (
+            <span class="inline-flex items-center gap-1 text-xs font-mono bg-white border border-orange-200 rounded px-2 py-0.5 text-gray-600">
+              {r.company} <span class="text-gray-400">s {(r.substanceShare * 100).toFixed(0)}%</span> <span class="text-orange-600">CV {r.earningsCV.toFixed(2)}</span>
+            </span>
+          ))}
+        </div>
       </div>
     </section>
 
