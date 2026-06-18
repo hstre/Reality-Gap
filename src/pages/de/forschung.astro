@@ -864,6 +864,61 @@ function scCellBg(v:number|null): string {
   return `rgba(239,68,68,${(0.2+(t-0.7)*0.65).toFixed(2)})`;
 }
 const scMaxSectorMed = scSectorRows[0]?.med ?? 1;
+
+// ── Coverage Composition: substance vs earnings, and coverage % (1/RG) ───────
+interface CovRow {
+  company: string; rg10: number; te: number; fb: number;
+  substanceShare: number; coveragePct: number; negTE: boolean;
+}
+const covRows: CovRow[] = [];
+for (const d of allCompanies) {
+  const obs = (d.observations as any[]).filter((o: any) => o.rg10 != null && !o.nearBoundary);
+  if (!obs.length) continue;
+  const o = [...obs].sort((a: any, b: any) => b.periodKey.localeCompare(a.periodKey))[0];
+  const te = o.tangibleEquity, g = o.smoothedEarnings, rg = o.rg10;
+  if (te == null || g == null || rg == null || rg <= 0) continue;
+  const fb = te + 10 * Math.max(g, 0);
+  if (fb <= 0) continue;
+  covRows.push({ company: d.company as string, rg10: rg, te, fb, substanceShare: te / fb, coveragePct: 100 / rg, negTE: te < 0 });
+}
+const covN = covRows.length;
+const covNegTE = covRows.filter(r => r.negTE).sort((a, b) => a.te - b.te);
+const covNegTEPct = covN > 0 ? Math.round(covNegTE.length / covN * 100) : 0;
+const covEarningsBacked = covRows.filter(r => !r.negTE).sort((a, b) => a.substanceShare - b.substanceShare).slice(0, 8);
+const covSubstanceBacked = covRows.filter(r => !r.negTE).sort((a, b) => b.substanceShare - a.substanceShare).slice(0, 8);
+const covMedCoverage = median(covRows.map(r => r.coveragePct));
+
+// ── RG × Earnings-Trend Interaction (forward return) ─────────────────────────
+const TI_ANCHORS = ['2024_q4', '2024_q3', '2024_q2', '2024_q1'];
+interface TIEntry { company: string; rg10: number; trend: string; ret: number; }
+const tiEntries: TIEntry[] = [];
+for (const d of allCompanies) {
+  const obs = d.observations as any[];
+  let h: any = null;
+  for (const pk of TI_ANCHORS) { h = obs.find((o: any) => o.periodKey === pk && o.rg10 != null && !o.nearBoundary); if (h) break; }
+  if (!h || !h.trend) continue;
+  const cur = [...obs].filter((o: any) => o.dataType === 'quarterly' && o.marketCap != null).sort((a: any, b: any) => b.periodKey.localeCompare(a.periodKey))[0];
+  if (!cur) continue;
+  const hMC = h.marketCap, cMC = cur.marketCap;
+  if (!hMC || !cMC || hMC <= 0) continue;
+  tiEntries.push({ company: d.company as string, rg10: h.rg10 as number, trend: h.trend as string, ret: (cMC - hMC) / hMC * 100 });
+}
+const tiN = tiEntries.length;
+const tiMedRG = median(tiEntries.map(e => e.rg10));
+function tiSign(tr: string): 'up' | 'flat' | 'down' {
+  if (tr === '++' || tr === '+') return 'up';
+  if (tr === '--' || tr === '-') return 'down';
+  return 'flat';
+}
+function tiCell(hi: boolean, sign: 'up' | 'flat' | 'down'): { n: number; avg: number } {
+  const arr = tiEntries.filter(e => (e.rg10 >= tiMedRG) === hi && tiSign(e.trend) === sign);
+  return { n: arr.length, avg: arr.length ? arr.reduce((s, e) => s + e.ret, 0) / arr.length : 0 };
+}
+const tiGrid = {
+  hiUp: tiCell(true, 'up'), hiFlat: tiCell(true, 'flat'), hiDown: tiCell(true, 'down'),
+  loUp: tiCell(false, 'up'), loFlat: tiCell(false, 'flat'), loDown: tiCell(false, 'down'),
+};
+const tiHiUpVsDown = tiGrid.hiUp.avg - tiGrid.hiDown.avg;
 ---
 
 <BaseLayout
@@ -2581,6 +2636,125 @@ const scMaxSectorMed = scSectorRows[0]?.med ?? 1;
             })}
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- 6b. Deckungs-Zusammensetzung: Substanz vs. Ertrag -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Deckungs-Zusammensetzung: Substanz vs. Ertrag</h2>
+      <p class="text-sm text-gray-500 mb-2">
+        Der Nenner von RG ist <span class="font-mono">FB = TE + 10·Ḡ</span> — materielles Eigenkapital plus
+        kapitalisierter Zehnjahres-Ertrag. Der RG-Wert verbirgt die <em>Mischung</em>: Zwei Firmen mit gleichem RG
+        sind ökonomisch entgegengesetzt, wenn die eine von Substanz und die andere fast ausschließlich vom
+        kapitalisierten Ertrag getragen wird.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">
+        Substanzanteil <span class="font-mono">s = TE / FB</span>. Jeweils jüngste gültige Beobachtung pro Unternehmen; n={covN}.
+      </p>
+
+      <div class="border border-orange-200 bg-orange-50/40 rounded-md px-5 py-4 mb-8">
+        <p class="text-sm font-semibold text-gray-800 mb-1">
+          {covNegTE.length} von {covN} Unternehmen ({covNegTEPct}%) haben <span class="text-orange-700">negatives materielles Eigenkapital</span>.
+        </p>
+        <p class="text-sm text-gray-600 mb-3">
+          Für diese Firmen ist die konservative „Substanz-Untergrenze", auf der die Metrik ruht, nicht nur abwesend —
+          sie ist <em>negativ</em>, sodass die Fundamentalbasis allein vom kapitalisierten Ertragsterm getragen wird.
+          Das ist typischerweise die Spur anhaltender Rückkäufe und kapitalisierter immaterieller Werte, kein
+          Schwächezeichen. Für sie ist RG faktisch ein reines Gewinn-Multiple — und am empfindlichsten gegenüber der Wahl von N.
+        </p>
+        <div class="flex flex-wrap gap-1.5">
+          {covNegTE.map(r => (
+            <span class="inline-flex items-center gap-1 text-xs font-mono bg-white border border-orange-200 rounded px-2 py-0.5 text-gray-600">
+              {r.company} <span class="text-orange-600">TE {r.te.toFixed(1)}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-6 mb-8" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Am stärksten ertragsgetragen (niedriges s)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covEarningsBacked.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">s {(r.substanceShare * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div class="border border-gray-200 rounded-md overflow-hidden text-xs">
+          <div class="bg-gray-50 px-3 py-2 font-semibold text-gray-700 border-b border-gray-200">Am stärksten substanzgetragen (hohes s)</div>
+          <table class="w-full border-collapse">
+            <tbody>
+              {covSubstanceBacked.map(r => (
+                <tr class="border-t border-gray-100">
+                  <td class="px-3 py-1.5 text-gray-700">{r.company}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-500">RG {r.rg10.toFixed(1)}</td>
+                  <td class="px-3 py-1.5 text-right font-mono text-gray-600">s {(r.substanceShare * 100).toFixed(0)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="border border-gray-200 rounded-md bg-gray-50/50 px-5 py-4">
+        <p class="text-sm font-semibold text-gray-700 mb-1">Deckungsgrad % — was die Kernfrage eigentlich misst</p>
+        <p class="text-sm text-gray-600">
+          Die Kernfrage des Papers lautet wörtlich „wie weit ist der Marktwert noch <em>gedeckt</em>?" Die direkte
+          Antwort ist der Kehrwert <span class="font-mono">1 / RG = FB / MC</span>, beschränkt und intuitiv:
+          RG10 2,0 → 50% gedeckt, RG10 4,0 → 25% gedeckt, RG10 0,8 → 125% (überdeckt). Das Median-Unternehmen hier
+          ist zu {covMedCoverage.toFixed(0)}% gedeckt.
+        </p>
+      </div>
+    </section>
+
+    <!-- 6c. RG × Ertragstrend — Interaktion -->
+    <section class="mb-12">
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">RG × Ertragstrend — Interaktion</h2>
+      <p class="text-sm text-gray-500 mb-2">
+        Der Trend-Code (++ … --) wird neben RG ausgewiesen, aber nie darauf getestet, ob er Information hinzufügt.
+        Hier: Forward-Marktkapital-Rendite ab einem 2024-Anker, aufgeteilt nach RG-Niveau (über/unter Median) und Trendrichtung.
+      </p>
+      <p class="text-xs text-gray-400 mb-6">Anker 2024; n={tiN}. Durchschnittliche näherungsweise Rendite bis zum jüngsten Quartal.</p>
+
+      <div class="border border-gray-200 rounded-md overflow-hidden mb-4 text-xs">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-50 text-gray-500 uppercase tracking-wide">
+              <th class="text-left px-3 py-2 font-medium"></th>
+              <th class="text-right px-3 py-2 font-medium">Trend ↑ (++/+)</th>
+              <th class="text-right px-3 py-2 font-medium">Trend =</th>
+              <th class="text-right px-3 py-2 font-medium">Trend ↓ (--/-)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-t border-gray-100">
+              <td class="px-3 py-2 font-medium text-gray-700">Hoher RG (≥ Median)</td>
+              <td class="px-3 py-2 text-right font-mono text-gray-700">{tiGrid.hiUp.avg >= 0 ? '+' : ''}{fmt(tiGrid.hiUp.avg, 0)}% <span class="text-gray-400">n={tiGrid.hiUp.n}</span></td>
+              <td class="px-3 py-2 text-right font-mono text-gray-600">{tiGrid.hiFlat.avg >= 0 ? '+' : ''}{fmt(tiGrid.hiFlat.avg, 0)}% <span class="text-gray-400">n={tiGrid.hiFlat.n}</span></td>
+              <td class="px-3 py-2 text-right font-mono text-gray-600">{tiGrid.hiDown.avg >= 0 ? '+' : ''}{fmt(tiGrid.hiDown.avg, 0)}% <span class="text-gray-400">n={tiGrid.hiDown.n}</span></td>
+            </tr>
+            <tr class="border-t border-gray-100">
+              <td class="px-3 py-2 font-medium text-gray-700">Niedriger RG (&lt; Median)</td>
+              <td class="px-3 py-2 text-right font-mono text-gray-700">{tiGrid.loUp.avg >= 0 ? '+' : ''}{fmt(tiGrid.loUp.avg, 0)}% <span class="text-gray-400">n={tiGrid.loUp.n}</span></td>
+              <td class="px-3 py-2 text-right font-mono text-gray-600">{tiGrid.loFlat.avg >= 0 ? '+' : ''}{fmt(tiGrid.loFlat.avg, 0)}% <span class="text-gray-400">n={tiGrid.loFlat.n}</span></td>
+              <td class="px-3 py-2 text-right font-mono text-gray-600">{tiGrid.loDown.avg >= 0 ? '+' : ''}{fmt(tiGrid.loDown.avg, 0)}% <span class="text-gray-400">n={tiGrid.loDown.n}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="border border-gray-200 rounded-md bg-gray-50/50 px-5 py-4">
+        <p class="text-sm text-gray-600">
+          Bei Firmen mit hohem RG geht ein steigender Ertragstrend mit einer Differenz von
+          <span class="font-semibold text-gray-800">{tiHiUpVsDown >= 0 ? '+' : ''}{fmt(tiHiUpVsDown, 0)} pp</span>
+          in der Forward-Rendite gegenüber einem fallenden Trend einher — ein erster, transparenter Test, ob der
+          Trend-Anhang eigenständige Information trägt statt bloß Dekoration zu sein. (Illustrativ; kleines n je Zelle.)
+        </p>
       </div>
     </section>
 
