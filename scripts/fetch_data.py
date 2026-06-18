@@ -372,6 +372,35 @@ def compute_g(
     return round(total / n * 4, 4)
 
 
+def compute_earnings_cv(
+    dated_quarters: list[tuple],  # [(ni_b, date), ...] same window used for G
+    apply_cpi: bool = False,
+) -> Optional[float]:
+    """Coefficient of variation of the quarterly earnings inside the smoothing
+    window: stdev / |mean|.
+
+    A high value means the smoothed earnings G rests on volatile quarters (low
+    earnings quality / cyclicality); a low value means steady earning power.
+    Uses the same CPI scaling as compute_g so the two are consistent. Returns
+    None when the window is too short or its mean is ~0 (sign-mixed earnings).
+    """
+    n = len(dated_quarters)
+    if n < 2:
+        return None
+    if apply_cpi and _CPI_CURRENT is not None:
+        vals = [
+            (v * (_CPI_CURRENT / c) if ((c := cpi_at(date)) and c > 0) else v)
+            for v, date in dated_quarters
+        ]
+    else:
+        vals = [v for v, _ in dated_quarters]
+    mean = sum(vals) / n
+    if abs(mean) < 1e-9:
+        return None
+    var = sum((v - mean) ** 2 for v in vals) / n
+    return round((var ** 0.5) / abs(mean), 4)
+
+
 def trend_code(current: Optional[float], previous: Optional[float]) -> Optional[str]:
     if current is None or previous is None or previous == 0:
         return None
@@ -559,6 +588,7 @@ def build_historical_annual_obs(
             "marketCap":            round(hist_mc_b, 1),
             "tangibleEquity":       round(tangible_eq_b, 1),
             "smoothedEarnings":     G,
+            "earningsCV":           compute_earnings_cv(window8_dated, apply_cpi=use_cpi),
             "fundamentalBaseRG8":   round(fb8, 2) if fb8 is not None else None,
             "fundamentalBaseRG10":  round(fb10, 2) if fb10 is not None else None,
             "fundamentalBaseRG12":  round(fb12, 2) if fb12 is not None else None,
@@ -886,6 +916,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
                 "marketCap":            round(q_mc_b, 1),
                 "tangibleEquity":       round(tangible_eq_b, 1),
                 "smoothedEarnings":     G,
+                "earningsCV":           compute_earnings_cv(dated_s8, apply_cpi=use_cpi),
                 "fundamentalBaseRG8":   round(fb8, 2) if fb8 is not None else None,
                 "fundamentalBaseRG10":  round(fb10, 2) if fb10 is not None else None,
                 "fundamentalBaseRG12":  round(fb12, 2) if fb12 is not None else None,
