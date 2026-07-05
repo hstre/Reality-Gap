@@ -56,6 +56,9 @@ jobs:
       - name: Update DAX 40 trailing P/E
         run: python3 scripts/fetch_dax_pe.py || echo "::warning::DAX P/E update failed — keeping previous data"
 
+      - name: Update TE-corrected macro RG
+        run: python3 scripts/fetch_macro_rg.py || echo "::warning::Macro RG update failed — keeping previous data"
+
       - name: Commit and push data updates
         run: |
           git config user.name "github-actions[bot]"

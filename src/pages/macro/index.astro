@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../components/layout/BaseLayout.astro';
 import capeRaw from '../../data/macro/sp500_cape.json';
+import macroRgRaw from '../../data/macro/macro_rg.json';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -64,7 +65,23 @@ const currentBandIdx = bands.findIndex(b => rg10 >= b.lo && rg10 < b.hi);
 const chartLabels = data.series.map(p => p.date);
 const chartRg10   = data.series.map(p => p.rg10);
 const chartAvg    = data.series.map(() => parseFloat(avgRg10.toFixed(3)));
-const chartData   = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg });
+
+// ── TE-corrected macro RG (macro_rg.json) ────────────────────────────────────
+const macroRg = macroRgRaw as any;
+const mrIdx   = macroRg.indices ?? {};
+const mrOrder = ['sp500', 'dax40', 'n225', 'hsi'];
+const mrRows  = mrOrder
+  .map(k => ({ key: k, ...(mrIdx[k] ?? {}) }))
+  .filter((r: any) => r.topDown || r.bottomUp);
+const spCorrected = mrIdx.sp500?.topDown?.rg10 ?? null;
+
+// Corrected S&P 500 series (annual year-end points) mapped onto monthly labels
+const corrMap = new Map<string, number>(
+  ((mrIdx.sp500?.series ?? []) as any[]).map((p: any) => [p.date, p.rg10])
+);
+const chartCorr = data.series.map(p => corrMap.get(p.date) ?? null);
+
+const chartData = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg, corr: chartCorr });
 
 // ── Provenance labels ────────────────────────────────────────────────────────
 const hasMultpl     = data.sources.includes('multpl_supplement');
@@ -113,7 +130,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
     <span class="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-0.5">Macro approximation — not full RG</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Monthly series · {data.series.length} observations</span>
     <span class="text-xs bg-gray-50 text-gray-500 border border-gray-200 rounded px-2 py-0.5">Data through {cur.date} · fetched {data.fetched}</span>
-    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Tangible equity not included in this construction</span>
+    <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">CAPE series is earnings-only — TE-corrected variant in §2</span>
   </div>
 
   <!-- ── Section 1: Current Reading ─────────────────────────────────────── -->
@@ -159,10 +176,84 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
   </section>
 
-  <!-- ── Section 2: Interpretation Guide ────────────────────────────────── -->
+  <!-- ── Section 2: TE-Corrected Macro RG ───────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
-      2. Heuristic Interpretation Bands
+      2. The Missing Half — TE-Corrected Macro RG
+    </h2>
+    <p class="text-sm text-gray-500 mb-4">
+      The firm-level RG divides market cap by the <em>full</em> fundamental base
+      TE + N·G. CAPE / 10 captures only the earnings half — tangible equity is
+      missing from the denominator, so the CAPE-based value is a systematic
+      <strong>upper bound</strong>. The missing half can be recovered from the
+      index price-to-book ratio via an exact identity:
+    </p>
+
+    <div class="border border-gray-200 rounded-md p-5 bg-gray-50 mb-6">
+      <div class="text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">Identity</div>
+      <div class="font-mono text-sm text-gray-800 mb-2">
+        1 / RG<sub>N</sub> = TE/MC + N·G/MC = 1/PB + N/PE<sub>smooth</sub>
+        &nbsp;&nbsp;⇒&nbsp;&nbsp; RG<sub>N</sub> = 1 / (1/PB + N/PE<sub>smooth</sub>)
+      </div>
+      <p class="text-xs text-gray-500">
+        PB = index price-to-book, PE<sub>smooth</sub> = CAPE (S&amp;P 500) or trailing
+        portfolio P/E (other indices). Because index P/B uses <em>book</em> equity
+        (incl. goodwill and intangibles) rather than tangible book, the corrected value
+        is a <strong>lower bound</strong> — the true macro RG lies between the corrected
+        and the earnings-only reading.
+      </p>
+    </div>
+
+    <div class="overflow-x-auto mb-4">
+      <table class="table-rg w-full">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="text-left text-xs text-gray-500 font-medium">Index</th>
+            <th class="text-right text-xs text-gray-500 font-medium">Earnings-only RG10</th>
+            <th class="text-right text-xs text-gray-500 font-medium">TE-corrected RG10</th>
+            <th class="text-right text-xs text-gray-500 font-medium">Bottom-up ΣMC / Σ(TE+10·G)</th>
+            <th class="text-right text-xs text-gray-500 font-medium">P/B used</th>
+            <th class="text-left text-xs text-gray-500 font-medium">Earnings basis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mrRows.map((r: any) => (
+            <tr>
+              <td class="text-sm font-medium text-gray-700 whitespace-nowrap">{r.label}</td>
+              <td class="font-mono text-sm text-gray-500 text-right">{r.earningsOnly?.rg10?.toFixed(2) ?? '—'}</td>
+              <td class="font-mono text-sm font-semibold text-gray-900 text-right">{r.topDown?.rg10?.toFixed(2) ?? '—'}</td>
+              <td class="font-mono text-sm text-gray-700 text-right">
+                {r.bottomUp?.rg10?.toFixed(2) ?? '—'}
+                {r.bottomUp && <span class="text-xs text-gray-400 font-sans"> (n={r.bottomUp.n})</span>}
+              </td>
+              <td class="font-mono text-sm text-gray-600 text-right">{r.topDown?.pb?.toFixed(2) ?? '—'}</td>
+              <td class="text-xs text-gray-500">{r.topDown?.peBasis ?? '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="text-sm text-gray-600 border-l-2 border-gray-200 pl-4 mb-3">
+      Two independent constructions cross-validate: for the S&amp;P 500 the top-down
+      corrected value ({spCorrected?.toFixed(2)}) and the bottom-up aggregate over the
+      {mrIdx.sp500?.bottomUp?.n} covered constituents ({mrIdx.sp500?.bottomUp?.rg10?.toFixed(2)})
+      land within a few percent of each other — far below the earnings-only reading
+      of {mrIdx.sp500?.earningsOnly?.rg10?.toFixed(2)}.
+    </div>
+    <p class="text-xs text-gray-400">
+      Bottom-up: value-weighted ΣMC / Σ(TE + 10·G) over the constituents covered in this
+      dataset (exact RG formula incl. tangible equity; coverage subset — top caps only).
+      Top-down P/B sources: multpl.com (S&amp;P 500), replicating-ETF portfolio ratios via
+      yfinance (DAX 40, Nikkei 225, Hang Seng). Non-US earnings basis is trailing 12m P/E,
+      not CAPE. Updated daily. Data as of {macroRg.fetched}.
+    </p>
+  </section>
+
+  <!-- ── Section 3: Interpretation Guide ────────────────────────────────── -->
+  <section class="mb-12">
+    <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
+      3. Heuristic Interpretation Bands
     </h2>
     <p class="text-sm text-gray-500 mb-5">
       Indicative reference only. These are not thresholds or signals — history shows
@@ -198,10 +289,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
   </section>
 
-  <!-- ── Section 3: Historical Chart ────────────────────────────────────── -->
+  <!-- ── Section 4: Historical Chart ────────────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
-      3. M(S&amp;P 500)RG10 — Monthly Series (1881–{cur.date})
+      4. M(S&amp;P 500)RG10 — Monthly Series (1881–{cur.date})
     </h2>
     <p class="text-sm text-gray-500 mb-1">
       <strong>Monthly observations</strong> — same series standard as the current value above.
@@ -232,6 +323,12 @@ function fmt2(v: number): string { return v.toFixed(2); }
         </svg>
         RG10 = 1.0 reference
       </span>
+      <span class="flex items-center gap-1.5">
+        <svg width="24" height="10" aria-hidden="true">
+          <line x1="0" y1="5" x2="24" y2="5" stroke="#059669" stroke-width="1.5" stroke-dasharray="6 3"/>
+        </svg>
+        TE-corrected RG10 (annual, since 1999 — see §2)
+      </span>
     </div>
 
     <div class="relative" style="height: 300px;">
@@ -250,10 +347,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </p>
   </section>
 
-  <!-- ── Section 4: Key Historical Peaks ────────────────────────────────── -->
+  <!-- ── Section 5: Key Historical Peaks ────────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
-      4. Key Historical Peaks
+      5. Key Historical Peaks
     </h2>
     <div class="overflow-x-auto">
       <table class="table-rg w-full">
@@ -293,10 +390,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
   </section>
 
-  <!-- ── Section 5: Other Markets (Placeholder) ─────────────────────────── -->
+  <!-- ── Section 6: Other Markets ─────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-1" style="font-family: Georgia, serif;">
-      5. Other Equity Universes
+      6. Other Equity Universes
     </h2>
     <p class="text-sm text-gray-500 mb-5">
       Macro RG coverage is currently limited to the S&amp;P 500 via Shiller data.
@@ -315,9 +412,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
         </thead>
         <tbody>
           {[
-            { m: 'M(S&P 500)RG10',   uni: 'S&P 500 (US large-cap)',       src: 'Shiller ie_data.xls / Yale',          st: 'live' },
-            { m: 'M(DAX)RG10',       uni: 'DAX 40 (German large-cap)',     src: 'StarCapital / Barclays CAPE series',   st: 'planned' },
-            { m: 'M(Nikkei 225)RG10',uni: 'Nikkei 225 (Japanese large-cap)',src: 'StarCapital / local academic sources', st: 'planned' },
+            { m: 'M(S&P 500)RG10',   uni: 'S&P 500 (US large-cap)',       src: 'Shiller ie_data.xls / Yale + multpl.com P/B (TE-corrected, §2)', st: 'live' },
+            { m: 'M(DAX)RG10',       uni: 'DAX 40 (German large-cap)',     src: 'Trailing P/E + ETF portfolio P/B (TE-corrected, §2)',  st: 'live' },
+            { m: 'M(Nikkei 225)RG10',uni: 'Nikkei 225 (Japanese large-cap)',src: 'Trailing P/E + ETF portfolio P/B (TE-corrected, §2)', st: 'live' },
+            { m: 'M(Hang Seng)RG10', uni: 'Hang Seng (HK-listed China)',   src: 'Trailing P/E + ETF portfolio P/B (TE-corrected, §2)',  st: 'live' },
             { m: 'M(STOXX 600)RG10', uni: 'STOXX Europe 600',              src: 'MSCI / Barclays European CAPE',        st: 'exploratory' },
             { m: 'M(MOEX)RG10',      uni: 'Moscow Exchange (Russia)',      src: 'Limited / disputed data',             st: 'exploratory' },
             { m: 'M(EM)RG10',        uni: 'MSCI Emerging Markets',         src: 'MSCI CAPE data',                      st: 'exploratory' },
@@ -343,10 +441,10 @@ function fmt2(v: number): string { return v.toFixed(2); }
     </div>
   </section>
 
-  <!-- ── Section 6: Methodology ─────────────────────────────────────────── -->
+  <!-- ── Section 7: Methodology ─────────────────────────────────────────── -->
   <section class="mb-12">
     <h2 class="text-xl font-semibold text-gray-800 mb-4" style="font-family: Georgia, serif;">
-      6. Methodology and Limitations
+      7. Methodology and Limitations
     </h2>
     <div class="overflow-x-auto">
       <table class="table-rg w-full">
@@ -361,7 +459,7 @@ function fmt2(v: number): string { return v.toFixed(2); }
             ['Measure name',          'M(S&P 500)RG10 — M for macro, (S&P 500) for the universe, RG10 for the capitalization factor N=10'],
             ['Formula',               'M(S&P 500)RG10 = CAPE / 10, where CAPE = P / (10-year average real EPS). This equals Price / (10 × smoothed real earnings), mirroring the RG earnings term.'],
             ['What is included',      'Price relative to long-run inflation-adjusted earnings (CAPE numerics). Captures earnings smoothing and cyclicality.'],
-            ['What is NOT included',  'Tangible equity is absent. The firm-level RG uses MC / (TE + N·G); at the macro level, aggregate tangible equity is not reliably available. This makes the macro measure systematically higher than a full-RG construction would be.'],
+            ['What is NOT included',  'Tangible equity is absent from the CAPE series (upper bound). Section 2 adds the missing half via the index price-to-book identity RG10 = 1/(1/PB + 10/CAPE); since index P/B uses book (not tangible) equity, that corrected value is a lower bound. The true macro RG lies between the two.'],
             ['Series standard',       `All values — current reading and historical chart — use the same <strong>monthly</strong> series. No annual downsampling. ${data.series.length} monthly observations (1881-01 – ${cur.date}).`],
             ['Current value',         `Latest monthly observation: ${cur.date}, CAPE = ${cur.cape.toFixed(2)}, M(S&P500)RG10 = ${rg10.toFixed(3)}. Trend (${trend}) = 12-month % change in CAPE.`],
             ['Long-run average',      `Long-run CAPE mean ≈ ${(avgRg10 * 10).toFixed(1)} (1881–${cur.date.slice(0,4)}), implying an M(S&P500)RG10 long-run mean of ≈ ${avgRg10.toFixed(2)}. The "normal" zone is around 1.7, not 1.0.`],
@@ -389,7 +487,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
     Last fetched: {data.fetched}. Series standard: monthly throughout (current value and chart use the same series).
     This page presents a macro approximation for research purposes only.
     It is not the full Reality Gap indicator and must not be used as investment advice.
-    M(S&amp;P 500)RG10 = CAPE / 10. Tangible equity is not included in this macro construction.
+    M(S&amp;P 500)RG10 = CAPE / 10 is an earnings-only upper bound; the TE-corrected
+    variant in §2 (1/(1/PB + 10/CAPE), P/B via multpl.com) is a lower bound.
   </p>
 
 </div>
@@ -410,10 +509,11 @@ function fmt2(v: number): string { return v.toFixed(2); }
     if (!raw) return;
     const avg  = parseFloat(canvas.getAttribute('data-avg') ?? '0');
 
-    const { labels, rg10, avg: avgLine } = JSON.parse(raw) as {
+    const { labels, rg10, avg: avgLine, corr } = JSON.parse(raw) as {
       labels: string[];
       rg10: number[];
       avg: number[];
+      corr: (number | null)[];
     };
 
     // Reference line at 1.0
@@ -460,6 +560,19 @@ function fmt2(v: number): string { return v.toFixed(2); }
             tension: 0,
             spanGaps: true,
             order: 3,
+          },
+          {
+            label: 'TE-corrected RG10 (annual, since 1999)',
+            data: corr ?? [],
+            borderColor: '#059669',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [6, 3],
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            tension: 0.2,
+            spanGaps: true,
+            order: 0,
           },
         ],
       },
