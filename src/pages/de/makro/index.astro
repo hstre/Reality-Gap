@@ -91,8 +91,29 @@ const corrTrend    = corrTrendPct == null ? ''
 const corrMax      = corrSeries.length ? Math.max(...corrSeries.map((p: any) => p.rg10)) : null;
 const corrIsRecord = spCorrected != null && corrMax != null && spCorrected >= corrMax;
 const corrFirst    = corrSeries.length ? corrSeries[0] : null;   // 1999-12 Dotcom-Jahresende
-const corrBand     = spCorrected != null ? bandFor(spCorrected) : band;
-const corrBandIdx  = spCorrected != null ? bands.findIndex(b => spCorrected >= b.lo && spCorrected < b.hi) : -1;
+// Die CAPE-kalibrierten Bänder gelten NICHT für die korrigierte Kennzahl
+// (gestauchte Skala). Einordnung stattdessen per Perzentil in eigener Serie.
+const corrVals = corrSeries.map((p: any) => p.rg10 as number);
+const corrPct  = (spCorrected != null && corrVals.length)
+  ? Math.round((corrVals.filter(v => v < spCorrected).length / corrVals.length) * 100)
+  : null;
+function corrBandFor(pct: number): { label: string; color: string; bg: string; border: string; } {
+  if (pct >= 95) return { label: 'Rekordterrain — über jedem Jahresendwert seit 1999, inkl. Dotcom',
+                          color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200' };
+  if (pct >= 80) return { label: 'Oberes Extrem der korrigierten Serie (oberstes Quintil)',
+                          color: 'text-orange-700',  bg: 'bg-orange-50',  border: 'border-orange-200' };
+  if (pct >= 60) return { label: 'Über dem Median der korrigierten Serie',
+                          color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' };
+  if (pct >= 40) return { label: 'Um den Median der korrigierten Serie',
+                          color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200' };
+  return              { label: 'Unterer Bereich der korrigierten Serie',
+                          color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+}
+const corrBand = corrPct != null ? corrBandFor(corrPct) : band;
+// Referenzpunkte der korrigierten Serie (für den Referenzblock in §3)
+const corrMinP   = corrSeries.length ? corrSeries.reduce((a: any, b: any) => (b.rg10 < a.rg10 ? b : a)) : null;
+const corrMedian = corrVals.length ? [...corrVals].sort((a, b) => a - b)[Math.floor(corrVals.length / 2)] : null;
+const corr2021   = corrSeries.find((p: any) => p.date === '2021-12') ?? null;
 
 const chartData = JSON.stringify({ labels: chartLabels, rg10: chartRg10, avg: chartAvg, gs10: chartGs10, corr: chartCorr });
 
@@ -286,6 +307,9 @@ function fmt2(v: number): string { return v.toFixed(2); }
     <p class="text-sm text-gray-500 mb-5">
       Nur als Orientierungshilfe. Es handelt sich nicht um Kauf- oder Verkaufssignale —
       Märkte können über lange Zeiträume in jeder Zone verharren.
+      <strong>Diese Bänder sind auf die Earnings-only-CAPE-Skala kalibriert und gelten
+      nicht für die TE-korrigierte Kennzahl</strong>, die auf einer gestauchten Skala
+      läuft — ihre eigenen Referenzpunkte stehen unter der Tabelle.
     </p>
 
     <div class="overflow-x-auto">
@@ -300,12 +324,9 @@ function fmt2(v: number): string { return v.toFixed(2); }
         </thead>
         <tbody>
           {bands.map((row, i) => (
-            <tr class={(i === currentBandIdx || i === corrBandIdx) ? 'bg-blue-50/40' : ''}>
+            <tr class={i === currentBandIdx ? 'bg-blue-50/40' : ''}>
               <td class="font-mono font-semibold text-sm text-gray-800 whitespace-nowrap">
                 {row.rg}
-                {i === corrBandIdx && (
-                  <span class={`ml-2 text-xs rounded px-1.5 py-0.5 border font-normal ${row.color}`}>← TE-korrigiert ({spCorrected?.toFixed(2)})</span>
-                )}
                 {i === currentBandIdx && (
                   <span class={`ml-2 text-xs rounded px-1.5 py-0.5 border font-normal ${row.color}`}>← Earnings-only ({rg10.toFixed(2)})</span>
                 )}
@@ -317,6 +338,26 @@ function fmt2(v: number): string { return v.toFixed(2); }
           ))}
         </tbody>
       </table>
+    </div>
+  
+    <!-- Referenzpunkte der korrigierten Serie -->
+    <div class="mt-5 border border-gray-200 rounded-md bg-gray-50/50 px-4 py-3">
+      <div class="text-xs text-gray-500 mb-2 font-medium tracking-wide uppercase">
+        TE-korrigierte Serie — eigene Referenzpunkte (Jahresendwerte, 1999–heute)
+      </div>
+      <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm font-mono">
+        {corrMinP && <span class="text-emerald-700">{corrMinP.rg10.toFixed(2)} <span class="font-sans text-xs text-gray-500">Finanzkrisen-Tief ({corrMinP.date})</span></span>}
+        {corrMedian != null && <span class="text-blue-700">{corrMedian.toFixed(2)} <span class="font-sans text-xs text-gray-500">Median</span></span>}
+        {corr2021 && <span class="text-amber-700">{corr2021.rg10.toFixed(2)} <span class="font-sans text-xs text-gray-500">Post-COVID-Hoch (2021-12)</span></span>}
+        {corrFirst && <span class="text-orange-700">{corrFirst.rg10.toFixed(2)} <span class="font-sans text-xs text-gray-500">Dotcom-Jahresende (1999-12)</span></span>}
+        {spCorrected != null && <span class="text-red-700 font-semibold">{spCorrected.toFixed(2)} <span class="font-sans text-xs">aktuell — {corrPct}. Perzentil{corrIsRecord ? ', Rekord' : ''}</span></span>}
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Auf der eigenen Skala liegt der korrigierte Wert <strong>nicht</strong> in einer
+        moderaten Zone: Er steht über jedem Jahresendwert seit 1999, einschließlich des
+        Dotcom-Jahresendes. Die gestauchte Skala (Buchkapital im Nenner dämpft die
+        Ausschläge) macht das Querlesen gegen die CAPE-Bänder irreführend.
+      </p>
     </div>
   </section>
 

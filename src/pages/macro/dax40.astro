@@ -142,6 +142,8 @@ function fmt2(v: number): string { return v.toFixed(2); }
         <div class="text-xs mt-1 text-gray-600">
           Earnings-only upper bound: {rg10.toFixed(2)} (trailing P/E / 10).
           Bottom-up aggregate: {daxBu?.rg10?.toFixed(2)} (n={daxBu?.n}).
+          Zone label uses the CAPE-calibrated scale — the corrected metric runs
+          structurally lower; no own long-run distribution is available yet.
         </div>
       </div>
 
