@@ -103,6 +103,9 @@ jobs:
   deploy:
     name: Deploy
     needs: build
+    # explicit condition: the skipped update-data job (push events) must not
+    # propagate "skipped" through the needs chain and cancel the deploy
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
