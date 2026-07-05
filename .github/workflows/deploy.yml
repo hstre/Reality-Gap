@@ -41,8 +41,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: Fetch latest data
+      - name: Update US CPI series (FRED)
+        run: python3 scripts/fetch_cpi.py || echo "::warning::CPI update failed — keeping previous data"
+
+      - name: Fetch latest data (S&P 500, Nikkei, DAX, KOSPI)
         run: python3 scripts/fetch_data.py
+
+      - name: Fetch latest data (China / Hang Seng)
+        run: python3 scripts/fetch_china.py
+
+      - name: Update S&P 500 Shiller CAPE
+        run: python3 scripts/fetch_shiller.py || echo "::warning::Shiller CAPE update failed — keeping previous data"
+
+      - name: Update DAX 40 trailing P/E
+        run: python3 scripts/fetch_dax_pe.py || echo "::warning::DAX P/E update failed — keeping previous data"
 
       - name: Commit and push data updates
         run: |

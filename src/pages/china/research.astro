@@ -123,8 +123,8 @@ function pct(v: number | null, max: number): string {
     China — RG Research
   </h1>
   <p class="text-gray-600 mb-1">
-    Reality Gap analysis for 7 major HK-listed Chinese companies.
-    Pilot dataset · 4 annual periods · All values in HKD billions.
+    Reality Gap analysis for {rows.length} major HK-listed Chinese companies.
+    Annual observations · 4-year smoothing window · All values in HKD billions.
   </p>
   <div class="flex flex-wrap gap-2 mb-8">
     <span class="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-0.5">Prototype-grade data</span>
@@ -351,13 +351,13 @@ function pct(v: number | null, max: number): string {
         <tbody>
           {[
             ['Source', 'yfinance / Yahoo Finance', 'Re-aggregated from HKEX filings. Not audited. Prototype-grade only.'],
-            ['Coverage', '7 companies, HK-listed', 'H-share basis. A-share-dominant SOEs (ICBC, PetroChina) excluded due to inconsistent market cap reconstruction.'],
-            ['Historical depth', '4 annual periods (FY2021–FY2024/25)', 'Insufficient for long-horizon fragility analysis. SEC XBRL covers US back to 2009.'],
+            ['Coverage', `${rows.length} companies, HK-listed`, 'H-share basis. A-share-dominant SOEs (ICBC, PetroChina) excluded due to inconsistent market cap reconstruction.'],
+            ['Historical depth', 'Annual periods as available from yfinance (~4–5 FYs)', 'Insufficient for long-horizon fragility analysis. SEC XBRL covers US back to 2009.'],
             ['Market cap', 'Current MC or shares × year-end close', 'Historical MC approximated using current shares outstanding × year-end price. Share count drift not corrected.'],
-            ['Earnings smoothing', '4-year average net income', 'Fixed across all periods (same G for all obs). True rolling smoothing not applied in this pilot.'],
+            ['Earnings smoothing', '4-year rolling average net income', 'Rolling window per period (minimum 2 fiscal years at series start; flagged per observation).'],
             ['Currency', 'HKD billions throughout', 'No CNY/HKD FX adjustment. No CPI inflation adjustment (unlike US dataset).'],
             ['Accounting standards', 'ASBE (Chinese GAAP)', 'Differs from IFRS/US GAAP: goodwill impairment, R&D capitalisation, minority interest treatment. RG interpretation may require adjustment.'],
-            ['Goodwill & intangibles', 'Present for 6/7 companies', 'ICBC: no goodwill/intangibles reported in yfinance schema (bank balance sheet structure).'],
+            ['Goodwill & intangibles', 'Present for most companies', 'Where GW/IA are not separately reported, TE falls back to book equity (flagged per observation).'],
           ].map(([dim, status, note]) => (
             <tr>
               <td class="text-sm font-medium text-gray-700 whitespace-nowrap">{dim}</td>
@@ -385,7 +385,7 @@ function pct(v: number | null, max: number): string {
         </thead>
         <tbody>
           {[
-            ['1 — Current', '7 HK-listed large-caps, FY2021–FY2024, H-share basis', 'yfinance / Yahoo Finance', 'live'],
+            ['1 — Current', `${rows.length} HK-listed large-caps, annual basis, refreshed daily`, 'yfinance / Yahoo Finance', 'live'],
             ['2 — Deepen', 'Tushare Pro free token → A-share fundamentals 2007–present for 30+ companies', 'Tushare Pro (free registration)', 'planned'],
             ['3 — Broaden', 'Expand to CSI 300 constituents, add HKEX historical prices', 'AKShare / Baostock (Chinese IP required)', 'planned'],
             ['4 — Cross-market', 'RG comparison: Hang Seng vs S&P 500 vs Nikkei 225 vs DAX 40 on unified basis', 'All existing sources + Phase 2–3', 'exploratory'],
