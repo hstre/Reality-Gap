@@ -20,7 +20,7 @@ const sectors = [...new Set(sorted.map(c => c.sector).filter(Boolean))].sort();
 
 <BaseLayout
   title="China — Reality Gap"
-  description="Reality Gap (RG) values for 31 major HK-listed Chinese companies across technology, finance, energy, and consumer sectors."
+  description="Reality Gap (RG) values for major HK-listed Chinese companies across technology, finance, energy, and consumer sectors."
   lang="en"
   canonicalPath="/china"
 >
@@ -29,7 +29,7 @@ const sectors = [...new Set(sorted.map(c => c.sector).filter(Boolean))].sort();
       China — Hang Seng
     </h1>
     <p class="text-gray-600 mb-2">
-      Reality Gap values for 31 major HK-listed Chinese companies spanning technology, finance, energy, telecom, and consumer sectors.
+      Reality Gap values for {sorted.length} major HK-listed Chinese companies spanning technology, finance, energy, telecom, and consumer sectors.
       Data via yfinance / Yahoo Finance. All values in HKD billions.
     </p>
     <div class="flex flex-wrap items-center gap-3 mb-8">

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -31,6 +32,25 @@ from typing import Optional
 
 import pandas as pd
 import yfinance as yf
+
+
+def make_yf_session():
+    """Optional custom HTTP session for yfinance.
+
+    Some proxied environments reset the TLS handshake of yfinance's default
+    curl_cffi fingerprint. Setting YF_IMPERSONATE (e.g. "chrome110") and
+    optionally YF_CA_BUNDLE switches to a fingerprint/CA that passes.
+    Returns None when unset → yfinance uses its default session.
+    """
+    imp = os.environ.get("YF_IMPERSONATE")
+    if not imp:
+        return None
+    from curl_cffi import requests as _cr
+    verify = os.environ.get("YF_CA_BUNDLE") or True
+    return _cr.Session(impersonate=imp, verify=verify)
+
+
+_YF_SESSION = make_yf_session()
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -675,7 +695,7 @@ def fetch_company(ticker: str, display_name: str, sector: str,
                   slug_override: Optional[str] = None) -> Optional[dict]:
     print(f"  {ticker:<12} {display_name:<30}", end=" ", flush=True)
     try:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=_YF_SESSION)
         info  = stock.info
 
         # --- Market cap -------------------------------------------------------

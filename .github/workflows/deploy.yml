@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Daily at 05:30 UTC (after US market close, before European morning)
+    - cron: "30 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -16,12 +19,67 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  update-data:
+    name: Update market data
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Update US CPI series (FRED)
+        run: python3 scripts/fetch_cpi.py || echo "::warning::CPI update failed — keeping previous data"
+
+      - name: Refresh company data (all indices, merge-based)
+        run: python3 scripts/refresh_all.py
+
+      - name: Update S&P 500 Shiller CAPE
+        run: python3 scripts/fetch_shiller.py || echo "::warning::Shiller CAPE update failed — keeping previous data"
+
+      - name: Update DAX 40 trailing P/E
+        run: python3 scripts/fetch_dax_pe.py || echo "::warning::DAX P/E update failed — keeping previous data"
+
+      - name: Update TE-corrected macro RG
+        run: python3 scripts/fetch_macro_rg.py || echo "::warning::Macro RG update failed — keeping previous data"
+
+      - name: Commit and push data updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "chore: daily market data update"
+            git pull --rebase origin main
+            git push origin main
+          fi
+
   build:
     name: Build
+    needs: update-data
+    # Run on push events (update-data skipped) and after a successful data update
+    if: always() && (needs.update-data.result == 'success' || needs.update-data.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
