@@ -70,26 +70,6 @@
       "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
-    },
-    {
-      "periodKey": "2022_q4",
-      "periodLabel": "Q4 2022",
-      "rg8": 2.58,
-      "rg10": 2.27,
-      "rg12": 2.02,
-      "trend": null,
-      "marketCap": 152.4,
-      "tangibleEquity": 26.9,
-      "smoothedEarnings": 4.0373,
-      "fundamentalBaseRG8": 59.16,
-      "fundamentalBaseRG10": 67.24,
-      "fundamentalBaseRG12": 75.31,
-      "netIncome": 4.1,
-      "dataType": "annual",
-      "teIsApprox": true,
-      "nearBoundary": false,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
-      "dataQuality": "ok"
     }
   ]
 }

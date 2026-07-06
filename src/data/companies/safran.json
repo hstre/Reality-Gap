@@ -11,7 +11,7 @@
     {
       "periodKey": "2025_q4",
       "periodLabel": "Q4 2025",
-      "rg8": 4.48,
+      "rg8": 4.47,
       "rg10": 3.62,
       "rg12": 3.04,
       "trend": "--",
@@ -32,7 +32,7 @@
     {
       "periodKey": "2024_q4",
       "periodLabel": "Q4 2024",
-      "rg8": 7.68,
+      "rg8": 7.67,
       "rg10": 6.3,
       "rg12": 5.34,
       "trend": "--",
@@ -53,9 +53,9 @@
     {
       "periodKey": "2023_q4",
       "periodLabel": "Q4 2023",
-      "rg8": 12.63,
-      "rg10": 10.72,
-      "rg12": 9.31,
+      "rg8": 12.62,
+      "rg10": 10.71,
+      "rg12": 9.3,
       "trend": null,
       "marketCap": 69.7,
       "tangibleEquity": 1.6,

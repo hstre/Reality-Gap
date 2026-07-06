@@ -70,26 +70,6 @@
       "nearBoundary": false,
       "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
       "dataQuality": "ok"
-    },
-    {
-      "periodKey": "2023_q1",
-      "periodLabel": "Q1 2023",
-      "rg8": 0.85,
-      "rg10": 0.73,
-      "rg12": 0.64,
-      "trend": null,
-      "marketCap": 12271.3,
-      "tangibleEquity": 4924.6,
-      "smoothedEarnings": 1197.0995,
-      "fundamentalBaseRG8": 14501.37,
-      "fundamentalBaseRG10": 16895.57,
-      "fundamentalBaseRG12": 19289.77,
-      "netIncome": 1213.1,
-      "dataType": "annual",
-      "teIsApprox": true,
-      "nearBoundary": false,
-      "note": "Annual historical observation. Market cap approximated from historical close price × current shares outstanding. TE uses current balance sheet (not historical). Approximation.",
-      "dataQuality": "ok"
     }
   ]
 }

@@ -93,26 +93,6 @@
       "dataQuality": "ok"
     },
     {
-      "periodKey": "2025_q1",
-      "periodLabel": "Q1 2025",
-      "rg8": 0.82,
-      "rg10": 0.73,
-      "rg12": 0.65,
-      "trend": "++",
-      "marketCap": 42.1,
-      "tangibleEquity": 25.7,
-      "smoothedEarnings": 3.2277,
-      "fundamentalBaseRG8": 51.51,
-      "fundamentalBaseRG10": 57.97,
-      "fundamentalBaseRG12": 64.43,
-      "netIncome": 3.2,
-      "dataType": "quarterly",
-      "teIsApprox": false,
-      "nearBoundary": false,
-      "note": "Computed via yfinance. Older quarters estimated from annual NI / 4. Approximation.",
-      "dataQuality": "ok"
-    },
-    {
       "periodKey": "2024_q4",
       "periodLabel": "Q4 2024",
       "rg8": 0.33,

@@ -93,26 +93,6 @@
       "dataQuality": "ok"
     },
     {
-      "periodKey": "2025_q1",
-      "periodLabel": "Q1 2025",
-      "rg8": 0.16,
-      "rg10": 0.15,
-      "rg12": 0.13,
-      "trend": "+",
-      "marketCap": 307.9,
-      "tangibleEquity": 940.1,
-      "smoothedEarnings": 116.2612,
-      "fundamentalBaseRG8": 1870.18,
-      "fundamentalBaseRG10": 2102.7,
-      "fundamentalBaseRG12": 2335.23,
-      "netIncome": 108.1,
-      "dataType": "quarterly",
-      "teIsApprox": false,
-      "nearBoundary": false,
-      "note": "Computed via yfinance. Historical end-of-quarter closing price × current shares outstanding. Older quarters estimated from annual NI / 4. Approximation.",
-      "dataQuality": "ok"
-    },
-    {
       "periodKey": "2024_q4",
       "periodLabel": "Q4 2024",
       "rg8": 0.15,
