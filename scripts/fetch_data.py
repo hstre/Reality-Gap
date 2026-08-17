@@ -104,6 +104,9 @@ SP500_MEMBERS: list[tuple] = [
     ("AMD",   "AMD",                "Semiconductors",           "S&P 500", "US", "USD"),
     ("KO",    "Coca-Cola",          "Consumer Staples",         "S&P 500", "US", "USD"),
     ("PEP",   "PepsiCo",            "Consumer Staples",         "S&P 500", "US", "USD"),
+    ("EQIX",  "Equinix",            "Data Centers (REIT)",      "S&P 500", "US", "USD"),
+    ("DLR",   "Digital Realty",     "Data Centers (REIT)",      "S&P 500", "US", "USD"),
+    ("VRT",   "Vertiv",             "Data Center Infrastructure","S&P 500", "US", "USD"),
 ]
 
 NIKKEI_MEMBERS: list[tuple] = [
