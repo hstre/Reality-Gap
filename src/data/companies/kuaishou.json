@@ -32,11 +32,11 @@
     {
       "periodKey": "2025_q2",
       "periodLabel": "Q2 2025",
-      "rg8": 1.2,
+      "rg8": 1.19,
       "rg10": 1.02,
       "rg12": 0.9,
       "trend": "++",
-      "marketCap": 250.8,
+      "marketCap": 250.7,
       "tangibleEquity": 69.7,
       "smoothedEarnings": 17.5201,
       "earningsCV": 0.0985,
