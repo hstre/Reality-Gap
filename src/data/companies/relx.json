@@ -32,7 +32,7 @@
     {
       "periodKey": "2024_q4",
       "periodLabel": "Q4 2024",
-      "rg8": 14.3,
+      "rg8": 14.29,
       "rg10": 8.12,
       "rg12": 5.67,
       "trend": "=",
@@ -53,7 +53,7 @@
     {
       "periodKey": "2023_q4",
       "periodLabel": "Q4 2023",
-      "rg8": 15.36,
+      "rg8": 15.35,
       "rg10": 7.97,
       "rg12": 5.38,
       "trend": null,
