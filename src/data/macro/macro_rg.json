@@ -1,30 +1,30 @@
 {
-  "fetched": "2026-07-05",
+  "fetched": "2026-10-31",
   "formula": "RG_N = 1 / (1/PB + N/PE_smooth)",
   "note": "TE-corrected macro RG. Index P/B uses book equity (incl. goodwill/intangibles), not tangible book — the corrected value is a lower bound, the earnings-only value an upper bound. Bottom-up aggregates use true tangible equity but cover only the constituents in this dataset.",
   "indices": {
     "sp500": {
       "label": "S&P 500",
       "bottomUp": {
-        "n": 30,
-        "rg8": 2.682,
-        "rg10": 2.262,
-        "rg12": 1.955,
+        "n": 33,
+        "rg8": 2.593,
+        "rg10": 2.189,
+        "rg12": 1.894,
         "note": "Value-weighted aggregate ΣMC / Σ(TE + N·G) over covered constituents (latest observation per company). Exact RG formula incl. tangible equity; coverage subset only."
       },
       "earningsOnly": {
-        "rg10": 4.132,
+        "rg10": 4.081,
         "peBasis": "Shiller CAPE (10y real)",
-        "pe": 41.32
+        "pe": 40.81
       },
       "topDown": {
-        "pb": 5.92,
-        "pe": 41.32,
+        "pb": 6.01,
+        "pe": 40.81,
         "peBasis": "Shiller CAPE (10y real)",
         "pbSource": "multpl.com",
-        "rg8": 2.758,
-        "rg10": 2.433,
-        "rg12": 2.177
+        "rg8": 2.759,
+        "rg10": 2.431,
+        "rg12": 2.172
       },
       "series": [
         {
@@ -186,8 +186,14 @@
         {
           "date": "2025-12",
           "pb": 5.39,
-          "cape": 39.84,
-          "rg10": 2.291
+          "cape": 39.59,
+          "rg10": 2.282
+        },
+        {
+          "date": "2026-10",
+          "pb": 6.01,
+          "cape": 40.81,
+          "rg10": 2.431
         }
       ],
       "seriesStandard": "annual (year-end P/B from multpl.com × same-month CAPE) + current month"
@@ -195,73 +201,73 @@
     "dax40": {
       "label": "DAX 40",
       "bottomUp": {
-        "n": 27,
-        "rg8": 0.938,
-        "rg10": 0.832,
-        "rg12": 0.747,
+        "n": 30,
+        "rg8": 1.056,
+        "rg10": 0.935,
+        "rg12": 0.838,
         "note": "Value-weighted aggregate ΣMC / Σ(TE + N·G) over covered constituents (latest observation per company). Exact RG formula incl. tangible equity; coverage subset only."
       },
       "earningsOnly": {
-        "rg10": 1.835,
+        "rg10": 1.784,
         "peBasis": "trailing 12m portfolio P/E (EXS1.DE)",
-        "pe": 18.349
+        "pe": 17.844
       },
       "topDown": {
-        "pb": 1.905,
-        "pe": 18.349,
+        "pb": 1.962,
+        "pe": 17.844,
         "peBasis": "trailing 12m portfolio P/E (EXS1.DE)",
         "pbSource": "ETF portfolio (EXS1.DE, yfinance funds data)",
-        "rg8": 1.041,
-        "rg10": 0.935,
-        "rg12": 0.848
+        "rg8": 1.044,
+        "rg10": 0.934,
+        "rg12": 0.846
       }
     },
     "n225": {
       "label": "Nikkei 225",
       "bottomUp": {
         "n": 19,
-        "rg8": 1.052,
-        "rg10": 0.941,
-        "rg12": 0.851,
+        "rg8": 1.204,
+        "rg10": 1.067,
+        "rg12": 0.958,
         "note": "Value-weighted aggregate ΣMC / Σ(TE + N·G) over covered constituents (latest observation per company). Exact RG formula incl. tangible equity; coverage subset only."
       },
       "earningsOnly": {
-        "rg10": 2.254,
+        "rg10": 1.75,
         "peBasis": "trailing 12m portfolio P/E (1321.T)",
-        "pe": 22.538
+        "pe": 17.495
       },
       "topDown": {
-        "pb": 2.596,
-        "pe": 22.538,
+        "pb": 2.756,
+        "pe": 17.495,
         "peBasis": "trailing 12m portfolio P/E (1321.T)",
         "pbSource": "ETF portfolio (1321.T, yfinance funds data)",
-        "rg8": 1.351,
-        "rg10": 1.206,
-        "rg12": 1.09
+        "rg8": 1.219,
+        "rg10": 1.07,
+        "rg12": 0.954
       }
     },
     "hsi": {
       "label": "Hang Seng",
       "bottomUp": {
         "n": 42,
-        "rg8": 0.514,
-        "rg10": 0.461,
-        "rg12": 0.418,
+        "rg8": 0.47,
+        "rg10": 0.422,
+        "rg12": 0.383,
         "note": "Value-weighted aggregate ΣMC / Σ(TE + N·G) over covered constituents (latest observation per company). Exact RG formula incl. tangible equity; coverage subset only."
       },
       "earningsOnly": {
-        "rg10": 1.238,
+        "rg10": 1.271,
         "peBasis": "trailing 12m portfolio P/E (2800.HK)",
-        "pe": 12.382
+        "pe": 12.706
       },
       "topDown": {
-        "pb": 1.275,
-        "pe": 12.382,
+        "pb": 1.325,
+        "pe": 12.706,
         "peBasis": "trailing 12m portfolio P/E (2800.HK)",
         "pbSource": "ETF portfolio (2800.HK, yfinance funds data)",
-        "rg8": 0.699,
-        "rg10": 0.628,
-        "rg12": 0.57
+        "rg8": 0.722,
+        "rg10": 0.649,
+        "rg12": 0.589
       }
     }
   }
