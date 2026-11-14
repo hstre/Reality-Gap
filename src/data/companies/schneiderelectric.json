@@ -36,7 +36,7 @@
       "rg10": 4.05,
       "rg12": 3.27,
       "trend": "++",
-      "marketCap": 139.5,
+      "marketCap": 139.4,
       "tangibleEquity": -6.9,
       "smoothedEarnings": 4.136,
       "earningsCV": 0.0322,
@@ -53,7 +53,7 @@
     {
       "periodKey": "2023_q4",
       "periodLabel": "Q4 2023",
-      "rg8": 4.46,
+      "rg8": 4.45,
       "rg10": 3.36,
       "rg12": 2.7,
       "trend": null,
